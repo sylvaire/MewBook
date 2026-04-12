@@ -1,0 +1,23 @@
+# Android / Gradle
+.gradle/
+build/
+*/build/
+captures/
+
+# Local SDK / machine config
+local.properties
+
+# IDE
+.idea/
+*.iml
+
+# Local agent / tool state
+.agents/
+.claude/
+.cline/
+.cursor/
+.omx/
+
+# OS / misc
+Thumbs.db
+.DS_Store

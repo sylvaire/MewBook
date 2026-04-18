@@ -23,7 +23,7 @@ jobs:
           java-version: "17"
           cache: gradle
 
-      - name: Prepare signing config
+      - name: Prepare signing config (optional)
         shell: bash
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
@@ -33,13 +33,10 @@ jobs:
         run: |
           set -euo pipefail
 
-          if [[ -z "${ANDROID_KEYSTORE_BASE64:-}" ]]; then
-            echo "::error::Missing secret ANDROID_KEYSTORE_BASE64"
-            exit 1
-          fi
-          if [[ -z "${ANDROID_KEYSTORE_PASSWORD:-}" ]]; then
-            echo "::error::Missing secret ANDROID_KEYSTORE_PASSWORD"
-            exit 1
+          if [[ -z "${ANDROID_KEYSTORE_BASE64:-}" || -z "${ANDROID_KEYSTORE_PASSWORD:-}" ]]; then
+            echo "::warning::Signing secrets are not configured. Build will continue with unsigned release APK."
+            rm -f keystore.properties
+            exit 0
           fi
 
           mkdir -p signing
@@ -123,7 +120,22 @@ jobs:
       - name: Rename release artifact
         shell: bash
         run: |
-          cp app/build/outputs/apk/release/app-release.apk "app/build/outputs/apk/release/MewBook-${GITHUB_REF_NAME}.apk"
+          set -euo pipefail
+          SIGNED_APK="app/build/outputs/apk/release/app-release.apk"
+          UNSIGNED_APK="app/build/outputs/apk/release/app-release-unsigned.apk"
+          TARGET_APK="app/build/outputs/apk/release/MewBook-${GITHUB_REF_NAME}.apk"
+
+          if [[ -f "${SIGNED_APK}" ]]; then
+            cp "${SIGNED_APK}" "${TARGET_APK}"
+            echo "Using signed release APK."
+          elif [[ -f "${UNSIGNED_APK}" ]]; then
+            cp "${UNSIGNED_APK}" "${TARGET_APK}"
+            echo "::warning::Publishing unsigned release APK because signing config is unavailable."
+          else
+            echo "::error::No release APK was produced."
+            ls -la app/build/outputs/apk/release || true
+            exit 1
+          fi
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2

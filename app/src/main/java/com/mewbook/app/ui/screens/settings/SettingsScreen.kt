@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Category
@@ -16,7 +17,10 @@ import androidx.compose.material.icons.filled.CloudSync
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.AccountBalanceWallet
+import androidx.compose.material.icons.filled.AccountTree
 import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -24,11 +28,18 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.foundation.verticalScroll
+import com.mewbook.app.data.preferences.AppThemeMode
 import com.mewbook.app.ui.components.MewCompactTopAppBar
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -37,8 +48,24 @@ fun SettingsScreen(
     onNavigateToCategories: () -> Unit,
     onNavigateToDavSettings: () -> Unit,
     onNavigateToBudget: () -> Unit,
-    onNavigateToExport: () -> Unit
+    onNavigateToExport: () -> Unit,
+    onNavigateToLedgerManagement: () -> Unit,
+    viewModel: SettingsViewModel = hiltViewModel()
 ) {
+    val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
+    var showThemeDialog = androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+
+    if (showThemeDialog.value) {
+        ThemeModeDialog(
+            selectedThemeMode = themeMode,
+            onDismiss = { showThemeDialog.value = false },
+            onSelect = {
+                viewModel.setThemeMode(it)
+                showThemeDialog.value = false
+            }
+        )
+    }
+
     Scaffold(
         topBar = {
             MewCompactTopAppBar(
@@ -50,7 +77,9 @@ fun SettingsScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
+                .verticalScroll(rememberScrollState())
                 .padding(16.dp)
+                .padding(bottom = 24.dp)
         ) {
             Text(
                 text = "通用",
@@ -62,8 +91,15 @@ fun SettingsScreen(
             SettingsItem(
                 icon = Icons.Filled.Palette,
                 title = "主题",
-                subtitle = "跟随系统",
-                onClick = { }
+                subtitle = themeMode.displayName,
+                onClick = { showThemeDialog.value = true }
+            )
+
+            SettingsItem(
+                icon = Icons.Filled.AccountTree,
+                title = "分支管理",
+                subtitle = "长按删除，自定义排序",
+                onClick = onNavigateToLedgerManagement
             )
 
             SettingsItem(
@@ -123,6 +159,50 @@ fun SettingsScreen(
 }
 
 @Composable
+private fun ThemeModeDialog(
+    selectedThemeMode: AppThemeMode,
+    onDismiss: () -> Unit,
+    onSelect: (AppThemeMode) -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("选择主题") },
+        text = {
+            Column {
+                AppThemeMode.entries.forEach { themeMode ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onSelect(themeMode) }
+                            .padding(vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = themeMode.displayName,
+                                style = MaterialTheme.typography.bodyLarge
+                            )
+                        }
+                        if (selectedThemeMode == themeMode) {
+                            Icon(
+                                imageVector = Icons.Filled.Check,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("关闭")
+            }
+        }
+    )
+}
+
+@Composable
 fun SettingsItem(
     icon: ImageVector,
     title: String,
@@ -160,7 +240,9 @@ fun SettingsItem(
                 Text(
                     text = subtitle,
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
 

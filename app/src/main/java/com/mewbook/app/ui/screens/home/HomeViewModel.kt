@@ -4,10 +4,12 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mewbook.app.domain.model.Account
 import com.mewbook.app.domain.model.Category
+import com.mewbook.app.domain.model.Ledger
 import com.mewbook.app.domain.model.Record
 import com.mewbook.app.domain.model.RecordType
 import com.mewbook.app.domain.repository.AccountRepository
 import com.mewbook.app.domain.repository.BudgetRepository
+import com.mewbook.app.domain.repository.LedgerRepository
 import com.mewbook.app.domain.usecase.category.GetCategoriesUseCase
 import com.mewbook.app.domain.usecase.category.InitializeDefaultCategoriesUseCase
 import com.mewbook.app.domain.usecase.ledger.InitializeDefaultLedgerUseCase
@@ -21,6 +23,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -34,6 +37,7 @@ data class HomeUiState(
     val records: List<Record> = emptyList(),
     val categories: Map<Long, Category> = emptyMap(),
     val accounts: List<Account> = emptyList(),
+    val activeLedger: Ledger? = null,
     val totalIncome: Double = 0.0,
     val totalExpense: Double = 0.0,
     val totalBudget: Double = 0.0,
@@ -55,6 +59,7 @@ class HomeViewModel @Inject constructor(
     private val getCategoriesUseCase: GetCategoriesUseCase,
     private val initializeDefaultCategoriesUseCase: InitializeDefaultCategoriesUseCase,
     private val initializeDefaultLedgerUseCase: InitializeDefaultLedgerUseCase,
+    private val ledgerRepository: LedgerRepository,
     private val accountRepository: AccountRepository,
     private val budgetRepository: BudgetRepository
 ) : ViewModel() {
@@ -72,6 +77,7 @@ class HomeViewModel @Inject constructor(
         _showAddEditSheet,
         _editingRecord,
         getCategoriesUseCase.getAll(),
+        ledgerRepository.getDefaultLedgerFlow(),
         accountRepository.getAllAccounts()
     ) { flows ->
         val month = flows[0] as YearMonth
@@ -80,7 +86,9 @@ class HomeViewModel @Inject constructor(
         val showSheet = flows[3] as Boolean
         val editingRecord = flows[4] as Record?
         val categories = flows[5] as List<Category>
-        val accounts = flows[6] as List<Account>
+        val activeLedger = flows[6] as Ledger?
+        val accounts = flows[7] as List<Account>
+        val activeLedgerId = activeLedger?.id ?: 1L
 
         HomeUiState(
             selectedMonth = month,
@@ -88,8 +96,9 @@ class HomeViewModel @Inject constructor(
             error = error,
             showAddEditSheet = showSheet,
             editingRecord = editingRecord,
+            activeLedger = activeLedger,
             categories = categories.associateBy { it.id },
-            accounts = accounts
+            accounts = accounts.filter { it.ledgerId == activeLedgerId }
         )
     }.stateIn(
         viewModelScope,
@@ -114,7 +123,7 @@ class HomeViewModel @Inject constructor(
 
     init {
         initializeData()
-        loadRecords()
+        observeLedgerRecords()
     }
 
     private fun initializeData() {
@@ -124,38 +133,36 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    fun loadRecords() {
+    private fun observeLedgerRecords() {
         viewModelScope.launch {
-            _isLoading.update { true }
-            try {
-                val startDate = _selectedMonth.value.atDay(1)
-                val endDate = _selectedMonth.value.atEndOfMonth()
+            combine(_selectedMonth, ledgerRepository.getDefaultLedgerFlow()) { month, ledger ->
+                month to (ledger?.id ?: 1L)
+            }.collectLatest { (month, ledgerId) ->
+                _isLoading.update { true }
+                try {
+                    val monthStr = month.format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM"))
+                    val totalBudgetAmount = budgetRepository.getTotalBudgetAmountByMonth(monthStr, ledgerId)
+                    _totalBudget.update { totalBudgetAmount }
 
-                // Load budget info first
-                val monthStr = _selectedMonth.value.format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM"))
-                val totalBudgetAmount = budgetRepository.getTotalBudgetAmountByMonth(monthStr, 1L)
-                _totalBudget.update { totalBudgetAmount }
-
-                getRecordsUseCase(startDate, endDate).collect { recordList ->
-                    _records.update { recordList }
-                    val income = recordList.filter { it.type == RecordType.INCOME }.sumOf { r -> r.amount }
-                    val expense = recordList.filter { it.type == RecordType.EXPENSE }.sumOf { r -> r.amount }
-                    _totalIncome.update { income }
-                    _totalExpense.update { expense }
-                    _budgetRemaining.update { totalBudgetAmount - expense }
-
+                    getRecordsUseCase.getByLedgerMonth(ledgerId, monthStr).collectLatest { recordList ->
+                        _records.update { recordList }
+                        val income = recordList.filter { it.type == RecordType.INCOME }.sumOf { r -> r.amount }
+                        val expense = recordList.filter { it.type == RecordType.EXPENSE }.sumOf { r -> r.amount }
+                        _totalIncome.update { income }
+                        _totalExpense.update { expense }
+                        _budgetRemaining.update { totalBudgetAmount - expense }
+                        _isLoading.update { false }
+                    }
+                } catch (e: Exception) {
+                    _error.update { e.message }
                     _isLoading.update { false }
                 }
-            } catch (e: Exception) {
-                _error.update { e.message }
-                _isLoading.update { false }
             }
         }
     }
 
     fun selectMonth(month: YearMonth) {
         _selectedMonth.update { month }
-        loadRecords()
     }
 
     fun showAddSheet() {
@@ -184,6 +191,7 @@ class HomeViewModel @Inject constructor(
         viewModelScope.launch {
             val now = LocalDateTime.now()
             val editing = _editingRecord.value
+            val activeLedgerId = uiState.value.activeLedger?.id ?: 1L
 
             if (editing != null) {
                 // 如果有账户，先还原旧记录的账户余额
@@ -226,7 +234,7 @@ class HomeViewModel @Inject constructor(
                     createdAt = now,
                     updatedAt = now,
                     syncId = UUID.randomUUID().toString(),
-                    ledgerId = 1L,
+                    ledgerId = activeLedgerId,
                     accountId = accountId
                 )
                 addRecordUseCase(newRecord)

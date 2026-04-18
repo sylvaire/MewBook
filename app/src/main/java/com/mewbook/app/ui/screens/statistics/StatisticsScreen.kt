@@ -18,11 +18,16 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ChevronLeft
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -83,6 +88,12 @@ fun StatisticsScreen(
                     selectedRange = uiState.timeRange,
                     onRangeSelected = { viewModel.setTimeRange(it) }
                 )
+                PeriodNavigator(
+                    periodLabel = uiState.periodLabel,
+                    canGoNext = uiState.canGoNext,
+                    onPrevious = { viewModel.previousPeriod() },
+                    onNext = { viewModel.nextPeriod() }
+                )
 
                 SummarySection(
                     totalIncome = uiState.totalIncome,
@@ -128,12 +139,46 @@ fun TimeRangeSelector(
                 label = {
                     Text(
                         when (range) {
-                            TimeRange.WEEK -> "本周"
-                            TimeRange.MONTH -> "本月"
-                            TimeRange.YEAR -> "本年"
+                            TimeRange.WEEK -> "周"
+                            TimeRange.MONTH -> "月"
+                            TimeRange.YEAR -> "年"
                         }
                     )
                 }
+            )
+        }
+    }
+}
+
+@Composable
+private fun PeriodNavigator(
+    periodLabel: String,
+    canGoNext: Boolean,
+    onPrevious: () -> Unit,
+    onNext: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        IconButton(onClick = onPrevious) {
+            Icon(
+                imageVector = Icons.Filled.ChevronLeft,
+                contentDescription = "上一周期"
+            )
+        }
+        Text(
+            text = periodLabel,
+            modifier = Modifier.weight(1f),
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold
+        )
+        IconButton(onClick = onNext, enabled = canGoNext) {
+            Icon(
+                imageVector = Icons.Filled.ChevronRight,
+                contentDescription = "下一周期"
             )
         }
     }
@@ -315,144 +360,139 @@ fun IncomeExpenseTrend(
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 if (incomeData.isNotEmpty() || expenseData.isNotEmpty()) {
-                    var selectedIndex by remember { mutableStateOf<Int?>(null) }
-                    val maxValue = (incomeData + expenseData).maxOrNull()?.coerceAtLeast(1.0) ?: 1.0
-                    val chartHeight = 160.dp
-                    val chartPadding = 45f
+                    val pointCount = maxOf(incomeData.size, expenseData.size, labels.size).coerceAtLeast(1)
+                    val normalizedIncome = List(pointCount) { incomeData.getOrElse(it) { 0.0 } }
+                    val normalizedExpense = List(pointCount) { expenseData.getOrElse(it) { 0.0 } }
+                    var selectedIndex by remember(normalizedIncome, normalizedExpense, labels) {
+                        mutableStateOf<Int?>(null)
+                    }
+                    val maxValue = (normalizedIncome + normalizedExpense).maxOrNull()?.coerceAtLeast(1.0) ?: 1.0
+                    val chartHeight = 180.dp
+                    val yAxisWidth = 56.dp
+                    val gridLineColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)
 
-                    Box(
+                    Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(chartHeight + 30.dp)
+                            .height(chartHeight),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // Y轴标签
                         Column(
                             modifier = Modifier
-                                .align(Alignment.CenterStart)
-                                .fillMaxWidth()
-                                .height(chartHeight)
+                                .width(yAxisWidth)
+                                .fillMaxSize()
                                 .padding(end = 8.dp),
-                            verticalArrangement = Arrangement.SpaceBetween
+                            verticalArrangement = Arrangement.SpaceBetween,
+                            horizontalAlignment = Alignment.End
                         ) {
                             Text(
                                 text = formatCurrency(maxValue),
                                 style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.align(Alignment.End)
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                             Text(
                                 text = formatCurrency(maxValue / 2),
                                 style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.align(Alignment.End)
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                             Text(
                                 text = "0",
                                 style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.align(Alignment.End)
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
 
-                        // 图表区域
                         Box(
                             modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(start = 45.dp)
-                                .height(chartHeight)
-                                .pointerInput(incomeData, expenseData) {
+                                .weight(1f)
+                                .fillMaxSize()
+                                .pointerInput(normalizedIncome, normalizedExpense, pointCount) {
                                     detectTapGestures { offset ->
-                                        val width = size.width.toFloat()
-                                        val padding = chartPadding
-                                        val stepX = (width - padding * 2) / (incomeData.size - 1).coerceAtLeast(1)
-                                        val index = ((offset.x - padding) / stepX).toInt()
-                                            .coerceIn(0, (incomeData.size - 1).coerceAtLeast(0))
+                                        val pointRadiusPx = 6.dp.toPx()
+                                        val xStart = pointRadiusPx
+                                        val xEnd = size.width - pointRadiusPx
+                                        val stepX = if (pointCount > 1) {
+                                            (xEnd - xStart) / (pointCount - 1)
+                                        } else {
+                                            0f
+                                        }
+                                        val index = if (pointCount == 1) {
+                                            0
+                                        } else {
+                                            ((offset.x - xStart) / stepX).toInt().coerceIn(0, pointCount - 1)
+                                        }
                                         selectedIndex = if (selectedIndex == index) null else index
                                     }
                                 }
                         ) {
                             Canvas(modifier = Modifier.fillMaxSize()) {
-                                val width = size.width
-                                val height = size.height
-                                val padding = chartPadding
+                                val pointRadius = 6.dp.toPx()
+                                val xStart = pointRadius
+                                val xEnd = size.width - pointRadius
+                                val yTop = pointRadius
+                                val yBottom = size.height - pointRadius
+                                val chartHeightPx = (yBottom - yTop).coerceAtLeast(1f)
+                                val stepX = if (pointCount > 1) {
+                                    (xEnd - xStart) / (pointCount - 1)
+                                } else {
+                                    0f
+                                }
+                                fun xFor(index: Int): Float = if (pointCount == 1) {
+                                    (xStart + xEnd) / 2f
+                                } else {
+                                    xStart + index * stepX
+                                }
+                                fun yFor(value: Double): Float {
+                                    val ratio = (value / maxValue).toFloat().coerceIn(0f, 1f)
+                                    return yBottom - ratio * chartHeightPx
+                                }
 
-                                // 绘制网格线
                                 for (i in 0..2) {
-                                    val y = padding + (height - padding * 2) / 2 * i
+                                    val y = yTop + (chartHeightPx / 2f) * i
                                     drawLine(
-                                        color = Color.Gray.copy(alpha = 0.2f),
-                                        start = Offset(0f, y),
-                                        end = Offset(width, y),
+                                        color = gridLineColor,
+                                        start = Offset(xStart, y),
+                                        end = Offset(xEnd, y),
                                         strokeWidth = 1.dp.toPx()
                                     )
                                 }
 
-                                // 收入折线
-                                if (incomeData.isNotEmpty()) {
-                                    val incomePath = Path()
-                                    val incomeStepX = (width - padding * 2) / (incomeData.size - 1).coerceAtLeast(1)
-
-                                    incomeData.forEachIndexed { index, value ->
-                                        val x = padding + index * incomeStepX
-                                        val y = height - padding - ((value / maxValue) * (height - padding * 2)).toFloat()
-
-                                        if (index == 0) {
-                                            incomePath.moveTo(x, y)
-                                        } else {
-                                            incomePath.lineTo(x, y)
-                                        }
-                                    }
-
-                                    drawPath(
-                                        path = incomePath,
+                                val incomePath = Path()
+                                normalizedIncome.forEachIndexed { index, value ->
+                                    val x = xFor(index)
+                                    val y = yFor(value)
+                                    if (index == 0) incomePath.moveTo(x, y) else incomePath.lineTo(x, y)
+                                }
+                                drawPath(
+                                    path = incomePath,
+                                    color = IncomeGreen,
+                                    style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round)
+                                )
+                                normalizedIncome.forEachIndexed { index, value ->
+                                    drawCircle(
                                         color = IncomeGreen,
-                                        style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round)
+                                        radius = if (selectedIndex == index) 8.dp.toPx() else 5.dp.toPx(),
+                                        center = Offset(xFor(index), yFor(value))
                                     )
-
-                                    // 收入数据点
-                                    incomeData.forEachIndexed { index, value ->
-                                        val x = padding + index * incomeStepX
-                                        val y = height - padding - ((value / maxValue) * (height - padding * 2)).toFloat()
-                                        drawCircle(
-                                            color = IncomeGreen,
-                                            radius = if (selectedIndex == index) 8.dp.toPx() else 5.dp.toPx(),
-                                            center = Offset(x, y)
-                                        )
-                                    }
                                 }
 
-                                // 支出折线
-                                if (expenseData.isNotEmpty()) {
-                                    val expensePath = Path()
-                                    val expenseStepX = (width - padding * 2) / (expenseData.size - 1).coerceAtLeast(1)
-
-                                    expenseData.forEachIndexed { index, value ->
-                                        val x = padding + index * expenseStepX
-                                        val y = height - padding - ((value / maxValue) * (height - padding * 2)).toFloat()
-
-                                        if (index == 0) {
-                                            expensePath.moveTo(x, y)
-                                        } else {
-                                            expensePath.lineTo(x, y)
-                                        }
-                                    }
-
-                                    drawPath(
-                                        path = expensePath,
+                                val expensePath = Path()
+                                normalizedExpense.forEachIndexed { index, value ->
+                                    val x = xFor(index)
+                                    val y = yFor(value)
+                                    if (index == 0) expensePath.moveTo(x, y) else expensePath.lineTo(x, y)
+                                }
+                                drawPath(
+                                    path = expensePath,
+                                    color = ExpenseRed,
+                                    style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round)
+                                )
+                                normalizedExpense.forEachIndexed { index, value ->
+                                    drawCircle(
                                         color = ExpenseRed,
-                                        style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round)
+                                        radius = if (selectedIndex == index) 8.dp.toPx() else 5.dp.toPx(),
+                                        center = Offset(xFor(index), yFor(value))
                                     )
-
-                                    // 支出数据点
-                                    expenseData.forEachIndexed { index, value ->
-                                        val x = padding + index * expenseStepX
-                                        val y = height - padding - ((value / maxValue) * (height - padding * 2)).toFloat()
-                                        drawCircle(
-                                            color = ExpenseRed,
-                                            radius = if (selectedIndex == index) 8.dp.toPx() else 5.dp.toPx(),
-                                            center = Offset(x, y)
-                                        )
-                                    }
                                 }
                             }
                         }
@@ -485,7 +525,7 @@ fun IncomeExpenseTrend(
                                         style = MaterialTheme.typography.bodySmall
                                     )
                                     Text(
-                                        text = "+${formatCurrency(incomeData.getOrNull(index) ?: 0.0)}",
+                                        text = "+${formatCurrency(normalizedIncome.getOrElse(index) { 0.0 })}",
                                         style = MaterialTheme.typography.bodySmall,
                                         color = IncomeGreen,
                                         fontWeight = FontWeight.Medium
@@ -500,13 +540,13 @@ fun IncomeExpenseTrend(
                                         style = MaterialTheme.typography.bodySmall
                                     )
                                     Text(
-                                        text = "-${formatCurrency(expenseData.getOrNull(index) ?: 0.0)}",
+                                        text = "-${formatCurrency(normalizedExpense.getOrElse(index) { 0.0 })}",
                                         style = MaterialTheme.typography.bodySmall,
                                         color = ExpenseRed,
                                         fontWeight = FontWeight.Medium
                                     )
                                 }
-                                val balance = (incomeData.getOrNull(index) ?: 0.0) - (expenseData.getOrNull(index) ?: 0.0)
+                                val balance = normalizedIncome.getOrElse(index) { 0.0 } - normalizedExpense.getOrElse(index) { 0.0 }
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.SpaceBetween
@@ -528,13 +568,14 @@ fun IncomeExpenseTrend(
 
                     Spacer(modifier = Modifier.height(8.dp))
 
+                    val bottomLabels = buildBottomLabels(labels)
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(start = 45.dp),
+                            .padding(start = yAxisWidth),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        labels.forEach { label ->
+                        bottomLabels.forEach { label ->
                             Text(
                                 text = label,
                                 style = MaterialTheme.typography.labelSmall,
@@ -546,4 +587,22 @@ fun IncomeExpenseTrend(
             }
         }
     }
+}
+
+private fun buildBottomLabels(labels: List<String>): List<String> {
+    if (labels.isEmpty()) {
+        return emptyList()
+    }
+    if (labels.size <= 8) {
+        return labels
+    }
+
+    val indexCandidates = listOf(
+        0,
+        labels.lastIndex / 4,
+        labels.lastIndex / 2,
+        labels.lastIndex * 3 / 4,
+        labels.lastIndex
+    )
+    return indexCandidates.map { labels[it.coerceIn(0, labels.lastIndex)] }
 }

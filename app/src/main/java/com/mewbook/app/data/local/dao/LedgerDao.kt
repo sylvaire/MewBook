@@ -21,6 +21,9 @@ interface LedgerDao {
     @Query("SELECT * FROM ledgers WHERE isDefault = 1 LIMIT 1")
     suspend fun getDefaultLedger(): LedgerEntity?
 
+    @Query("SELECT * FROM ledgers WHERE isDefault = 1 LIMIT 1")
+    fun getDefaultLedgerFlow(): Flow<LedgerEntity?>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertLedger(ledger: LedgerEntity): Long
 

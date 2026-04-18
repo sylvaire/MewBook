@@ -39,11 +39,12 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mewbook.app.ui.components.RecordItem
 import com.mewbook.app.ui.components.MewCompactTopAppBar
 import com.mewbook.app.ui.screens.add.AddEditRecordSheet
@@ -62,140 +63,147 @@ import java.time.format.DateTimeFormatter
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
+    onAddSheetVisibilityChanged: (Boolean) -> Unit = {},
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val isDarkTheme = isSystemInDarkTheme()
-    val uiState by viewModel.uiState.collectAsState()
-    val records by viewModel.records.collectAsState()
-    val totalIncome by viewModel.totalIncome.collectAsState()
-    val totalExpense by viewModel.totalExpense.collectAsState()
-    val totalBudget by viewModel.totalBudget.collectAsState()
-    val budgetRemaining by viewModel.budgetRemaining.collectAsState()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val records by viewModel.records.collectAsStateWithLifecycle()
+    val totalIncome by viewModel.totalIncome.collectAsStateWithLifecycle()
+    val totalExpense by viewModel.totalExpense.collectAsStateWithLifecycle()
+    val totalBudget by viewModel.totalBudget.collectAsStateWithLifecycle()
+    val budgetRemaining by viewModel.budgetRemaining.collectAsStateWithLifecycle()
 
-    Scaffold(
-        topBar = {
-            // 温暖渐变顶部导航栏
-            MewCompactTopAppBar(
-                title = "喵喵记账",
-                titleContent = {
-                    Text(
-                        text = "🐱",
-                        style = MaterialTheme.typography.titleLarge
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = "喵喵记账",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1
-                    )
-                }
-            )
-        },
-        floatingActionButton = {
-            // Claymorphism 浮动按钮 - 多层阴影
-            Box(
-                modifier = Modifier
-                    .shadow(
-                        elevation = 8.dp,
-                        shape = CircleShape,
-                        spotColor = MaterialTheme.colorScheme.primary.copy(alpha = if (isDarkTheme) 0.18f else 0.4f)
-                    )
-                    .shadow(
-                        elevation = 4.dp,
-                        shape = CircleShape,
-                        spotColor = MaterialTheme.colorScheme.primary.copy(alpha = if (isDarkTheme) 0.10f else 0.25f)
-                    )
-            ) {
-                FloatingActionButton(
-                    onClick = { viewModel.showAddSheet() },
-                    shape = CircleShape,
-                    containerColor = MaterialTheme.colorScheme.primary
-                ) {
-                    Icon(
-                        Icons.Filled.Add,
-                        contentDescription = "添加记录",
-                        modifier = Modifier.size(28.dp)
-                    )
-                }
-            }
-        }
-    ) { paddingValues ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .background(MaterialTheme.colorScheme.background)
-        ) {
-            // 月份选择器
-            MonthSelector(
-                selectedMonth = uiState.selectedMonth,
-                onMonthChange = { viewModel.selectMonth(it) }
-            )
+    LaunchedEffect(uiState.showAddEditSheet) {
+        onAddSheetVisibilityChanged(uiState.showAddEditSheet)
+    }
 
-            // 概要卡片 - Claymorphism 风格
-            SummaryCard(
-                totalIncome = totalIncome,
-                totalExpense = totalExpense,
-                totalBudget = totalBudget,
-                budgetRemaining = budgetRemaining
-            )
-
-            // 记录列表
-            if (uiState.isLoading) {
+    Box(modifier = Modifier.fillMaxSize()) {
+        Scaffold(
+            topBar = {
+                // 温暖渐变顶部导航栏
+                MewCompactTopAppBar(
+                    title = "喵喵记账",
+                    titleContent = {
+                        Text(
+                            text = "🐱",
+                            style = MaterialTheme.typography.titleLarge
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "喵喵记账",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1
+                        )
+                    }
+                )
+            },
+            floatingActionButton = {
+                // Claymorphism 浮动按钮 - 多层阴影
                 Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
+                    modifier = Modifier
+                        .shadow(
+                            elevation = 8.dp,
+                            shape = CircleShape,
+                            spotColor = MaterialTheme.colorScheme.primary.copy(alpha = if (isDarkTheme) 0.18f else 0.4f)
+                        )
+                        .shadow(
+                            elevation = 4.dp,
+                            shape = CircleShape,
+                            spotColor = MaterialTheme.colorScheme.primary.copy(alpha = if (isDarkTheme) 0.10f else 0.25f)
+                        )
                 ) {
-                    CircularProgressIndicator(
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                }
-            } else if (records.isEmpty()) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center
+                    FloatingActionButton(
+                        onClick = { viewModel.showAddSheet() },
+                        shape = CircleShape,
+                        containerColor = MaterialTheme.colorScheme.primary
                     ) {
-                        Text(
-                            text = "🍊",
-                            style = MaterialTheme.typography.displayLarge
-                        )
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Text(
-                            text = "还没有记录",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Text(
-                            text = "点击 + 添加第一笔记录",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                        Icon(
+                            Icons.Filled.Add,
+                            contentDescription = "添加记录",
+                            modifier = Modifier.size(28.dp)
                         )
                     }
                 }
-            } else {
-                LazyColumn(
-                    contentPadding = PaddingValues(
-                        start = 16.dp,
-                        end = 16.dp,
-                        top = 8.dp,
-                        bottom = 100.dp // 为 FAB 留出空间
-                    ),
-                    verticalArrangement = Arrangement.spacedBy(ClayDesign.CardSpacing)
-                ) {
-                    items(records, key = { it.id }) { record ->
-                        val category = uiState.categories[record.categoryId]
-                        RecordItem(
-                            record = record,
-                            categoryName = category?.name ?: "未知",
-                            categoryIcon = category?.icon ?: "more_horiz",
-                            categoryColor = category?.color ?: 0xFF808080,
-                            onClick = { viewModel.showEditSheet(record) }
+            }
+        ) { paddingValues ->
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues)
+                    .background(MaterialTheme.colorScheme.background)
+            ) {
+                // 月份选择器
+                MonthSelector(
+                    selectedMonth = uiState.selectedMonth,
+                    onMonthChange = { viewModel.selectMonth(it) }
+                )
+
+                // 概要卡片 - Claymorphism 风格
+                SummaryCard(
+                    totalIncome = totalIncome,
+                    totalExpense = totalExpense,
+                    totalBudget = totalBudget,
+                    budgetRemaining = budgetRemaining
+                )
+
+                // 记录列表
+                if (uiState.isLoading) {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator(
+                            color = MaterialTheme.colorScheme.primary
                         )
+                    }
+                } else if (records.isEmpty()) {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            Text(
+                                text = "🍊",
+                                style = MaterialTheme.typography.displayLarge
+                            )
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text(
+                                text = "还没有记录",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                text = "点击 + 添加第一笔记录",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                            )
+                        }
+                    }
+                } else {
+                    LazyColumn(
+                        contentPadding = PaddingValues(
+                            start = 16.dp,
+                            end = 16.dp,
+                            top = 8.dp,
+                            bottom = 100.dp // 为 FAB 留出空间
+                        ),
+                        verticalArrangement = Arrangement.spacedBy(ClayDesign.CardSpacing)
+                    ) {
+                        items(records, key = { it.id }) { record ->
+                            val category = uiState.categories[record.categoryId]
+                            RecordItem(
+                                record = record,
+                                categoryName = category?.name ?: "未知",
+                                categoryIcon = category?.icon ?: "more_horiz",
+                                categoryColor = category?.color ?: 0xFF808080,
+                                onClick = { viewModel.showEditSheet(record) }
+                            )
+                        }
                     }
                 }
             }

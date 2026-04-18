@@ -15,10 +15,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.Chat
-import androidx.compose.material.icons.filled.AccountBalanceWallet
-import androidx.compose.material.icons.filled.CreditCard
-import androidx.compose.material.icons.filled.Payment
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -38,7 +34,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -47,7 +43,11 @@ import androidx.lifecycle.viewModelScope
 import com.mewbook.app.domain.model.Account
 import com.mewbook.app.domain.model.AccountType
 import com.mewbook.app.domain.repository.AccountRepository
+import com.mewbook.app.domain.repository.LedgerRepository
+import com.mewbook.app.ui.components.AccountTypeIconBadge
 import com.mewbook.app.ui.components.MewCompactTopAppBar
+import com.mewbook.app.ui.components.defaultColorValue
+import com.mewbook.app.ui.components.toDisplayName
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -66,7 +66,8 @@ data class AddAccountUiState(
 
 @HiltViewModel
 class AddAccountViewModel @Inject constructor(
-    private val accountRepository: AccountRepository
+    private val accountRepository: AccountRepository,
+    private val ledgerRepository: LedgerRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(AddAccountUiState())
@@ -75,8 +76,7 @@ class AddAccountViewModel @Inject constructor(
     fun saveAccount(
         name: String,
         type: AccountType,
-        balance: Double,
-        ledgerId: Long = 1L
+        balance: Double
     ) {
         viewModelScope.launch {
             _uiState.update { it.copy(isSaving = true, isDuplicateName = false) }
@@ -100,12 +100,13 @@ class AddAccountViewModel @Inject constructor(
             }
 
             try {
+                val ledgerId = ledgerRepository.getDefaultLedger()?.id ?: 1L
                 val account = Account(
                     id = 0,
                     name = finalName,
                     type = type,
                     balance = balance,
-                    icon = type.name.lowercase(),
+                    icon = getDefaultIconNameForType(type),
                     color = getDefaultColorForType(type),
                     isDefault = false,
                     sortOrder = 0,
@@ -136,14 +137,18 @@ class AddAccountViewModel @Inject constructor(
     }
 
     private fun getDefaultColorForType(type: AccountType): Long {
+        return type.defaultColorValue()
+    }
+
+    private fun getDefaultIconNameForType(type: AccountType): String {
         return when (type) {
-            AccountType.CASH -> 0xFF4CAF50
-            AccountType.BANK -> 0xFF2196F3
-            AccountType.ALIPAY -> 0xFF1890FF
-            AccountType.WECHAT -> 0xFF07C160
-            AccountType.CREDIT_CARD -> 0xFFFF9800
-            AccountType.INVESTMENT -> 0xFF9C27B0
-            AccountType.OTHER -> 0xFF607D8B
+            AccountType.CASH -> "account_balance_wallet"
+            AccountType.BANK -> "account_balance"
+            AccountType.ALIPAY -> "alipay"
+            AccountType.WECHAT -> "wechat"
+            AccountType.CREDIT_CARD -> "credit_card"
+            AccountType.INVESTMENT -> "savings"
+            AccountType.OTHER -> "more_horiz"
         }
     }
 }
@@ -210,50 +215,36 @@ fun AddAccountScreen(
             ) {
                 AccountTypeChip(
                     type = AccountType.BANK,
-                    name = "银行卡",
-                    icon = Icons.Default.CreditCard,
                     isSelected = selectedType == AccountType.BANK,
                     onClick = { selectedType = AccountType.BANK }
                 )
                 AccountTypeChip(
                     type = AccountType.ALIPAY,
-                    name = "支付宝",
-                    icon = Icons.Default.Payment,
                     isSelected = selectedType == AccountType.ALIPAY,
                     onClick = { selectedType = AccountType.ALIPAY }
                 )
                 AccountTypeChip(
                     type = AccountType.WECHAT,
-                    name = "微信",
-                    icon = Icons.AutoMirrored.Filled.Chat,
                     isSelected = selectedType == AccountType.WECHAT,
                     onClick = { selectedType = AccountType.WECHAT }
                 )
                 AccountTypeChip(
                     type = AccountType.CASH,
-                    name = "现金",
-                    icon = Icons.Default.AccountBalanceWallet,
                     isSelected = selectedType == AccountType.CASH,
                     onClick = { selectedType = AccountType.CASH }
                 )
                 AccountTypeChip(
                     type = AccountType.CREDIT_CARD,
-                    name = "信用卡",
-                    icon = Icons.Default.Payment,
                     isSelected = selectedType == AccountType.CREDIT_CARD,
                     onClick = { selectedType = AccountType.CREDIT_CARD }
                 )
                 AccountTypeChip(
                     type = AccountType.INVESTMENT,
-                    name = "投资",
-                    icon = Icons.Default.AccountBalanceWallet,
                     isSelected = selectedType == AccountType.INVESTMENT,
                     onClick = { selectedType = AccountType.INVESTMENT }
                 )
                 AccountTypeChip(
                     type = AccountType.OTHER,
-                    name = "其他",
-                    icon = Icons.Default.AccountBalanceWallet,
                     isSelected = selectedType == AccountType.OTHER,
                     onClick = { selectedType = AccountType.OTHER }
                 )
@@ -328,8 +319,6 @@ fun AddAccountScreen(
 @Composable
 private fun AccountTypeChip(
     type: AccountType,
-    name: String,
-    icon: ImageVector,
     isSelected: Boolean,
     onClick: () -> Unit
 ) {
@@ -338,15 +327,17 @@ private fun AccountTypeChip(
         onClick = onClick,
         label = {
             Text(
-                text = name,
+                text = type.toDisplayName(),
                 style = MaterialTheme.typography.bodyMedium
             )
         },
         leadingIcon = {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                modifier = Modifier.size(18.dp)
+            AccountTypeIconBadge(
+                type = type,
+                accentColor = Color(type.defaultColorValue()),
+                containerSize = 22.dp,
+                iconSize = 14.dp,
+                emphasized = isSelected
             )
         },
         colors = FilterChipDefaults.filterChipColors(

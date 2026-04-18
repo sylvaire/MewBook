@@ -25,7 +25,11 @@ import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
@@ -46,6 +50,7 @@ import com.mewbook.app.ui.screens.categories.CategoriesScreen
 import com.mewbook.app.ui.screens.dav.DavSettingsScreen
 import com.mewbook.app.ui.screens.export.ExportScreen
 import com.mewbook.app.ui.screens.home.HomeScreen
+import com.mewbook.app.ui.screens.ledger.LedgerManagementScreen
 import com.mewbook.app.ui.screens.settings.SettingsScreen
 import com.mewbook.app.ui.screens.statistics.StatisticsScreen
 
@@ -74,13 +79,20 @@ fun MewBookNavHost() {
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
+    var isHomeAddSheetVisible by remember { mutableStateOf(false) }
+
+    LaunchedEffect(currentDestination?.route) {
+        if (currentDestination?.route != Screen.Home.route) {
+            isHomeAddSheetVisible = false
+        }
+    }
 
     val showBottomBar = currentDestination?.route in listOf(
         Screen.Home.route,
         Screen.Statistics.route,
         Screen.Asset.route,
         Screen.Settings.route
-    )
+    ) && !isHomeAddSheetVisible
 
     Scaffold(
         bottomBar = {
@@ -161,7 +173,11 @@ fun MewBookNavHost() {
             modifier = Modifier.padding(innerPadding)
         ) {
             composable(Screen.Home.route) {
-                HomeScreen()
+                HomeScreen(
+                    onAddSheetVisibilityChanged = { visible ->
+                        isHomeAddSheetVisible = visible
+                    }
+                )
             }
             composable(Screen.Statistics.route) {
                 StatisticsScreen()
@@ -192,6 +208,16 @@ fun MewBookNavHost() {
                     },
                     onNavigateToExport = {
                         navController.navigate(Screen.Export.route)
+                    },
+                    onNavigateToLedgerManagement = {
+                        navController.navigate(Screen.LedgerManagement.route)
+                    }
+                )
+            }
+            composable(Screen.LedgerManagement.route) {
+                LedgerManagementScreen(
+                    onNavigateBack = {
+                        navController.popBackStack()
                     }
                 )
             }

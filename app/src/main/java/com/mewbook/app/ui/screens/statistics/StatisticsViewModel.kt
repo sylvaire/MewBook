@@ -27,6 +27,8 @@ enum class TimeRange {
 
 data class StatisticsUiState(
     val timeRange: TimeRange = TimeRange.MONTH,
+    val periodLabel: String = "",
+    val canGoNext: Boolean = false,
     val records: List<Record> = emptyList(),
     val categories: Map<Long, Category> = emptyMap(),
     val totalIncome: Double = 0.0,
@@ -45,16 +47,18 @@ class StatisticsViewModel @Inject constructor(
 ) : ViewModel() {
 
     private val _timeRange = MutableStateFlow(TimeRange.MONTH)
+    private val _anchorDate = MutableStateFlow(LocalDate.now())
 
     private val _records = MutableStateFlow<List<Record>>(emptyList())
     private val _categories = MutableStateFlow<List<Category>>(emptyList())
 
     val uiState: StateFlow<StatisticsUiState> = combine(
         _timeRange,
+        _anchorDate,
         _records,
         _categories
-    ) { timeRange, records, categories ->
-        val (startDate, endDate) = getDateRange(timeRange)
+    ) { timeRange, anchorDate, records, categories ->
+        val (startDate, endDate) = getDateRange(timeRange, anchorDate)
 
         val filteredRecords = records.filter { record ->
             !record.date.isBefore(startDate) && !record.date.isAfter(endDate)
@@ -69,13 +73,18 @@ class StatisticsViewModel @Inject constructor(
             .mapValues { (_, records) -> records.sumOf { it.amount } }
 
         val (dailyIncome, dailyExpense, labels) = when (timeRange) {
-            TimeRange.WEEK -> calculateWeeklyData(filteredRecords)
-            TimeRange.MONTH -> calculateMonthlyData(filteredRecords)
-            TimeRange.YEAR -> calculateYearlyData(filteredRecords)
+            TimeRange.WEEK -> calculateWeeklyData(filteredRecords, startDate)
+            TimeRange.MONTH -> calculateMonthlyData(filteredRecords, YearMonth.from(startDate))
+            TimeRange.YEAR -> calculateYearlyData(filteredRecords, startDate.year)
         }
+
+        val nextAnchorDate = shiftAnchorDate(anchorDate, timeRange, 1)
+        val (_, nextEndDate) = getDateRange(timeRange, nextAnchorDate)
 
         StatisticsUiState(
             timeRange = timeRange,
+            periodLabel = buildPeriodLabel(timeRange, startDate, endDate),
+            canGoNext = !nextEndDate.isAfter(LocalDate.now()),
             records = filteredRecords,
             categories = categories.associateBy { it.id },
             totalIncome = totalIncome,
@@ -114,28 +123,49 @@ class StatisticsViewModel @Inject constructor(
         _timeRange.update { range }
     }
 
-    private fun getDateRange(timeRange: TimeRange): Pair<LocalDate, LocalDate> {
-        val today = LocalDate.now()
+    fun previousPeriod() {
+        val range = _timeRange.value
+        _anchorDate.update { current -> shiftAnchorDate(current, range, -1) }
+    }
+
+    fun nextPeriod() {
+        val range = _timeRange.value
+        _anchorDate.update { current ->
+            val candidate = shiftAnchorDate(current, range, 1)
+            val (_, candidateEnd) = getDateRange(range, candidate)
+            if (candidateEnd.isAfter(LocalDate.now())) current else candidate
+        }
+    }
+
+    private fun shiftAnchorDate(anchorDate: LocalDate, timeRange: TimeRange, step: Int): LocalDate {
+        return when (timeRange) {
+            TimeRange.WEEK -> anchorDate.plusWeeks(step.toLong())
+            TimeRange.MONTH -> anchorDate.plusMonths(step.toLong())
+            TimeRange.YEAR -> anchorDate.plusYears(step.toLong())
+        }
+    }
+
+    private fun getDateRange(timeRange: TimeRange, anchorDate: LocalDate): Pair<LocalDate, LocalDate> {
         return when (timeRange) {
             TimeRange.WEEK -> {
-                val startOfWeek = today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
-                startOfWeek to today
+                val startOfWeek = anchorDate.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+                startOfWeek to startOfWeek.plusDays(6)
             }
             TimeRange.MONTH -> {
-                val startOfMonth = today.withDayOfMonth(1)
-                startOfMonth to today
+                val targetMonth = YearMonth.from(anchorDate)
+                targetMonth.atDay(1) to targetMonth.atEndOfMonth()
             }
             TimeRange.YEAR -> {
-                val startOfYear = today.withDayOfYear(1)
-                startOfYear to today
+                val startOfYear = anchorDate.withDayOfYear(1)
+                startOfYear to anchorDate.with(TemporalAdjusters.lastDayOfYear())
             }
         }
     }
 
-    private fun calculateWeeklyData(records: List<Record>): Triple<List<Double>, List<Double>, List<String>> {
-        val today = LocalDate.now()
-        val startOfWeek = today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
-
+    private fun calculateWeeklyData(
+        records: List<Record>,
+        startOfWeek: LocalDate
+    ): Triple<List<Double>, List<Double>, List<String>> {
         val dailyIncome = mutableListOf<Double>()
         val dailyExpense = mutableListOf<Double>()
         val labels = mutableListOf<String>()
@@ -153,17 +183,17 @@ class StatisticsViewModel @Inject constructor(
         return Triple(dailyIncome, dailyExpense, labels)
     }
 
-    private fun calculateMonthlyData(records: List<Record>): Triple<List<Double>, List<Double>, List<String>> {
-        val today = LocalDate.now()
-        val daysInMonth = today.lengthOfMonth()
-
+    private fun calculateMonthlyData(
+        records: List<Record>,
+        yearMonth: YearMonth
+    ): Triple<List<Double>, List<Double>, List<String>> {
+        val daysInMonth = yearMonth.lengthOfMonth()
         val dailyIncome = mutableListOf<Double>()
         val dailyExpense = mutableListOf<Double>()
         val labels = mutableListOf<String>()
 
         for (day in 1..daysInMonth) {
-            val date = today.withDayOfMonth(day)
-            if (date.isAfter(today)) break
+            val date = yearMonth.atDay(day)
 
             val dayRecords = records.filter { it.date == date }
 
@@ -186,18 +216,39 @@ class StatisticsViewModel @Inject constructor(
         DayOfWeek.SUNDAY -> "周日"
     }
 
-    private fun calculateYearlyData(records: List<Record>): Triple<List<Double>, List<Double>, List<String>> {
+    private fun calculateYearlyData(
+        records: List<Record>,
+        targetYear: Int
+    ): Triple<List<Double>, List<Double>, List<String>> {
         val monthlyIncome = mutableListOf<Double>()
         val monthlyExpense = mutableListOf<Double>()
         val labels = listOf("1月", "2月", "3月", "4月", "5月", "6月", "7月", "8月", "9月", "10月", "11月", "12月")
 
         for (month in 1..12) {
-            val monthRecords = records.filter { it.date.monthValue == month && it.date.year == LocalDate.now().year }
+            val monthRecords = records.filter { it.date.monthValue == month && it.date.year == targetYear }
 
             monthlyIncome.add(monthRecords.filter { it.type == RecordType.INCOME }.sumOf { it.amount })
             monthlyExpense.add(monthRecords.filter { it.type == RecordType.EXPENSE }.sumOf { it.amount })
         }
 
         return Triple(monthlyIncome, monthlyExpense, labels)
+    }
+
+    private fun buildPeriodLabel(
+        timeRange: TimeRange,
+        startDate: LocalDate,
+        endDate: LocalDate
+    ): String {
+        return when (timeRange) {
+            TimeRange.WEEK -> {
+                if (startDate.year == endDate.year) {
+                    "${startDate.monthValue}月${startDate.dayOfMonth}日 - ${endDate.monthValue}月${endDate.dayOfMonth}日"
+                } else {
+                    "${startDate.year}年${startDate.monthValue}月${startDate.dayOfMonth}日 - ${endDate.year}年${endDate.monthValue}月${endDate.dayOfMonth}日"
+                }
+            }
+            TimeRange.MONTH -> "${startDate.year}年${startDate.monthValue}月"
+            TimeRange.YEAR -> "${startDate.year}年"
+        }
     }
 }

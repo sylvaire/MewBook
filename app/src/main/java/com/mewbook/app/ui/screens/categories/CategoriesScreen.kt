@@ -14,10 +14,14 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -27,6 +31,8 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -59,6 +65,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.mewbook.app.ui.components.MewCompactTopAppBar
 import com.mewbook.app.domain.model.Category
 import com.mewbook.app.domain.model.RecordType
+import com.mewbook.app.ui.components.CategoryIconBadge
 import com.mewbook.app.ui.components.getIconForCategory
 
 // 可选的图标列表
@@ -73,7 +80,10 @@ val availableIcons = listOf(
     "local_bar", "people", "redeem", "menu_book", "edit", "sports_basketball",
     "wifi", "local_fire_department", "local_drink", "emoji_food_beverage", "nutrition",
     "tablet_android", "pool", "mic", "meeting_room", "inbox", "cloud", "star",
-    "favorite", "monetization_on", "cookie", "eco"
+    "favorite", "monetization_on", "cookie", "eco", "local_mall", "medication",
+    "health_and_safety", "directions_run", "weekend", "local_shipping", "forum",
+    "auto_stories", "brush", "emoji_nature", "savings", "receipt_long", "apple",
+    "baby_changing_station", "boy"
 )
 
 // 可选的颜色列表
@@ -165,12 +175,16 @@ fun CategoriesScreen(
             val displayedCategories = if (selectedTabIndex == 0) expenseCategories else incomeCategories
 
             LazyColumn(
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 items(displayedCategories, key = { it.id }) { category ->
                     CategoryItem(
                         category = category,
+                        canMoveUp = displayedCategories.firstOrNull()?.id != category.id,
+                        canMoveDown = displayedCategories.lastOrNull()?.id != category.id,
+                        onMoveUpClick = { viewModel.moveCategoryUp(category) },
+                        onMoveDownClick = { viewModel.moveCategoryDown(category) },
                         onEditClick = { viewModel.showEditDialog(category) },
                         onDeleteClick = { viewModel.deleteCategory(category) }
                     )
@@ -183,6 +197,10 @@ fun CategoriesScreen(
 @Composable
 fun CategoryItem(
     category: Category,
+    canMoveUp: Boolean,
+    canMoveDown: Boolean,
+    onMoveUpClick: () -> Unit,
+    onMoveDownClick: () -> Unit,
     onEditClick: () -> Unit,
     onDeleteClick: () -> Unit
 ) {
@@ -195,61 +213,81 @@ fun CategoryItem(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
+                .padding(horizontal = 12.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .background(
-                        color = Color(category.color).copy(alpha = 0.2f),
-                        shape = CircleShape
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = getIconForCategory(category.icon),
-                    contentDescription = null,
-                    tint = Color(category.color),
-                    modifier = Modifier.size(24.dp)
-                )
-            }
+            CategoryIconBadge(
+                category = category,
+                emphasized = true,
+                containerSize = 28.dp,
+                iconSize = 15.dp
+            )
 
-            Spacer(modifier = Modifier.width(12.dp))
+            Spacer(modifier = Modifier.width(8.dp))
 
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = category.name,
-                    style = MaterialTheme.typography.bodyLarge
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold
                 )
                 if (category.isDefault) {
                     Text(
                         text = "默认分类",
-                        style = MaterialTheme.typography.bodySmall,
+                        style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 } else {
                     Text(
                         text = "自定义",
-                        style = MaterialTheme.typography.bodySmall,
+                        style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.primary
                     )
                 }
             }
 
+            Column(horizontalAlignment = Alignment.End) {
+                IconButton(
+                    onClick = onMoveUpClick,
+                    enabled = canMoveUp,
+                    modifier = Modifier.size(28.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.KeyboardArrowUp,
+                        contentDescription = "上移",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+                IconButton(
+                    onClick = onMoveDownClick,
+                    enabled = canMoveDown,
+                    modifier = Modifier.size(28.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.KeyboardArrowDown,
+                        contentDescription = "下移",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+            }
+
             if (!category.isDefault) {
-                IconButton(onClick = onEditClick) {
+                IconButton(onClick = onEditClick, modifier = Modifier.size(28.dp)) {
                     Icon(
                         Icons.Filled.Edit,
                         contentDescription = "编辑",
-                        tint = MaterialTheme.colorScheme.primary
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(16.dp)
                     )
                 }
-                IconButton(onClick = onDeleteClick) {
+                IconButton(onClick = onDeleteClick, modifier = Modifier.size(28.dp)) {
                     Icon(
                         Icons.Filled.Delete,
                         contentDescription = "删除",
-                        tint = MaterialTheme.colorScheme.error
+                        tint = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.size(16.dp)
                     )
                 }
             }
@@ -290,39 +328,11 @@ fun AddCategoryDialog(
                 )
                 Spacer(modifier = Modifier.height(8.dp))
 
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    availableIcons.forEach { iconName ->
-                        Box(
-                            modifier = Modifier
-                                .size(40.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(
-                                    if (selectedIcon == iconName)
-                                        Color(selectedColor).copy(alpha = 0.3f)
-                                    else
-                                        MaterialTheme.colorScheme.surfaceVariant
-                                )
-                                .border(
-                                    width = if (selectedIcon == iconName) 2.dp else 0.dp,
-                                    color = if (selectedIcon == iconName) Color(selectedColor) else Color.Transparent,
-                                    shape = RoundedCornerShape(8.dp)
-                                )
-                                .clickable { selectedIcon = iconName },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = getIconForCategory(iconName),
-                                contentDescription = iconName,
-                                tint = if (selectedIcon == iconName) Color(selectedColor) else MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(24.dp)
-                            )
-                        }
-                    }
-                }
+                CategoryIconPickerGrid(
+                    selectedIcon = selectedIcon,
+                    selectedColor = selectedColor,
+                    onSelect = { selectedIcon = it }
+                )
 
                 Spacer(modifier = Modifier.height(16.dp))
 
@@ -441,39 +451,11 @@ fun EditCategoryDialog(
                 )
                 Spacer(modifier = Modifier.height(8.dp))
 
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    availableIcons.forEach { iconName ->
-                        Box(
-                            modifier = Modifier
-                                .size(40.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(
-                                    if (selectedIcon == iconName)
-                                        Color(selectedColor).copy(alpha = 0.3f)
-                                    else
-                                        MaterialTheme.colorScheme.surfaceVariant
-                                )
-                                .border(
-                                    width = if (selectedIcon == iconName) 2.dp else 0.dp,
-                                    color = if (selectedIcon == iconName) Color(selectedColor) else Color.Transparent,
-                                    shape = RoundedCornerShape(8.dp)
-                                )
-                                .clickable { selectedIcon = iconName },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = getIconForCategory(iconName),
-                                contentDescription = iconName,
-                                tint = if (selectedIcon == iconName) Color(selectedColor) else MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(24.dp)
-                            )
-                        }
-                    }
-                }
+                CategoryIconPickerGrid(
+                    selectedIcon = selectedIcon,
+                    selectedColor = selectedColor,
+                    onSelect = { selectedIcon = it }
+                )
 
                 Spacer(modifier = Modifier.height(16.dp))
 
@@ -538,4 +520,49 @@ fun EditCategoryDialog(
             }
         }
     )
+}
+
+@Composable
+private fun CategoryIconPickerGrid(
+    selectedIcon: String,
+    selectedColor: Long,
+    onSelect: (String) -> Unit
+) {
+    LazyVerticalGrid(
+        columns = GridCells.Fixed(5),
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(max = 220.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        items(availableIcons, key = { it }) { iconName ->
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(
+                        if (selectedIcon == iconName) {
+                            Color(selectedColor).copy(alpha = 0.18f)
+                        } else {
+                            MaterialTheme.colorScheme.surfaceVariant
+                        }
+                    )
+                    .border(
+                        width = if (selectedIcon == iconName) 2.dp else 1.dp,
+                        color = if (selectedIcon == iconName) Color(selectedColor) else MaterialTheme.colorScheme.outline.copy(alpha = 0.16f),
+                        shape = RoundedCornerShape(10.dp)
+                    )
+                    .clickable { onSelect(iconName) },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = getIconForCategory(iconName),
+                    contentDescription = iconName,
+                    tint = if (selectedIcon == iconName) Color(selectedColor) else MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+        }
+    }
 }

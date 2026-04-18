@@ -4,6 +4,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.compose.setContent
+import androidx.activity.viewModels
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -26,16 +27,27 @@ import com.mewbook.app.ui.theme.SplashBackgroundDark
 import com.mewbook.app.ui.navigation.MewBookNavHost
 import com.mewbook.app.ui.theme.MewBookTheme
 import com.mewbook.app.ui.theme.SplashBackground
+import com.mewbook.app.data.preferences.AppThemeMode
+import com.mewbook.app.ui.theme.ThemeViewModel
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.delay
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+    private val themeViewModel: ThemeViewModel by viewModels()
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            val isDarkTheme = isSystemInDarkTheme()
+            val systemDarkTheme = isSystemInDarkTheme()
+            val themeMode by themeViewModel.themeMode.collectAsStateWithLifecycle()
+            val isDarkTheme = when (themeMode) {
+                AppThemeMode.SYSTEM -> systemDarkTheme
+                AppThemeMode.LIGHT -> false
+                AppThemeMode.DARK -> true
+            }
             var showCustomSplash by rememberSaveable { mutableStateOf(true) }
 
             LaunchedEffect(Unit) {

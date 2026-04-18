@@ -4,6 +4,7 @@ import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mewbook.app.data.repository.ExportRepository
+import com.mewbook.app.domain.repository.LedgerRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -24,7 +25,8 @@ enum class ExportType {
 
 @HiltViewModel
 class ExportViewModel @Inject constructor(
-    private val exportRepository: ExportRepository
+    private val exportRepository: ExportRepository,
+    private val ledgerRepository: LedgerRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ExportUiState())
@@ -33,10 +35,11 @@ class ExportViewModel @Inject constructor(
     fun export(type: ExportType) {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isExporting = true, exportType = type, error = null)
+            val activeLedgerId = ledgerRepository.getDefaultLedger()?.id ?: 1L
 
             val result = when (type) {
-                ExportType.CSV -> exportRepository.exportToCsv(1L)  // 默认账本ID
-                ExportType.JSON -> exportRepository.exportToJson(1L)
+                ExportType.CSV -> exportRepository.exportToCsv(activeLedgerId)
+                ExportType.JSON -> exportRepository.exportToJson(activeLedgerId)
             }
 
             result.fold(

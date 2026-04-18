@@ -43,7 +43,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mewbook.app.domain.model.Account
 import com.mewbook.app.domain.repository.AccountRepository
+import com.mewbook.app.ui.components.AccountTypeIconBadge
 import com.mewbook.app.ui.components.MewCompactTopAppBar
+import com.mewbook.app.ui.components.toDisplayName
 import com.mewbook.app.ui.theme.ExpenseRed
 import com.mewbook.app.ui.theme.IncomeGreen
 import com.mewbook.app.util.formatCurrency
@@ -207,11 +209,12 @@ fun AccountEditScreen(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(
-                            imageVector = account.type.toIcon(),
-                            contentDescription = null,
-                            modifier = Modifier.size(48.dp),
-                            tint = Color(account.color)
+                        AccountTypeIconBadge(
+                            type = account.type,
+                            accentColor = Color(account.color),
+                            containerSize = 52.dp,
+                            iconSize = 28.dp,
+                            emphasized = true
                         )
                         Spacer(modifier = Modifier.width(16.dp))
                         Column {

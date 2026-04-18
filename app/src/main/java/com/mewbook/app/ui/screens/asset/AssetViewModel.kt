@@ -5,11 +5,13 @@ import androidx.lifecycle.viewModelScope
 import com.mewbook.app.domain.model.Account
 import com.mewbook.app.domain.model.AccountType
 import com.mewbook.app.domain.repository.AccountRepository
+import com.mewbook.app.domain.repository.LedgerRepository
 import com.mewbook.app.domain.usecase.account.InitializeDefaultAccountsUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -24,6 +26,7 @@ data class AssetUiState(
 @HiltViewModel
 class AssetViewModel @Inject constructor(
     private val accountRepository: AccountRepository,
+    private val ledgerRepository: LedgerRepository,
     private val initializeDefaultAccountsUseCase: InitializeDefaultAccountsUseCase
 ) : ViewModel() {
 
@@ -43,23 +46,26 @@ class AssetViewModel @Inject constructor(
 
     fun loadAccounts() {
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isLoading = true)
-            accountRepository.getAllAccounts().collect { accounts ->
-                val totalAsset = accounts
-                    .filter { it.type != AccountType.CREDIT_CARD }
-                    .sumOf { it.balance }
-                val totalLiability = accounts
-                    .filter { it.type == AccountType.CREDIT_CARD }
-                    .sumOf { kotlin.math.abs(it.balance) }
-                val netAsset = totalAsset - totalLiability
+            ledgerRepository.getDefaultLedgerFlow().collectLatest { ledger ->
+                val activeLedgerId = ledger?.id ?: 1L
+                _uiState.value = _uiState.value.copy(isLoading = true)
+                accountRepository.getAccountsByLedger(activeLedgerId).collectLatest { accounts ->
+                    val totalAsset = accounts
+                        .filter { it.type != AccountType.CREDIT_CARD }
+                        .sumOf { it.balance }
+                    val totalLiability = accounts
+                        .filter { it.type == AccountType.CREDIT_CARD }
+                        .sumOf { kotlin.math.abs(it.balance) }
+                    val netAsset = totalAsset - totalLiability
 
-                _uiState.value = AssetUiState(
-                    totalAsset = totalAsset,
-                    totalLiability = totalLiability,
-                    netAsset = netAsset,
-                    accounts = accounts,
-                    isLoading = false
-                )
+                    _uiState.value = AssetUiState(
+                        totalAsset = totalAsset,
+                        totalLiability = totalLiability,
+                        netAsset = netAsset,
+                        accounts = accounts,
+                        isLoading = false
+                    )
+                }
             }
         }
     }

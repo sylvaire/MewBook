@@ -21,6 +21,12 @@ class LedgerRepositoryImpl @Inject constructor(
         }
     }
 
+    override fun getDefaultLedgerFlow(): Flow<Ledger?> {
+        return ledgerDao.getDefaultLedgerFlow().map { entity ->
+            entity?.toDomain()
+        }
+    }
+
     override suspend fun getLedgerById(id: Long): Ledger? {
         return ledgerDao.getLedgerById(id)?.toDomain()
     }

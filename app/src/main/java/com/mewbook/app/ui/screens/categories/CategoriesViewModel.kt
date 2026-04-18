@@ -122,4 +122,34 @@ class CategoriesViewModel @Inject constructor(
             }
         }
     }
+
+    fun moveCategoryUp(category: Category) {
+        viewModelScope.launch {
+            val siblings = _uiState.value.categories
+                .filter { it.type == category.type && it.parentId == category.parentId }
+                .sortedBy { it.sortOrder }
+            val currentIndex = siblings.indexOfFirst { it.id == category.id }
+            if (currentIndex <= 0) return@launch
+
+            val current = siblings[currentIndex]
+            val previous = siblings[currentIndex - 1]
+            updateCategoryUseCase(current.copy(sortOrder = previous.sortOrder))
+            updateCategoryUseCase(previous.copy(sortOrder = current.sortOrder))
+        }
+    }
+
+    fun moveCategoryDown(category: Category) {
+        viewModelScope.launch {
+            val siblings = _uiState.value.categories
+                .filter { it.type == category.type && it.parentId == category.parentId }
+                .sortedBy { it.sortOrder }
+            val currentIndex = siblings.indexOfFirst { it.id == category.id }
+            if (currentIndex == -1 || currentIndex >= siblings.lastIndex) return@launch
+
+            val current = siblings[currentIndex]
+            val next = siblings[currentIndex + 1]
+            updateCategoryUseCase(current.copy(sortOrder = next.sortOrder))
+            updateCategoryUseCase(next.copy(sortOrder = current.sortOrder))
+        }
+    }
 }

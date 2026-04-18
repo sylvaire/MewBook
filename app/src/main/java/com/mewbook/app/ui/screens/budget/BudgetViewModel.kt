@@ -7,12 +7,14 @@ import com.mewbook.app.domain.model.BudgetWithSpending
 import com.mewbook.app.domain.model.Category
 import com.mewbook.app.domain.repository.BudgetRepository
 import com.mewbook.app.domain.repository.CategoryRepository
+import com.mewbook.app.domain.repository.LedgerRepository
 import com.mewbook.app.domain.repository.RecordRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import java.time.YearMonth
 import javax.inject.Inject
@@ -32,9 +34,11 @@ data class BudgetUiState(
 class BudgetViewModel @Inject constructor(
     private val budgetRepository: BudgetRepository,
     private val categoryRepository: CategoryRepository,
+    private val ledgerRepository: LedgerRepository,
     private val recordRepository: RecordRepository
 ) : ViewModel() {
 
+    private val currentMonthFlow = MutableStateFlow(YearMonth.now())
     private val _uiState = MutableStateFlow(BudgetUiState())
     val uiState: StateFlow<BudgetUiState> = _uiState.asStateFlow()
 
@@ -44,56 +48,56 @@ class BudgetViewModel @Inject constructor(
 
     fun loadData() {
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isLoading = true)
-
-            val month = _uiState.value.currentMonth.toString()
-            val ledgerId = 1L
-
             combine(
-                budgetRepository.getBudgetsByMonth(ledgerId, month),
-                categoryRepository.getAllCategories(),
-                recordRepository.getRecordsByMonth(ledgerId, month)
-            ) { budgets, categories, records ->
-                val categoryMap = categories.associateBy { it.id }
+                ledgerRepository.getDefaultLedgerFlow(),
+                currentMonthFlow
+            ) { ledger, state ->
+                (ledger?.id ?: 1L) to state
+            }.collectLatest { (ledgerId, currentMonth) ->
+                _uiState.value = _uiState.value.copy(isLoading = true)
+                val month = currentMonth.toString()
 
-                // 计算总支出
-                val totalSpent = records.filter { it.type.name == "EXPENSE" }.sumOf { it.amount }
+                combine(
+                    budgetRepository.getBudgetsByMonth(ledgerId, month),
+                    categoryRepository.getAllCategories(),
+                    recordRepository.getRecordsByMonth(ledgerId, month)
+                ) { budgets, categories, records ->
+                    val categoryMap = categories.associateBy { it.id }
+                    val totalSpent = records.filter { it.type.name == "EXPENSE" }.sumOf { it.amount }
+                    val categorySpending = records
+                        .filter { it.type.name == "EXPENSE" }
+                        .groupBy { it.categoryId }
+                        .mapValues { entry -> entry.value.sumOf { it.amount } }
 
-                // 计算分类支出
-                val categorySpending = records
-                    .filter { it.type.name == "EXPENSE" }
-                    .groupBy { it.categoryId }
-                    .mapValues { entry -> entry.value.sumOf { it.amount } }
+                    val budgetsWithSpending = budgets.map { budget ->
+                        BudgetWithSpending(
+                            budget = budget,
+                            spent = if (budget.categoryId != null) {
+                                categorySpending[budget.categoryId] ?: 0.0
+                            } else {
+                                totalSpent
+                            }
+                        )
+                    }
 
-                // 构建预算与支出列表
-                val budgetsWithSpending = budgets.map { budget ->
-                    BudgetWithSpending(
-                        budget = budget,
-                        spent = if (budget.categoryId != null) {
-                            categorySpending[budget.categoryId] ?: 0.0
-                        } else {
-                            totalSpent
-                        }
+                    BudgetUiState(
+                        currentMonth = currentMonth,
+                        totalBudget = budgets.find { it.categoryId == null },
+                        totalSpent = totalSpent,
+                        categoryBudgets = budgetsWithSpending,
+                        categories = categoryMap,
+                        isLoading = false
                     )
+                }.collect { state ->
+                    _uiState.value = state
                 }
-
-                BudgetUiState(
-                    currentMonth = _uiState.value.currentMonth,
-                    totalBudget = budgets.find { it.categoryId == null },
-                    totalSpent = totalSpent,
-                    categoryBudgets = budgetsWithSpending,
-                    categories = categoryMap,
-                    isLoading = false
-                )
-            }.collect { state ->
-                _uiState.value = state
             }
         }
     }
 
     fun selectMonth(month: YearMonth) {
+        currentMonthFlow.value = month
         _uiState.value = _uiState.value.copy(currentMonth = month)
-        loadData()
     }
 
     fun showAddDialog(categoryId: Long? = null) {
@@ -112,7 +116,7 @@ class BudgetViewModel @Inject constructor(
     fun saveBudget(categoryId: Long?, amount: Double) {
         viewModelScope.launch {
             val month = _uiState.value.currentMonth.toString()
-            val ledgerId = 1L
+            val ledgerId = ledgerRepository.getDefaultLedger()?.id ?: 1L
 
             val budget = Budget(
                 id = _uiState.value.editingBudget?.id ?: 0,
@@ -129,14 +133,12 @@ class BudgetViewModel @Inject constructor(
             }
 
             hideDialog()
-            loadData()
         }
     }
 
     fun deleteBudget(budget: Budget) {
         viewModelScope.launch {
             budgetRepository.deleteBudget(budget)
-            loadData()
         }
     }
 }

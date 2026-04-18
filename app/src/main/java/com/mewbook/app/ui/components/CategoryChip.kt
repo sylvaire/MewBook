@@ -24,6 +24,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.mewbook.app.domain.model.Category
 
@@ -34,27 +35,22 @@ fun CategoryChip(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val accentColor = Color(category.color)
     val backgroundColor = if (isSelected) {
-        Color(category.color).copy(alpha = 0.15f)
+        accentColor.copy(alpha = 0.08f)
     } else {
-        MaterialTheme.colorScheme.surfaceVariant
+        MaterialTheme.colorScheme.surface.copy(alpha = 0.96f)
     }
 
     val borderColor = if (isSelected) {
-        Color(category.color)
+        accentColor
     } else {
-        MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
-    }
-
-    val iconContainerColor = if (isSelected) {
-        Color(category.color).copy(alpha = 0.2f)
-    } else {
-        Color(category.color).copy(alpha = 0.12f)
+        MaterialTheme.colorScheme.outline.copy(alpha = 0.16f)
     }
 
     Surface(
         modifier = modifier,
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(18.dp),
         color = backgroundColor,
         border = BorderStroke(
             width = if (isSelected) 2.dp else 1.dp,
@@ -64,33 +60,24 @@ fun CategoryChip(
     ) {
         Column(
             modifier = Modifier
-                .padding(horizontal = 8.dp, vertical = 10.dp),
+                .padding(horizontal = 8.dp, vertical = 12.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            // 图标容器 - 36.dp 提供充足空间，图标居中不会溢出
-            Box(
-                modifier = Modifier
-                    .size(36.dp)
-                    .clip(CircleShape)
-                    .background(iconContainerColor),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = getIconForCategory(category.icon),
-                    contentDescription = category.name,
-                    tint = if (isSelected) Color(category.color) else Color(category.color).copy(alpha = 0.8f),
-                    modifier = Modifier.size(18.dp)
-                )
-            }
+            CategoryIconBadge(
+                category = category,
+                emphasized = isSelected,
+                containerSize = 42.dp,
+                iconSize = 22.dp
+            )
             Spacer(modifier = Modifier.height(6.dp))
             Text(
                 text = category.name,
                 style = MaterialTheme.typography.labelSmall,
                 color = if (isSelected) {
-                    Color(category.color)
+                    accentColor
                 } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant
+                    MaterialTheme.colorScheme.onSurface
                 },
                 fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
                 textAlign = TextAlign.Center,
@@ -98,5 +85,41 @@ fun CategoryChip(
                 overflow = TextOverflow.Ellipsis
             )
         }
+    }
+}
+
+@Composable
+fun CategoryIconBadge(
+    category: Category,
+    emphasized: Boolean,
+    modifier: Modifier = Modifier,
+    containerSize: Dp = 40.dp,
+    iconSize: Dp = 20.dp
+) {
+    val accentColor = Color(category.color)
+    val backgroundColor = if (emphasized) {
+        accentColor.copy(alpha = 0.14f)
+    } else {
+        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
+    }
+    val iconTint = if (emphasized) {
+        accentColor
+    } else {
+        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.78f)
+    }
+
+    Box(
+        modifier = modifier
+            .size(containerSize)
+            .clip(CircleShape)
+            .background(backgroundColor),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(
+            imageVector = getIconForCategory(category.icon),
+            contentDescription = category.name,
+            tint = iconTint,
+            modifier = Modifier.size(iconSize)
+        )
     }
 }

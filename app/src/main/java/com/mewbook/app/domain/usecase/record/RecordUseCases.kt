@@ -13,6 +13,10 @@ class GetRecordsUseCase @Inject constructor(
         return recordRepository.getRecordsByDateRange(startDate, endDate)
     }
 
+    fun getByLedgerMonth(ledgerId: Long, month: String): Flow<List<Record>> {
+        return recordRepository.getRecordsByMonth(ledgerId, month)
+    }
+
     fun getAll(): Flow<List<Record>> {
         return recordRepository.getAllRecords()
     }

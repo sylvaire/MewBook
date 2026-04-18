@@ -36,10 +36,20 @@ android {
     signingConfigs {
         if (keystorePropertiesFile.exists()) {
             create("release") {
-                storeFile = rootProject.file(keystoreProperties["storeFile"] as String)
-                storePassword = keystoreProperties["storePassword"] as String
-                keyAlias = keystoreProperties["keyAlias"] as String
-                keyPassword = keystoreProperties["keyPassword"] as String
+                val storeFilePath = keystoreProperties.getProperty("storeFile")
+                val storePasswordValue = keystoreProperties.getProperty("storePassword")
+                val keyAliasValue = keystoreProperties.getProperty("keyAlias")
+                val keyPasswordValue = keystoreProperties.getProperty("keyPassword", storePasswordValue)
+
+                require(!storeFilePath.isNullOrBlank()) { "Missing `storeFile` in keystore.properties" }
+                require(!storePasswordValue.isNullOrBlank()) { "Missing `storePassword` in keystore.properties" }
+                require(!keyAliasValue.isNullOrBlank()) { "Missing `keyAlias` in keystore.properties" }
+                require(!keyPasswordValue.isNullOrBlank()) { "Missing `keyPassword` in keystore.properties" }
+
+                storeFile = rootProject.file(storeFilePath)
+                storePassword = storePasswordValue
+                keyAlias = keyAliasValue
+                keyPassword = keyPasswordValue
                 storeType = keystoreProperties.getProperty("storeType", "jks")
             }
         }

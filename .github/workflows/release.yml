@@ -23,22 +23,96 @@ jobs:
           java-version: "17"
           cache: gradle
 
-      - name: Decode signing keystore
+      - name: Prepare signing config
         shell: bash
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
-          mkdir -p signing
-          printf '%s' "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > signing/mewbook-release.jks
+          set -euo pipefail
 
-      - name: Create keystore.properties
-        shell: bash
-        run: |
+          if [[ -z "${ANDROID_KEYSTORE_BASE64:-}" ]]; then
+            echo "::error::Missing secret ANDROID_KEYSTORE_BASE64"
+            exit 1
+          fi
+          if [[ -z "${ANDROID_KEYSTORE_PASSWORD:-}" ]]; then
+            echo "::error::Missing secret ANDROID_KEYSTORE_PASSWORD"
+            exit 1
+          fi
+
+          mkdir -p signing
+          printf '%s' "${ANDROID_KEYSTORE_BASE64}" | base64 --decode > signing/mewbook-release.jks
+          if [[ ! -s signing/mewbook-release.jks ]]; then
+            echo "::error::Decoded keystore is empty. Check ANDROID_KEYSTORE_BASE64."
+            exit 1
+          fi
+
+          STORE_TYPE=""
+          for candidate in jks pkcs12; do
+            if keytool -list \
+              -keystore signing/mewbook-release.jks \
+              -storetype "${candidate}" \
+              -storepass "${ANDROID_KEYSTORE_PASSWORD}" \
+              >/tmp/keytool-list.txt 2>/tmp/keytool-list.err; then
+              STORE_TYPE="${candidate}"
+              break
+            fi
+          done
+
+          if [[ -z "${STORE_TYPE}" ]]; then
+            echo "::error::Keystore cannot be opened as JKS or PKCS12. Check keystore secret and password."
+            tail -n 10 /tmp/keytool-list.err || true
+            exit 1
+          fi
+
+          DETECTED_ALIAS="$(keytool -list -v \
+            -keystore signing/mewbook-release.jks \
+            -storetype "${STORE_TYPE}" \
+            -storepass "${ANDROID_KEYSTORE_PASSWORD}" \
+            | awk -F': ' '/Alias name:/ {print $2; exit}')"
+
+          if [[ -z "${DETECTED_ALIAS}" ]]; then
+            echo "::error::No alias found in keystore."
+            exit 1
+          fi
+
+          KEY_ALIAS="${ANDROID_KEY_ALIAS:-${DETECTED_ALIAS}}"
+          KEY_PASSWORD="${ANDROID_KEY_PASSWORD:-${ANDROID_KEYSTORE_PASSWORD}}"
+
+          if ! keytool -list \
+            -keystore signing/mewbook-release.jks \
+            -storetype "${STORE_TYPE}" \
+            -storepass "${ANDROID_KEYSTORE_PASSWORD}" \
+            -alias "${KEY_ALIAS}" \
+            >/dev/null 2>&1; then
+            echo "::error::Configured key alias '${KEY_ALIAS}' does not exist. Detected alias: '${DETECTED_ALIAS}'."
+            exit 1
+          fi
+
+          if ! keytool -certreq \
+            -keystore signing/mewbook-release.jks \
+            -storetype "${STORE_TYPE}" \
+            -storepass "${ANDROID_KEYSTORE_PASSWORD}" \
+            -keypass "${KEY_PASSWORD}" \
+            -alias "${KEY_ALIAS}" \
+            -file /tmp/signing-check.csr \
+            >/dev/null 2>/tmp/keytool-certreq.err; then
+            echo "::error::Failed to unlock private key for alias '${KEY_ALIAS}'. Check ANDROID_KEY_PASSWORD."
+            tail -n 10 /tmp/keytool-certreq.err || true
+            exit 1
+          fi
+
           cat > keystore.properties <<EOF
           storeFile=signing/mewbook-release.jks
-          storeType=jks
-          storePassword=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}
-          keyPassword=${{ secrets.ANDROID_KEY_PASSWORD }}
+          storeType=${STORE_TYPE}
+          storePassword=${ANDROID_KEYSTORE_PASSWORD}
+          keyAlias=${KEY_ALIAS}
+          keyPassword=${KEY_PASSWORD}
           EOF
+
+          echo "Signing preflight passed (storeType=${STORE_TYPE}, alias=${KEY_ALIAS})"
 
       - name: Make Gradle executable
         run: chmod +x gradlew

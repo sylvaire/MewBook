@@ -23,6 +23,9 @@ interface DavConfigDao {
     @Update
     suspend fun updateDavConfig(config: DavConfigEntity)
 
+    @Query("DELETE FROM dav_config")
+    suspend fun deleteDavConfig()
+
     @Query("UPDATE dav_config SET lastSyncTime = :syncTime WHERE id = 1")
     suspend fun updateLastSyncTime(syncTime: Long)
 }

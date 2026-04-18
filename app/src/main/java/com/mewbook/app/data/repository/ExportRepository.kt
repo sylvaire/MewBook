@@ -3,18 +3,14 @@ package com.mewbook.app.data.repository
 import android.content.Context
 import android.net.Uri
 import androidx.core.content.FileProvider
-import com.mewbook.app.domain.model.Category
 import com.mewbook.app.domain.repository.CategoryRepository
 import com.mewbook.app.domain.repository.RecordRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
-import org.json.JSONArray
-import org.json.JSONObject
 import java.io.File
 import java.io.FileWriter
-import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -23,7 +19,8 @@ import javax.inject.Singleton
 class ExportRepository @Inject constructor(
     @ApplicationContext private val context: Context,
     private val recordRepository: RecordRepository,
-    private val categoryRepository: CategoryRepository
+    private val categoryRepository: CategoryRepository,
+    private val backupRepository: BackupRepository
 ) {
 
     suspend fun exportToCsv(ledgerId: Long): Result<Uri> = withContext(Dispatchers.IO) {
@@ -68,38 +65,15 @@ class ExportRepository @Inject constructor(
         }
     }
 
-    suspend fun exportToJson(ledgerId: Long): Result<Uri> = withContext(Dispatchers.IO) {
+    suspend fun exportToJson(): Result<Uri> = withContext(Dispatchers.IO) {
         try {
-            val records = recordRepository.getAllRecordsOnce()
-                .filter { it.ledgerId == ledgerId }
-            val categoriesMap = categoryRepository.getAllCategories().first()
-                .associateBy { it.id }
-
-            val jsonObject = JSONObject()
-            jsonObject.put("exportTime", LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME))
-            jsonObject.put("version", "1.0")
-
-            val recordsArray = JSONArray()
-            records.forEach { record ->
-                val category = categoriesMap[record.categoryId]
-                val parentCategory = category?.parentId?.let { categoriesMap[it] }
-
-                val recordJson = JSONObject()
-                recordJson.put("date", record.date.toString())
-                recordJson.put("type", record.type.name)
-                recordJson.put("categoryName", parentCategory?.name ?: category?.name ?: "未知")
-                recordJson.put("subCategoryName", if (parentCategory != null) category.name else "")
-                recordJson.put("amount", record.amount)
-                recordJson.put("note", record.note ?: "")
-                recordsArray.put(recordJson)
-            }
-            jsonObject.put("records", recordsArray)
+            val jsonString = backupRepository.exportToJsonString()
 
             val fileName = "mewbook_export_${System.currentTimeMillis()}.json"
             val file = File(context.cacheDir, fileName)
 
             FileWriter(file).use { writer ->
-                writer.append(jsonObject.toString(2))
+                writer.append(jsonString)
             }
 
             val uri = FileProvider.getUriForFile(

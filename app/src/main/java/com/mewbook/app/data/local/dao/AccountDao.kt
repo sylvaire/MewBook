@@ -18,17 +18,26 @@ interface AccountDao {
     @Query("SELECT * FROM accounts ORDER BY sortOrder ASC")
     fun getAllAccounts(): Flow<List<AccountEntity>>
 
+    @Query("SELECT * FROM accounts ORDER BY sortOrder ASC")
+    suspend fun getAllAccountsOnce(): List<AccountEntity>
+
     @Query("SELECT * FROM accounts WHERE id = :id")
     suspend fun getAccountById(id: Long): AccountEntity?
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAccount(account: AccountEntity): Long
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAccounts(accounts: List<AccountEntity>)
+
     @Update
     suspend fun updateAccount(account: AccountEntity)
 
     @Delete
     suspend fun deleteAccount(account: AccountEntity)
+
+    @Query("DELETE FROM accounts")
+    suspend fun deleteAllAccounts()
 
     @Query("UPDATE accounts SET balance = :balance WHERE id = :id")
     suspend fun updateBalance(id: Long, balance: Double)

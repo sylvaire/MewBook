@@ -37,6 +37,7 @@ data class StatisticsUiState(
     val dailyIncome: List<Double> = emptyList(),
     val dailyExpense: List<Double> = emptyList(),
     val labels: List<String> = emptyList(),
+    val observedMask: List<Boolean> = emptyList(),
     val isLoading: Boolean = true
 )
 
@@ -77,6 +78,7 @@ class StatisticsViewModel @Inject constructor(
             TimeRange.MONTH -> calculateMonthlyData(filteredRecords, YearMonth.from(startDate))
             TimeRange.YEAR -> calculateYearlyData(filteredRecords, startDate.year)
         }
+        val observedMask = buildObservedMask(timeRange, startDate, labels.size)
 
         val nextAnchorDate = shiftAnchorDate(anchorDate, timeRange, 1)
         val (_, nextEndDate) = getDateRange(timeRange, nextAnchorDate)
@@ -93,6 +95,7 @@ class StatisticsViewModel @Inject constructor(
             dailyIncome = dailyIncome,
             dailyExpense = dailyExpense,
             labels = labels,
+            observedMask = observedMask,
             isLoading = false
         )
     }.stateIn(
@@ -249,6 +252,32 @@ class StatisticsViewModel @Inject constructor(
             }
             TimeRange.MONTH -> "${startDate.year}年${startDate.monthValue}月"
             TimeRange.YEAR -> "${startDate.year}年"
+        }
+    }
+
+    private fun buildObservedMask(
+        timeRange: TimeRange,
+        startDate: LocalDate,
+        count: Int
+    ): List<Boolean> {
+        val today = LocalDate.now()
+        return when (timeRange) {
+            TimeRange.WEEK -> List(count) { index ->
+                !startDate.plusDays(index.toLong()).isAfter(today)
+            }
+            TimeRange.MONTH -> {
+                val targetMonth = YearMonth.from(startDate)
+                List(count) { index ->
+                    !targetMonth.atDay(index + 1).isAfter(today)
+                }
+            }
+            TimeRange.YEAR -> List(count) { index ->
+                if (startDate.year < today.year) {
+                    true
+                } else {
+                    index + 1 <= today.monthValue
+                }
+            }
         }
     }
 }

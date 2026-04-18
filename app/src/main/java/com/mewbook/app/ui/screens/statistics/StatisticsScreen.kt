@@ -34,6 +34,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -43,9 +44,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -111,7 +115,9 @@ fun StatisticsScreen(
                     IncomeExpenseTrend(
                         incomeData = uiState.dailyIncome,
                         expenseData = uiState.dailyExpense,
-                        labels = uiState.labels
+                        labels = uiState.labels,
+                        observedMask = uiState.observedMask,
+                        timeRange = uiState.timeRange
                     )
                 }
 
@@ -313,8 +319,11 @@ fun ExpenseBreakdown(
 fun IncomeExpenseTrend(
     incomeData: List<Double>,
     expenseData: List<Double>,
-    labels: List<String>
+    labels: List<String>,
+    observedMask: List<Boolean>,
+    timeRange: TimeRange
 ) {
+    val density = LocalDensity.current
     Column(modifier = Modifier.padding(16.dp)) {
         Text(
             text = "收支趋势",
@@ -324,30 +333,9 @@ fun IncomeExpenseTrend(
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    modifier = Modifier
-                        .size(12.dp)
-                        .clip(RoundedCornerShape(2.dp))
-                        .background(IncomeGreen)
-                )
-                Spacer(modifier = Modifier.width(4.dp))
-                Text("收入", style = MaterialTheme.typography.labelSmall)
-            }
-
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    modifier = Modifier
-                        .size(12.dp)
-                        .clip(RoundedCornerShape(2.dp))
-                        .background(ExpenseRed)
-                )
-                Spacer(modifier = Modifier.width(4.dp))
-                Text("支出", style = MaterialTheme.typography.labelSmall)
-            }
+        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            TrendLegendItem(label = "收入", color = IncomeGreen)
+            TrendLegendItem(label = "支出", color = ExpenseRed)
         }
 
         Spacer(modifier = Modifier.height(8.dp))
@@ -363,52 +351,63 @@ fun IncomeExpenseTrend(
                     val pointCount = maxOf(incomeData.size, expenseData.size, labels.size).coerceAtLeast(1)
                     val normalizedIncome = List(pointCount) { incomeData.getOrElse(it) { 0.0 } }
                     val normalizedExpense = List(pointCount) { expenseData.getOrElse(it) { 0.0 } }
-                    var selectedIndex by remember(normalizedIncome, normalizedExpense, labels) {
-                        mutableStateOf<Int?>(null)
+                    val normalizedObservedMask = List(pointCount) { observedMask.getOrElse(it) { true } }
+                    val defaultSelectedIndex = remember(normalizedIncome, normalizedExpense, normalizedObservedMask) {
+                        buildSelectionIndex(
+                            incomeData = normalizedIncome,
+                            expenseData = normalizedExpense,
+                            observedMask = normalizedObservedMask
+                        )
+                    }
+                    var selectedIndex by remember(normalizedIncome, normalizedExpense, labels, normalizedObservedMask) {
+                        mutableIntStateOf(defaultSelectedIndex)
                     }
                     val maxValue = (normalizedIncome + normalizedExpense).maxOrNull()?.coerceAtLeast(1.0) ?: 1.0
-                    val chartHeight = 180.dp
-                    val yAxisWidth = 56.dp
-                    val gridLineColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)
+                    val chartHeight = 208.dp
+                    val selectedGuideColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)
+                    val selectedIncome = normalizedIncome.getOrElse(selectedIndex) { 0.0 }
+                    val selectedExpense = normalizedExpense.getOrElse(selectedIndex) { 0.0 }
+                    val selectedLabel = labels.getOrElse(selectedIndex) { "" }
+                    val selectedLabelDisplay = formatFocusedLabel(selectedLabel, timeRange)
+                    val selectedBalance = selectedIncome - selectedExpense
+                    val highestExpense = normalizedExpense.maxOrNull() ?: 0.0
+                    val averageExpense = normalizedExpense.average().takeIf { !it.isNaN() } ?: 0.0
+                    val pointRadius = 8.dp
+                    val annotationBandHeight = 10.dp
+                    val chartInnerHeight = chartHeight - annotationBandHeight - pointRadius * 2
+                    val highestExpenseRatio = (highestExpense / maxValue).toFloat().coerceIn(0f, 1f)
+                    val highestExpenseLineOffset = annotationBandHeight + pointRadius + chartInnerHeight * (1f - highestExpenseRatio)
+                    var highestExpenseLabelHeightPx by remember(highestExpense) { mutableIntStateOf(0) }
+                    val highestExpenseLabelOffset = with(density) {
+                        val linePx = highestExpenseLineOffset.roundToPx()
+                        val gapPx = 2.dp.roundToPx()
+                        (linePx - highestExpenseLabelHeightPx - gapPx).coerceAtLeast(0).toDp()
+                    }
 
-                    Row(
+                    Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(chartHeight),
-                        verticalAlignment = Alignment.CenterVertically
+                            .height(chartHeight)
                     ) {
-                        Column(
-                            modifier = Modifier
-                                .width(yAxisWidth)
-                                .fillMaxSize()
-                                .padding(end = 8.dp),
-                            verticalArrangement = Arrangement.SpaceBetween,
-                            horizontalAlignment = Alignment.End
-                        ) {
+                        if (highestExpense > 0) {
                             Text(
-                                text = formatCurrency(maxValue),
+                                text = formatCurrency(highestExpense),
+                                modifier = Modifier
+                                    .align(Alignment.TopStart)
+                                    .padding(start = 4.dp, top = highestExpenseLabelOffset),
                                 style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Text(
-                                text = formatCurrency(maxValue / 2),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Text(
-                                text = "0",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = ExpenseRed,
+                                fontWeight = FontWeight.SemiBold,
+                                onTextLayout = { highestExpenseLabelHeightPx = it.size.height }
                             )
                         }
 
                         Box(
                             modifier = Modifier
-                                .weight(1f)
-                                .fillMaxSize()
+                                .matchParentSize()
                                 .pointerInput(normalizedIncome, normalizedExpense, pointCount) {
                                     detectTapGestures { offset ->
-                                        val pointRadiusPx = 6.dp.toPx()
+                                        val pointRadiusPx = 8.dp.toPx()
                                         val xStart = pointRadiusPx
                                         val xEnd = size.width - pointRadiusPx
                                         val stepX = if (pointCount > 1) {
@@ -421,16 +420,16 @@ fun IncomeExpenseTrend(
                                         } else {
                                             ((offset.x - xStart) / stepX).toInt().coerceIn(0, pointCount - 1)
                                         }
-                                        selectedIndex = if (selectedIndex == index) null else index
+                                        selectedIndex = index
                                     }
                                 }
                         ) {
                             Canvas(modifier = Modifier.fillMaxSize()) {
-                                val pointRadius = 6.dp.toPx()
-                                val xStart = pointRadius
-                                val xEnd = size.width - pointRadius
-                                val yTop = pointRadius
-                                val yBottom = size.height - pointRadius
+                                val pointRadiusPx = pointRadius.toPx()
+                                val xStart = pointRadiusPx
+                                val xEnd = size.width - pointRadiusPx
+                                val yTop = annotationBandHeight.toPx() + pointRadiusPx
+                                val yBottom = size.height - pointRadiusPx
                                 val chartHeightPx = (yBottom - yTop).coerceAtLeast(1f)
                                 val stepX = if (pointCount > 1) {
                                     (xEnd - xStart) / (pointCount - 1)
@@ -446,16 +445,39 @@ fun IncomeExpenseTrend(
                                     val ratio = (value / maxValue).toFloat().coerceIn(0f, 1f)
                                     return yBottom - ratio * chartHeightPx
                                 }
+                                val selectedX = xFor(selectedIndex)
+                                val dashedPathEffect = PathEffect.dashPathEffect(
+                                    intervals = floatArrayOf(10.dp.toPx(), 8.dp.toPx()),
+                                    phase = 0f
+                                )
 
-                                for (i in 0..2) {
-                                    val y = yTop + (chartHeightPx / 2f) * i
+                                if (highestExpense > 0) {
+                                    val highestY = yFor(highestExpense)
                                     drawLine(
-                                        color = gridLineColor,
-                                        start = Offset(xStart, y),
-                                        end = Offset(xEnd, y),
-                                        strokeWidth = 1.dp.toPx()
+                                        color = ExpenseRed.copy(alpha = 0.32f),
+                                        start = Offset(xStart, highestY),
+                                        end = Offset(xEnd, highestY),
+                                        strokeWidth = 1.5.dp.toPx()
                                     )
                                 }
+
+                                if (averageExpense > 0) {
+                                    val averageY = yFor(averageExpense)
+                                    drawLine(
+                                        color = ExpenseRed.copy(alpha = 0.22f),
+                                        start = Offset(xStart, averageY),
+                                        end = Offset(xEnd, averageY),
+                                        strokeWidth = 1.dp.toPx(),
+                                        pathEffect = dashedPathEffect
+                                    )
+                                }
+
+                                drawLine(
+                                    color = selectedGuideColor,
+                                    start = Offset(selectedX, yTop),
+                                    end = Offset(selectedX, yBottom),
+                                    strokeWidth = 2.dp.toPx()
+                                )
 
                                 val incomePath = Path()
                                 normalizedIncome.forEachIndexed { index, value ->
@@ -466,14 +488,42 @@ fun IncomeExpenseTrend(
                                 drawPath(
                                     path = incomePath,
                                     color = IncomeGreen,
-                                    style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round)
+                                    style = Stroke(width = 1.75.dp.toPx(), cap = StrokeCap.Round)
                                 )
                                 normalizedIncome.forEachIndexed { index, value ->
+                                    val isObserved = normalizedObservedMask.getOrElse(index) { true }
+                                    val radius = if (selectedIndex == index && isObserved) 6.5.dp.toPx() else 5.dp.toPx()
+                                    val solidOuterRadius = radius - 2.dp.toPx()
+                                    val hollowStrokeWidth = 1.5.dp.toPx()
+                                    val hollowRadius = (solidOuterRadius - hollowStrokeWidth / 2f).coerceAtLeast(1.dp.toPx())
+                                    val center = Offset(xFor(index), yFor(value))
+                                    if (selectedIndex == index && isObserved) {
+                                        drawCircle(
+                                            color = IncomeGreen.copy(alpha = 0.20f),
+                                            radius = 10.dp.toPx(),
+                                            center = center
+                                        )
+                                    }
                                     drawCircle(
-                                        color = IncomeGreen,
-                                        radius = if (selectedIndex == index) 8.dp.toPx() else 5.dp.toPx(),
-                                        center = Offset(xFor(index), yFor(value))
+                                        color = Color.White,
+                                        radius = radius,
+                                        center = center
                                     )
+                                    if (isObserved) {
+                                        drawCircle(
+                                            color = IncomeGreen,
+                                            radius = solidOuterRadius,
+                                            center = center,
+                                            style = Fill
+                                        )
+                                    } else {
+                                        drawCircle(
+                                            color = IncomeGreen.copy(alpha = 0.82f),
+                                            radius = hollowRadius,
+                                            center = center,
+                                            style = Stroke(width = hollowStrokeWidth)
+                                        )
+                                    }
                                 }
 
                                 val expensePath = Path()
@@ -485,101 +535,111 @@ fun IncomeExpenseTrend(
                                 drawPath(
                                     path = expensePath,
                                     color = ExpenseRed,
-                                    style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round)
+                                    style = Stroke(width = 1.75.dp.toPx(), cap = StrokeCap.Round)
                                 )
                                 normalizedExpense.forEachIndexed { index, value ->
+                                    val isObserved = normalizedObservedMask.getOrElse(index) { true }
+                                    val radius = if (selectedIndex == index && isObserved) 6.5.dp.toPx() else 5.dp.toPx()
+                                    val solidOuterRadius = radius - 2.dp.toPx()
+                                    val hollowStrokeWidth = 1.5.dp.toPx()
+                                    val hollowRadius = (solidOuterRadius - hollowStrokeWidth / 2f).coerceAtLeast(1.dp.toPx())
+                                    val center = Offset(xFor(index), yFor(value))
+                                    if (selectedIndex == index && isObserved) {
+                                        drawCircle(
+                                            color = ExpenseRed.copy(alpha = 0.20f),
+                                            radius = 10.dp.toPx(),
+                                            center = center
+                                        )
+                                    }
                                     drawCircle(
-                                        color = ExpenseRed,
-                                        radius = if (selectedIndex == index) 8.dp.toPx() else 5.dp.toPx(),
-                                        center = Offset(xFor(index), yFor(value))
+                                        color = Color.White,
+                                        radius = radius,
+                                        center = center
                                     )
+                                    if (isObserved) {
+                                        drawCircle(
+                                            color = ExpenseRed,
+                                            radius = solidOuterRadius,
+                                            center = center,
+                                            style = Fill
+                                        )
+                                    } else {
+                                        drawCircle(
+                                            color = ExpenseRed.copy(alpha = 0.82f),
+                                            radius = hollowRadius,
+                                            center = center,
+                                            style = Stroke(width = hollowStrokeWidth)
+                                        )
+                                    }
                                 }
                             }
                         }
                     }
 
-                    // 选中数据详情
-                    selectedIndex?.let { index ->
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.primaryContainer
-                            )
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.primaryContainer
+                        )
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(14.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Column(
-                                modifier = Modifier.padding(12.dp)
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    text = labels.getOrNull(index) ?: "",
+                                    text = selectedLabelDisplay,
                                     style = MaterialTheme.typography.titleSmall,
                                     fontWeight = FontWeight.Bold
                                 )
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Text(
-                                        text = "收入",
-                                        style = MaterialTheme.typography.bodySmall
-                                    )
-                                    Text(
-                                        text = "+${formatCurrency(normalizedIncome.getOrElse(index) { 0.0 })}",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = IncomeGreen,
-                                        fontWeight = FontWeight.Medium
-                                    )
-                                }
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Text(
-                                        text = "支出",
-                                        style = MaterialTheme.typography.bodySmall
-                                    )
-                                    Text(
-                                        text = "-${formatCurrency(normalizedExpense.getOrElse(index) { 0.0 })}",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = ExpenseRed,
-                                        fontWeight = FontWeight.Medium
-                                    )
-                                }
-                                val balance = normalizedIncome.getOrElse(index) { 0.0 } - normalizedExpense.getOrElse(index) { 0.0 }
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Text(
-                                        text = "结余",
-                                        style = MaterialTheme.typography.bodySmall
-                                    )
-                                    Text(
-                                        text = formatCurrency(balance),
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = if (balance >= 0) IncomeGreen else ExpenseRed,
-                                        fontWeight = FontWeight.Medium
-                                    )
-                                }
+                                Text(
+                                    text = "当前聚焦",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
                             }
+                            TrendMetricRow(
+                                label = "收入",
+                                value = "+${formatCurrency(selectedIncome)}",
+                                valueColor = IncomeGreen
+                            )
+                            TrendMetricRow(
+                                label = "支出",
+                                value = "-${formatCurrency(selectedExpense)}",
+                                valueColor = ExpenseRed
+                            )
+                            TrendMetricRow(
+                                label = "结余",
+                                value = formatCurrency(selectedBalance),
+                                valueColor = if (selectedBalance >= 0) IncomeGreen else ExpenseRed
+                            )
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(10.dp))
 
                     val bottomLabels = buildBottomLabels(labels)
                     Row(
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(start = yAxisWidth),
+                            .fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         bottomLabels.forEach { label ->
                             Text(
                                 text = label,
                                 style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = if (label == selectedLabel) {
+                                    MaterialTheme.colorScheme.primary
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                },
+                                fontWeight = if (label == selectedLabel) FontWeight.SemiBold else FontWeight.Normal
                             )
                         }
                     }
@@ -587,6 +647,65 @@ fun IncomeExpenseTrend(
             }
         }
     }
+}
+
+@Composable
+private fun TrendLegendItem(
+    label: String,
+    color: Color
+) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Box(
+            modifier = Modifier
+                .size(12.dp)
+                .clip(RoundedCornerShape(2.dp))
+                .background(color)
+        )
+        Spacer(modifier = Modifier.width(4.dp))
+        Text(label, style = MaterialTheme.typography.labelSmall)
+    }
+}
+
+@Composable
+private fun TrendMetricRow(
+    label: String,
+    value: String,
+    valueColor: Color
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodySmall
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.bodyMedium,
+            color = valueColor,
+            fontWeight = FontWeight.SemiBold
+        )
+    }
+}
+
+private fun buildSelectionIndex(
+    incomeData: List<Double>,
+    expenseData: List<Double>,
+    observedMask: List<Boolean>
+): Int {
+    val combined = incomeData.zip(expenseData) { income, expense -> income + expense }
+    for (index in combined.indices.reversed()) {
+        if (observedMask.getOrElse(index) { true } && combined[index] > 0.0) {
+            return index
+        }
+    }
+    for (index in observedMask.indices.reversed()) {
+        if (observedMask[index]) {
+            return index
+        }
+    }
+    return combined.lastIndex.coerceAtLeast(0)
 }
 
 private fun buildBottomLabels(labels: List<String>): List<String> {
@@ -605,4 +724,15 @@ private fun buildBottomLabels(labels: List<String>): List<String> {
         labels.lastIndex
     )
     return indexCandidates.map { labels[it.coerceIn(0, labels.lastIndex)] }
+}
+
+private fun formatFocusedLabel(
+    label: String,
+    timeRange: TimeRange
+): String {
+    return if (timeRange == TimeRange.MONTH && label.all { it.isDigit() }) {
+        "${label}日"
+    } else {
+        label
+    }
 }

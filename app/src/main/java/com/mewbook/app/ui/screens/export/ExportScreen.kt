@@ -1,6 +1,10 @@
 package com.mewbook.app.ui.screens.export
 
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
 import android.content.Intent
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -15,6 +19,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.TableChart
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
@@ -25,9 +30,13 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -35,6 +44,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.activity.result.contract.ActivityResultContracts
 import com.mewbook.app.ui.components.MewCompactTopAppBar
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -45,6 +55,42 @@ fun ExportScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
+    var pendingRestoreUri by remember { mutableStateOf<android.net.Uri?>(null) }
+    val createBackupLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("application/json")
+    ) { uri ->
+        uri?.let(viewModel::backupToLocal)
+    }
+    val restoreBackupLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        pendingRestoreUri = uri
+    }
+
+    pendingRestoreUri?.let { uri ->
+        AlertDialog(
+            onDismissRequest = { pendingRestoreUri = null },
+            title = { Text("确认本地还原") },
+            text = {
+                Text("本地还原会覆盖当前应用中的记录、分类、账户、预算、分支、DAV 配置与主题设置。建议先做一次本地备份。")
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.restoreFromLocal(uri)
+                        pendingRestoreUri = null
+                    }
+                ) {
+                    Text("继续还原")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingRestoreUri = null }) {
+                    Text("取消")
+                }
+            }
+        )
+    }
 
     // Handle successful export
     if (uiState.exportedUri != null) {
@@ -56,6 +102,20 @@ fun ExportScreen(
         }
         context.startActivity(Intent.createChooser(shareIntent, "分享导出文件"))
         viewModel.clearExportedUri()
+    }
+
+    if (uiState.message != null) {
+        androidx.compose.runtime.LaunchedEffect(uiState.message) {
+            android.widget.Toast.makeText(context, uiState.message, android.widget.Toast.LENGTH_SHORT).show()
+            viewModel.clearMessage()
+        }
+    }
+
+    if (uiState.restoreRefreshToken != null) {
+        androidx.compose.runtime.LaunchedEffect(uiState.restoreRefreshToken) {
+            viewModel.consumeRestoreRefreshToken()
+            context.findActivity()?.recreate()
+        }
     }
 
     Scaffold(
@@ -94,6 +154,53 @@ fun ExportScreen(
             )
 
             Spacer(modifier = Modifier.height(8.dp))
+
+            Text(
+                text = "本地备份",
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.SemiBold
+            )
+
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Button(
+                        onClick = { createBackupLauncher.launch(viewModel.suggestedBackupFileName()) },
+                        enabled = !uiState.isBackingUpLocally && !uiState.isRestoringLocally,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        if (uiState.isBackingUpLocally) {
+                            CircularProgressIndicator(modifier = Modifier.height(18.dp), strokeWidth = 2.dp)
+                        } else {
+                            Text("本地备份")
+                        }
+                    }
+
+                    OutlinedButton(
+                        onClick = { restoreBackupLauncher.launch(arrayOf("application/json")) },
+                        enabled = !uiState.isBackingUpLocally && !uiState.isRestoringLocally,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        if (uiState.isRestoringLocally) {
+                            CircularProgressIndicator(modifier = Modifier.height(18.dp), strokeWidth = 2.dp)
+                        } else {
+                            Text("本地还原")
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Text(
+                text = "分享导出",
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.SemiBold
+            )
 
             ExportOptionCard(
                 icon = Icons.Default.TableChart,
@@ -134,11 +241,19 @@ fun ExportScreen(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Text(
-                text = "• 记账记录（日期、类型、金额、备注）\n• 分类信息（一级分类、二级分类）",
+                text = "• 本地备份/还原：完整应用数据（记录、分类、账户、预算、分支、DAV配置、主题）\n• 分享导出 CSV：便于表格查看\n• 分享导出 JSON：统一版本化备份快照",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
+    }
+}
+
+private tailrec fun Context.findActivity(): Activity? {
+    return when (this) {
+        is Activity -> this
+        is ContextWrapper -> baseContext.findActivity()
+        else -> null
     }
 }
 

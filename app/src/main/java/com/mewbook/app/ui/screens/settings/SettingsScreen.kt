@@ -39,6 +39,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.foundation.verticalScroll
+import com.mewbook.app.BuildConfig
 import com.mewbook.app.data.preferences.AppThemeMode
 import com.mewbook.app.ui.components.MewCompactTopAppBar
 
@@ -151,7 +152,7 @@ fun SettingsScreen(
             SettingsItem(
                 icon = Icons.Filled.Info,
                 title = "关于喵喵记账",
-                subtitle = "版本 1.0.0",
+                subtitle = "版本 ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
                 onClick = { }
             )
         }

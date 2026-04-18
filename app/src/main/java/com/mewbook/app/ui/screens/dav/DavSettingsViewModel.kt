@@ -1,5 +1,6 @@
 package com.mewbook.app.ui.screens.dav
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mewbook.app.domain.model.DavConfig
@@ -41,6 +42,10 @@ class DavSettingsViewModel @Inject constructor(
     private val exportDataUseCase: ExportDataUseCase,
     private val importDataUseCase: ImportDataUseCase
 ) : ViewModel() {
+
+    private companion object {
+        const val TAG = "DavSettingsVM"
+    }
 
     private val _uiState = MutableStateFlow(DavSettingsUiState())
     val uiState: StateFlow<DavSettingsUiState> = _uiState.asStateFlow()
@@ -107,6 +112,7 @@ class DavSettingsViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isTesting = true, message = null) }
             val state = _uiState.value
+            Log.d(TAG, "testConnection serverUrl=${state.serverUrl} remotePath=${state.remotePath}")
             val config = DavConfig(
                 serverUrl = state.serverUrl,
                 username = state.username,
@@ -128,6 +134,7 @@ class DavSettingsViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isExporting = true, message = null) }
             val state = _uiState.value
+            Log.d(TAG, "exportData serverUrl=${state.serverUrl} remotePath=${state.remotePath}")
             val config = DavConfig(
                 serverUrl = state.serverUrl,
                 username = state.username,
@@ -137,8 +144,10 @@ class DavSettingsViewModel @Inject constructor(
 
             val result = exportDataUseCase(config)
             _uiState.update {
+                val syncedAt = if (result.isSuccess) LocalDateTime.now() else it.lastSyncTime
                 it.copy(
                     isExporting = false,
+                    lastSyncTime = syncedAt,
                     message = if (result.isSuccess) "导出成功！" else "导出失败: ${result.exceptionOrNull()?.message}"
                 )
             }
@@ -149,6 +158,7 @@ class DavSettingsViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isImporting = true, message = null) }
             val state = _uiState.value
+            Log.d(TAG, "importData serverUrl=${state.serverUrl} remotePath=${state.remotePath}")
             val config = DavConfig(
                 serverUrl = state.serverUrl,
                 username = state.username,
@@ -158,8 +168,10 @@ class DavSettingsViewModel @Inject constructor(
 
             val result = importDataUseCase(config)
             _uiState.update {
+                val syncedAt = if (result.isSuccess) LocalDateTime.now() else it.lastSyncTime
                 it.copy(
                     isImporting = false,
+                    lastSyncTime = syncedAt,
                     message = if (result.isSuccess) "导入成功！" else "导入失败: ${result.exceptionOrNull()?.message}"
                 )
             }

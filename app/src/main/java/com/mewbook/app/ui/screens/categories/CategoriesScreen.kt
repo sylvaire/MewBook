@@ -3,6 +3,11 @@ package com.mewbook.app.ui.screens.categories
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.gestures.AnchoredDraggableState
+import androidx.compose.foundation.gestures.DraggableAnchors
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.anchoredDraggable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,6 +20,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -60,13 +66,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.IntOffset
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.mewbook.app.ui.components.MewCompactTopAppBar
 import com.mewbook.app.domain.model.Category
 import com.mewbook.app.domain.model.RecordType
 import com.mewbook.app.ui.components.CategoryIconBadge
 import com.mewbook.app.ui.components.getIconForCategory
+import kotlin.math.roundToInt
 
 // 可选的图标列表
 val availableIcons = listOf(
@@ -175,11 +184,16 @@ fun CategoriesScreen(
             val displayedCategories = if (selectedTabIndex == 0) expenseCategories else incomeCategories
 
             LazyColumn(
-                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
+                contentPadding = PaddingValues(
+                    start = 12.dp,
+                    end = 12.dp,
+                    top = 10.dp,
+                    bottom = 96.dp
+                ),
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 items(displayedCategories, key = { it.id }) { category ->
-                    CategoryItem(
+                    CategoryRowItem(
                         category = category,
                         canMoveUp = displayedCategories.firstOrNull()?.id != category.id,
                         canMoveDown = displayedCategories.lastOrNull()?.id != category.id,
@@ -194,8 +208,9 @@ fun CategoriesScreen(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun CategoryItem(
+private fun CategoryRowItem(
     category: Category,
     canMoveUp: Boolean,
     canMoveDown: Boolean,
@@ -204,8 +219,105 @@ fun CategoryItem(
     onEditClick: () -> Unit,
     onDeleteClick: () -> Unit
 ) {
+    if (category.isDefault) {
+        CategoryItemCard(
+            category = category,
+            canMoveUp = canMoveUp,
+            canMoveDown = canMoveDown,
+            onMoveUpClick = onMoveUpClick,
+            onMoveDownClick = onMoveDownClick,
+            onClick = {}
+        )
+        return
+    }
+
+    val actionWidth = 76.dp
+    val density = LocalDensity.current
+    val actionWidthPx = with(density) { actionWidth.toPx() }
+    val swipeState = remember {
+        AnchoredDraggableState(
+            initialValue = 0,
+            positionalThreshold = { distance -> distance * 0.35f },
+            velocityThreshold = { with(density) { 120.dp.toPx() } },
+            animationSpec = androidx.compose.animation.core.tween()
+        )
+    }
+    val anchors = remember(actionWidthPx) {
+        DraggableAnchors {
+            0 at 0f
+            1 at -actionWidthPx
+        }
+    }
+    val offsetX = swipeState.offset.takeIf { !it.isNaN() } ?: 0f
+
+    androidx.compose.runtime.LaunchedEffect(anchors) {
+        swipeState.updateAnchors(anchors)
+    }
+
+    Box(modifier = Modifier.fillMaxWidth()) {
+        Card(
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .width(actionWidth)
+                .height(64.dp)
+                .clickable {
+                    onDeleteClick()
+                },
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.error
+            )
+        ) {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Delete,
+                    contentDescription = "删除分类",
+                    tint = MaterialTheme.colorScheme.onError
+                )
+            }
+        }
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .offset { IntOffset(offsetX.roundToInt(), 0) }
+                .anchoredDraggable(
+                    state = swipeState,
+                    orientation = Orientation.Horizontal,
+                    reverseDirection = false
+                )
+        ) {
+            CategoryItemCard(
+                category = category,
+                canMoveUp = canMoveUp,
+                canMoveDown = canMoveDown,
+                onMoveUpClick = onMoveUpClick,
+                onMoveDownClick = onMoveDownClick,
+                onClick = {
+                    if (swipeState.currentValue == 0) {
+                        onEditClick()
+                    }
+                }
+            )
+        }
+    }
+}
+
+@Composable
+private fun CategoryItemCard(
+    category: Category,
+    canMoveUp: Boolean,
+    canMoveDown: Boolean,
+    onMoveUpClick: () -> Unit,
+    onMoveDownClick: () -> Unit,
+    onClick: () -> Unit
+) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
         )
@@ -241,7 +353,7 @@ fun CategoryItem(
                     Text(
                         text = "自定义",
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.primary
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
@@ -268,25 +380,6 @@ fun CategoryItem(
                         imageVector = Icons.Filled.KeyboardArrowDown,
                         contentDescription = "下移",
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(16.dp)
-                    )
-                }
-            }
-
-            if (!category.isDefault) {
-                IconButton(onClick = onEditClick, modifier = Modifier.size(28.dp)) {
-                    Icon(
-                        Icons.Filled.Edit,
-                        contentDescription = "编辑",
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(16.dp)
-                    )
-                }
-                IconButton(onClick = onDeleteClick, modifier = Modifier.size(28.dp)) {
-                    Icon(
-                        Icons.Filled.Delete,
-                        contentDescription = "删除",
-                        tint = MaterialTheme.colorScheme.error,
                         modifier = Modifier.size(16.dp)
                     )
                 }

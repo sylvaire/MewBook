@@ -24,8 +24,14 @@ interface BudgetDao {
     @Query("SELECT COALESCE(SUM(amount), 0) FROM budgets WHERE month = :month AND ledgerId = :ledgerId")
     suspend fun getTotalBudgetAmountByMonth(month: String, ledgerId: Long): Double
 
+    @Query("SELECT * FROM budgets")
+    suspend fun getAllBudgetsOnce(): List<BudgetEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertBudget(budget: BudgetEntity): Long
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertBudgets(budgets: List<BudgetEntity>)
 
     @Update
     suspend fun updateBudget(budget: BudgetEntity)
@@ -35,4 +41,7 @@ interface BudgetDao {
 
     @Query("DELETE FROM budgets WHERE ledgerId = :ledgerId AND month = :month")
     suspend fun deleteBudgetsByMonth(ledgerId: Long, month: String)
+
+    @Query("DELETE FROM budgets")
+    suspend fun deleteAllBudgets()
 }

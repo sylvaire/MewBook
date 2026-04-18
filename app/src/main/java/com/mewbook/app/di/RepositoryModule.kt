@@ -1,6 +1,10 @@
 package com.mewbook.app.di
 
+import com.mewbook.app.data.remote.DavClient
+import com.mewbook.app.data.remote.DavRemoteDataSource
 import com.mewbook.app.data.repository.AccountRepositoryImpl
+import com.mewbook.app.data.repository.BackupRepository
+import com.mewbook.app.data.repository.BackupSnapshotDataSource
 import com.mewbook.app.data.repository.BudgetRepositoryImpl
 import com.mewbook.app.data.repository.CategoryRepositoryImpl
 import com.mewbook.app.data.repository.DavRepositoryImpl
@@ -39,6 +43,18 @@ abstract class RepositoryModule {
     abstract fun bindDavRepository(
         davRepositoryImpl: DavRepositoryImpl
     ): DavRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindDavRemoteDataSource(
+        davClient: DavClient
+    ): DavRemoteDataSource
+
+    @Binds
+    @Singleton
+    abstract fun bindBackupSnapshotDataSource(
+        backupRepository: BackupRepository
+    ): BackupSnapshotDataSource
 
     @Binds
     @Singleton

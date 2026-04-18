@@ -1,33 +1,25 @@
 package com.mewbook.app.data.repository
 
-import com.mewbook.app.data.local.dao.CategoryDao
 import com.mewbook.app.data.local.dao.DavConfigDao
-import com.mewbook.app.data.local.dao.RecordDao
 import com.mewbook.app.data.local.entity.DavConfigEntity
-import com.mewbook.app.data.remote.DavClient
+import com.mewbook.app.data.remote.DavRemoteDataSource
 import com.mewbook.app.domain.model.DavConfig
-import com.mewbook.app.domain.model.RecordType
 import com.mewbook.app.domain.repository.DavRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
+import java.net.URI
+import java.time.Instant
 import java.time.LocalDateTime
-import java.time.ZoneOffset
-import java.util.UUID
+import java.time.ZoneId
 import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
 class DavRepositoryImpl @Inject constructor(
     private val davConfigDao: DavConfigDao,
-    private val recordDao: RecordDao,
-    private val categoryDao: CategoryDao,
-    private val davClient: DavClient
+    private val davRemoteDataSource: DavRemoteDataSource,
+    private val backupSnapshotDataSource: BackupSnapshotDataSource
 ) : DavRepository {
-
-    private val json = Json { prettyPrint = true }
 
     override fun getDavConfig(): Flow<DavConfig?> {
         return davConfigDao.getDavConfig().map { it?.toDomain() }
@@ -42,56 +34,23 @@ class DavRepositoryImpl @Inject constructor(
     }
 
     override suspend fun testConnection(config: DavConfig): Result<Boolean> {
-        return davClient.testConnection(config.serverUrl, config.username, config.password)
+        val baseUrl = config.serverUrl.trim().trimEnd('/')
+        return davRemoteDataSource.testConnection(baseUrl, config.username, config.password)
     }
 
     override suspend fun exportData(config: DavConfig): Result<Boolean> {
         return try {
-            val records = recordDao.getAllRecordsOnce()
-            val categories = categoryDao.getAllCategoriesOnce()
+            val jsonString = backupSnapshotDataSource.exportToJsonString()
+            val backupFileName = davRemoteDataSource.generateBackupFileName()
+            val directoryUrl = davRemoteDataSource.buildDirectoryUrl(config.serverUrl, config.remotePath)
+            val fileUrl = davRemoteDataSource.buildFileUrl(config.serverUrl, config.remotePath, backupFileName)
 
-            val exportData = ExportData(
-                version = 2,
-                exportTime = LocalDateTime.now().toString(),
-                records = records.map { record ->
-                    ExportRecord(
-                        id = record.id,
-                        amount = record.amount,
-                        type = record.type,
-                        categoryId = record.categoryId,
-                        note = record.note,
-                        date = record.date,
-                        createdAt = record.createdAt,
-                        updatedAt = record.updatedAt,
-                        syncId = record.syncId ?: UUID.randomUUID().toString(),
-                        ledgerId = record.ledgerId,
-                        accountId = record.accountId
-                    )
-                },
-                categories = categories.map { category ->
-                    ExportCategory(
-                        id = category.id,
-                        name = category.name,
-                        icon = category.icon,
-                        color = category.color,
-                        type = category.type,
-                        isDefault = category.isDefault,
-                        sortOrder = category.sortOrder,
-                        parentId = category.parentId
-                    )
-                }
-            )
-
-            val jsonString = json.encodeToString(exportData)
-            val backupFileName = davClient.generateBackupFileName()
-            val remotePath = "${config.remotePath.trimEnd('/')}/$backupFileName"
-
-            val dirResult = davClient.mkcol(config.serverUrl, config.username, config.password)
+            val dirResult = davRemoteDataSource.mkcol(directoryUrl, config.username, config.password)
             if (dirResult.isFailure) {
                 return Result.failure(dirResult.exceptionOrNull() ?: Exception("Failed to create directory"))
             }
 
-            val result = davClient.putFile(remotePath, config.username, config.password, jsonString)
+            val result = davRemoteDataSource.putFile(fileUrl, config.username, config.password, jsonString)
             if (result.isSuccess) {
                 updateLastSyncTime(System.currentTimeMillis())
             }
@@ -103,8 +62,9 @@ class DavRepositoryImpl @Inject constructor(
 
     override suspend fun importData(config: DavConfig): Result<Boolean> {
         return try {
-            val propfindResult = davClient.propfind(
-                config.serverUrl,
+            val directoryUrl = davRemoteDataSource.buildDirectoryUrl(config.serverUrl, config.remotePath)
+            val propfindResult = davRemoteDataSource.propfind(
+                directoryUrl,
                 config.username,
                 config.password
             )
@@ -121,49 +81,18 @@ class DavRepositoryImpl @Inject constructor(
             }
 
             val latestFile = backupFiles.maxByOrNull { it } ?: return Result.failure(Exception("No backup files found"))
+            val fileUrl = resolveRemoteFileUrl(directoryUrl, latestFile)
 
-            val fileUrl = if (latestFile.startsWith("http")) latestFile else "${config.serverUrl.trimEnd('/')}/$latestFile"
-
-            val getResult = davClient.getFile(fileUrl, config.username, config.password)
+            val getResult = davRemoteDataSource.getFile(fileUrl, config.username, config.password)
             if (getResult.isFailure) {
                 return Result.failure(getResult.exceptionOrNull() ?: Exception("Failed to download file"))
             }
 
             val jsonString = getResult.getOrNull() ?: return Result.failure(Exception("Empty file content"))
-            val exportData = json.decodeFromString<ExportData>(jsonString)
-
-            categoryDao.deleteNonDefaultCategories()
-            val categoryEntities = exportData.categories.map { category ->
-                com.mewbook.app.data.local.entity.CategoryEntity(
-                    id = category.id,
-                    name = category.name,
-                    icon = category.icon,
-                    color = category.color,
-                    type = category.type,
-                    isDefault = category.isDefault,
-                    sortOrder = category.sortOrder,
-                    parentId = category.parentId
-                )
+            val restoreResult = backupSnapshotDataSource.importFromJsonString(jsonString)
+            if (restoreResult.isFailure) {
+                return Result.failure(restoreResult.exceptionOrNull() ?: Exception("Failed to import backup"))
             }
-            categoryDao.insertCategories(categoryEntities)
-
-            recordDao.deleteAllRecords()
-            val recordEntities = exportData.records.map { record ->
-                com.mewbook.app.data.local.entity.RecordEntity(
-                    id = record.id,
-                    amount = record.amount,
-                    type = record.type,
-                    categoryId = record.categoryId,
-                    note = record.note,
-                    date = record.date,
-                    createdAt = record.createdAt,
-                    updatedAt = record.updatedAt,
-                    syncId = record.syncId,
-                    ledgerId = record.ledgerId,
-                    accountId = record.accountId
-                )
-            }
-            recordDao.insertRecords(recordEntities)
 
             updateLastSyncTime(System.currentTimeMillis())
             Result.success(true)
@@ -184,9 +113,7 @@ class DavRepositoryImpl @Inject constructor(
             password = password,
             remotePath = remotePath,
             isEnabled = isEnabled,
-            lastSyncTime = lastSyncTime?.let {
-                LocalDateTime.ofEpochSecond(it, 0, ZoneOffset.UTC)
-            }
+            lastSyncTime = lastSyncTime?.let(::fromStoredEpochTime)
         )
     }
 
@@ -198,42 +125,21 @@ class DavRepositoryImpl @Inject constructor(
             password = password,
             remotePath = remotePath,
             isEnabled = isEnabled,
-            lastSyncTime = lastSyncTime?.toEpochSecond(ZoneOffset.UTC)
+            lastSyncTime = lastSyncTime?.atZone(ZoneId.systemDefault())?.toInstant()?.toEpochMilli()
         )
     }
+
+    private fun resolveRemoteFileUrl(directoryUrl: String, latestFile: String): String {
+        val trimmed = latestFile.trim()
+        if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+            return trimmed
+        }
+        val base = if (directoryUrl.endsWith("/")) directoryUrl else "$directoryUrl/"
+        return URI(base).resolve(trimmed).toString()
+    }
+
+    private fun fromStoredEpochTime(raw: Long): LocalDateTime {
+        val epochMillis = if (raw >= 1_000_000_000_000L) raw else raw * 1000
+        return Instant.ofEpochMilli(epochMillis).atZone(ZoneId.systemDefault()).toLocalDateTime()
+    }
 }
-
-@Serializable
-data class ExportData(
-    val version: Int,
-    val exportTime: String,
-    val records: List<ExportRecord>,
-    val categories: List<ExportCategory>
-)
-
-@Serializable
-data class ExportRecord(
-    val id: Long,
-    val amount: Double,
-    val type: String,
-    val categoryId: Long,
-    val note: String?,
-    val date: Long,
-    val createdAt: Long,
-    val updatedAt: Long,
-    val syncId: String,
-    val ledgerId: Long,
-    val accountId: Long?
-)
-
-@Serializable
-data class ExportCategory(
-    val id: Long,
-    val name: String,
-    val icon: String,
-    val color: Long,
-    val type: String,
-    val isDefault: Boolean,
-    val sortOrder: Int,
-    val parentId: Long?
-)

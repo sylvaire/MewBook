@@ -1,0 +1,64 @@
+name: Android Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+
+      - name: Decode signing keystore
+        shell: bash
+        run: |
+          mkdir -p signing
+          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > signing/mewbook-release.jks
+
+      - name: Create keystore.properties
+        shell: bash
+        run: |
+          cat > keystore.properties <<EOF
+          storeFile=signing/mewbook-release.jks
+          storePassword=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}
+          keyPassword=${{ secrets.ANDROID_KEY_PASSWORD }}
+          EOF
+
+      - name: Make Gradle executable
+        run: chmod +x gradlew
+
+      - name: Build signed release APK
+        run: ./gradlew :app:assembleRelease
+
+      - name: Rename release artifact
+        shell: bash
+        run: |
+          cp app/build/outputs/apk/release/app-release.apk "app/build/outputs/apk/release/MewBook-${GITHUB_REF_NAME}.apk"
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: MewBook ${{ github.ref_name }}
+          tag_name: ${{ github.ref_name }}
+          generate_release_notes: true
+          files: app/build/outputs/apk/release/MewBook-${{ github.ref_name }}.apk
+          append_body: true
+          body: |
+            ## 更新内容
+            自动根据本次 tag 关联提交生成更新说明，并附带已签名的 release APK。
+

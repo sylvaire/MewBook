@@ -15,6 +15,9 @@ interface LedgerDao {
     @Query("SELECT * FROM ledgers ORDER BY isDefault DESC, createdAt ASC")
     fun getAllLedgers(): Flow<List<LedgerEntity>>
 
+    @Query("SELECT * FROM ledgers ORDER BY isDefault DESC, createdAt ASC")
+    suspend fun getAllLedgersOnce(): List<LedgerEntity>
+
     @Query("SELECT * FROM ledgers WHERE id = :id")
     suspend fun getLedgerById(id: Long): LedgerEntity?
 
@@ -27,11 +30,17 @@ interface LedgerDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertLedger(ledger: LedgerEntity): Long
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertLedgers(ledgers: List<LedgerEntity>)
+
     @Update
     suspend fun updateLedger(ledger: LedgerEntity)
 
     @Delete
     suspend fun deleteLedger(ledger: LedgerEntity)
+
+    @Query("DELETE FROM ledgers")
+    suspend fun deleteAllLedgers()
 
     @Query("UPDATE ledgers SET isDefault = 0")
     suspend fun clearDefaultLedger()

@@ -248,7 +248,7 @@ fun LedgerManagementScreen(
 
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 itemsIndexed(uiState.ledgers, key = { _, ledger -> ledger.id }) { index, ledger ->
                     LedgerItem(
@@ -291,20 +291,20 @@ private fun LedgerItem(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
+                .padding(horizontal = 14.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             LedgerTypeBadge(type = ledger.type, accentColor = Color(ledger.color))
-            Spacer(modifier = Modifier.width(14.dp))
+            Spacer(modifier = Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = ledger.name,
-                    style = MaterialTheme.typography.bodyLarge,
+                    style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.SemiBold
                 )
                 Text(
                     text = if (ledger.isDefault) "默认分支" else ledger.type.displayName(),
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MaterialTheme.typography.labelSmall,
                     color = if (ledger.isDefault) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
@@ -313,15 +313,36 @@ private fun LedgerItem(
                     imageVector = Icons.Filled.CheckCircle,
                     contentDescription = "默认分支",
                     tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(end = 8.dp)
+                    modifier = Modifier
+                        .padding(end = 6.dp)
+                        .size(18.dp)
                 )
             }
-            Column(horizontalAlignment = Alignment.End) {
-                IconButton(onClick = onMoveUp, enabled = canMoveUp) {
-                    Icon(Icons.Filled.KeyboardArrowUp, contentDescription = "上移")
+            Column(
+                horizontalAlignment = Alignment.End,
+                verticalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
+                IconButton(
+                    onClick = onMoveUp,
+                    enabled = canMoveUp,
+                    modifier = Modifier.size(28.dp)
+                ) {
+                    Icon(
+                        Icons.Filled.KeyboardArrowUp,
+                        contentDescription = "上移",
+                        modifier = Modifier.size(18.dp)
+                    )
                 }
-                IconButton(onClick = onMoveDown, enabled = canMoveDown) {
-                    Icon(Icons.Filled.KeyboardArrowDown, contentDescription = "下移")
+                IconButton(
+                    onClick = onMoveDown,
+                    enabled = canMoveDown,
+                    modifier = Modifier.size(28.dp)
+                ) {
+                    Icon(
+                        Icons.Filled.KeyboardArrowDown,
+                        contentDescription = "下移",
+                        modifier = Modifier.size(18.dp)
+                    )
                 }
             }
         }
@@ -343,8 +364,8 @@ private fun LedgerTypeBadge(
             contentDescription = null,
             tint = accentColor,
             modifier = Modifier
-                .padding(10.dp)
-                .size(22.dp)
+                .padding(8.dp)
+                .size(18.dp)
         )
     }
 }

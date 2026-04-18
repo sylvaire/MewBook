@@ -6,6 +6,12 @@ captures/
 
 # Local SDK / machine config
 local.properties
+keystore.properties
+signing/
+.android/
+.gradle-user/
+*.jks
+*.keystore
 
 # IDE
 .idea/

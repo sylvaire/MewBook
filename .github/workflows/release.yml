@@ -27,13 +27,14 @@ jobs:
         shell: bash
         run: |
           mkdir -p signing
-          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > signing/mewbook-release.jks
+          printf '%s' "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > signing/mewbook-release.jks
 
       - name: Create keystore.properties
         shell: bash
         run: |
           cat > keystore.properties <<EOF
           storeFile=signing/mewbook-release.jks
+          storeType=pkcs12
           storePassword=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}
           keyPassword=${{ secrets.ANDROID_KEY_PASSWORD }}

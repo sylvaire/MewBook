@@ -40,7 +40,7 @@ android {
                 storePassword = keystoreProperties["storePassword"] as String
                 keyAlias = keystoreProperties["keyAlias"] as String
                 keyPassword = keystoreProperties["keyPassword"] as String
-                storeType = keystoreProperties.getProperty("storeType", "pkcs12")
+                storeType = keystoreProperties.getProperty("storeType", "jks")
             }
         }
     }

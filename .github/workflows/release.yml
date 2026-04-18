@@ -34,7 +34,7 @@ jobs:
         run: |
           cat > keystore.properties <<EOF
           storeFile=signing/mewbook-release.jks
-          storeType=pkcs12
+          storeType=jks
           storePassword=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}
           keyPassword=${{ secrets.ANDROID_KEY_PASSWORD }}

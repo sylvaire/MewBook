@@ -83,14 +83,18 @@ class StatisticsViewModel @Inject constructor(
         val observedMask = buildObservedMask(timeRange, startDate, labels.size)
 
         val nextAnchorDate = shiftAnchorDate(anchorDate, timeRange, 1)
-        val (_, nextEndDate) = getDateRange(timeRange, nextAnchorDate)
+        val (nextPeriodStart, _) = getDateRange(timeRange, nextAnchorDate)
+        val today = LocalDate.now()
+        // 使用「下一周期首日」判断：仅当下一整段周期完全落在「今天之后」时才禁用（例如下月、下周起始于未来）。
+        // 若用周期末日判断，从上月点「下一月」到本月时，本月末日常晚于今天，会误禁用。
+        val canGoNext = !nextPeriodStart.isAfter(today)
 
         StatisticsUiState(
             timeRange = timeRange,
             periodStart = startDate,
             periodEnd = endDate,
             periodLabel = buildPeriodLabel(timeRange, startDate, endDate),
-            canGoNext = !nextEndDate.isAfter(LocalDate.now()),
+            canGoNext = canGoNext,
             records = filteredRecords,
             categories = categories.associateBy { it.id },
             totalIncome = totalIncome,
@@ -137,10 +141,12 @@ class StatisticsViewModel @Inject constructor(
 
     fun nextPeriod() {
         val range = _timeRange.value
+        val today = LocalDate.now()
         _anchorDate.update { current ->
             val candidate = shiftAnchorDate(current, range, 1)
-            val (_, candidateEnd) = getDateRange(range, candidate)
-            if (candidateEnd.isAfter(LocalDate.now())) current else candidate
+            val (candidateStart, _) = getDateRange(range, candidate)
+            // 与 canGoNext 一致：下一周期若完全在未来（首日晚于今天）则不可前进
+            if (candidateStart.isAfter(today)) current else candidate
         }
     }
 

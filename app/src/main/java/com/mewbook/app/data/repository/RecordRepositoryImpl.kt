@@ -25,16 +25,37 @@ class RecordRepositoryImpl @Inject constructor(
         ).map { entities -> entities.map { it.toDomain() } }
     }
 
+    override fun getExpenseRecordsByCategoryAndDateRange(
+        categoryId: Long,
+        startDate: LocalDate,
+        endDate: LocalDate
+    ): Flow<List<Record>> {
+        return recordDao.getRecordsByCategoryTypeAndDateRange(
+            categoryId,
+            RecordType.EXPENSE.name,
+            startDate.toEpochDay(),
+            endDate.toEpochDay()
+        ).map { entities -> entities.map { it.toDomain() } }
+    }
+
+    override fun getRecordsByLedgerAndDateRange(
+        ledgerId: Long,
+        startDate: LocalDate,
+        endDate: LocalDate
+    ): Flow<List<Record>> {
+        return recordDao.getRecordsByLedgerAndDateRange(
+            ledgerId,
+            startDate.toEpochDay(),
+            endDate.toEpochDay()
+        ).map { entities -> entities.map { it.toDomain() } }
+    }
+
     override fun getRecordsByMonth(ledgerId: Long, month: String): Flow<List<Record>> {
         val year = month.substring(0, 4).toInt()
         val monthNum = month.substring(5, 7).toInt()
         val startDate = LocalDate.of(year, monthNum, 1)
         val endDate = startDate.plusMonths(1).minusDays(1)
-        return recordDao.getRecordsByMonth(
-            ledgerId,
-            startDate.toEpochDay(),
-            endDate.toEpochDay()
-        ).map { entities -> entities.map { it.toDomain() } }
+        return getRecordsByLedgerAndDateRange(ledgerId, startDate, endDate)
     }
 
     override fun getAllRecords(): Flow<List<Record>> {

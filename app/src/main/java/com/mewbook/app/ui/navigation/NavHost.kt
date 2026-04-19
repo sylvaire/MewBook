@@ -38,10 +38,12 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.mewbook.app.ui.screens.asset.AccountEditScreen
 import com.mewbook.app.ui.screens.asset.AddAccountScreen
 import com.mewbook.app.ui.screens.asset.AssetScreen
@@ -52,6 +54,7 @@ import com.mewbook.app.ui.screens.export.ExportScreen
 import com.mewbook.app.ui.screens.home.HomeScreen
 import com.mewbook.app.ui.screens.ledger.LedgerManagementScreen
 import com.mewbook.app.ui.screens.settings.SettingsScreen
+import com.mewbook.app.ui.screens.statistics.CategoryExpenseDetailScreen
 import com.mewbook.app.ui.screens.statistics.StatisticsScreen
 
 // ============================================
@@ -180,7 +183,25 @@ fun MewBookNavHost() {
                 )
             }
             composable(Screen.Statistics.route) {
-                StatisticsScreen()
+                StatisticsScreen(
+                    onNavigateToCategoryExpense = { categoryId, periodStart, periodEnd ->
+                        navController.navigate(
+                            Screen.CategoryExpenseDetail.createRoute(categoryId, periodStart, periodEnd)
+                        )
+                    }
+                )
+            }
+            composable(
+                route = Screen.CategoryExpenseDetail.route,
+                arguments = listOf(
+                    navArgument("categoryId") { type = NavType.LongType },
+                    navArgument("startEpoch") { type = NavType.LongType },
+                    navArgument("endEpoch") { type = NavType.LongType }
+                )
+            ) {
+                CategoryExpenseDetailScreen(
+                    onNavigateBack = { navController.popBackStack() }
+                )
             }
             composable(Screen.Asset.route) {
                 AssetScreen(

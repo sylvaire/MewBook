@@ -17,6 +17,19 @@ class GetRecordsUseCase @Inject constructor(
         return recordRepository.getRecordsByMonth(ledgerId, month)
     }
 
+    fun getByLedgerAndDateRange(ledgerId: Long, startDate: LocalDate, endDate: LocalDate): Flow<List<Record>> {
+        return recordRepository.getRecordsByLedgerAndDateRange(ledgerId, startDate, endDate)
+    }
+
+    /** 统计页支出构成下钻：与全库按周期汇总一致（不按账本过滤） */
+    fun getExpenseByCategoryAndDateRange(
+        categoryId: Long,
+        startDate: LocalDate,
+        endDate: LocalDate
+    ): Flow<List<Record>> {
+        return recordRepository.getExpenseRecordsByCategoryAndDateRange(categoryId, startDate, endDate)
+    }
+
     fun getAll(): Flow<List<Record>> {
         return recordRepository.getAllRecords()
     }

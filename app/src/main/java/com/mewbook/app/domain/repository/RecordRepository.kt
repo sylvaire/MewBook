@@ -6,6 +6,12 @@ import java.time.LocalDate
 
 interface RecordRepository {
     fun getRecordsByDateRange(startDate: LocalDate, endDate: LocalDate): Flow<List<Record>>
+    fun getExpenseRecordsByCategoryAndDateRange(
+        categoryId: Long,
+        startDate: LocalDate,
+        endDate: LocalDate
+    ): Flow<List<Record>>
+    fun getRecordsByLedgerAndDateRange(ledgerId: Long, startDate: LocalDate, endDate: LocalDate): Flow<List<Record>>
     fun getRecordsByMonth(ledgerId: Long, month: String): Flow<List<Record>>
     fun getAllRecords(): Flow<List<Record>>
     suspend fun getRecordById(id: Long): Record?

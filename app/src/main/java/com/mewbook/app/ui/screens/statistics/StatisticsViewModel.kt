@@ -27,6 +27,8 @@ enum class TimeRange {
 
 data class StatisticsUiState(
     val timeRange: TimeRange = TimeRange.MONTH,
+    val periodStart: LocalDate = LocalDate.now(),
+    val periodEnd: LocalDate = LocalDate.now(),
     val periodLabel: String = "",
     val canGoNext: Boolean = false,
     val records: List<Record> = emptyList(),
@@ -85,6 +87,8 @@ class StatisticsViewModel @Inject constructor(
 
         StatisticsUiState(
             timeRange = timeRange,
+            periodStart = startDate,
+            periodEnd = endDate,
             periodLabel = buildPeriodLabel(timeRange, startDate, endDate),
             canGoNext = !nextEndDate.isAfter(LocalDate.now()),
             records = filteredRecords,

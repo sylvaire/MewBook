@@ -16,7 +16,18 @@ interface RecordDao {
     fun getRecordsByDateRange(startDate: Long, endDate: Long): Flow<List<RecordEntity>>
 
     @Query("SELECT * FROM records WHERE ledgerId = :ledgerId AND date >= :startDate AND date <= :endDate ORDER BY date DESC, createdAt DESC")
-    fun getRecordsByMonth(ledgerId: Long, startDate: Long, endDate: Long): Flow<List<RecordEntity>>
+    fun getRecordsByLedgerAndDateRange(ledgerId: Long, startDate: Long, endDate: Long): Flow<List<RecordEntity>>
+
+    @Query(
+        "SELECT * FROM records WHERE categoryId = :categoryId AND type = :type AND date >= :startDate AND date <= :endDate " +
+            "ORDER BY date DESC, createdAt DESC"
+    )
+    fun getRecordsByCategoryTypeAndDateRange(
+        categoryId: Long,
+        type: String,
+        startDate: Long,
+        endDate: Long
+    ): Flow<List<RecordEntity>>
 
     @Query("SELECT * FROM records ORDER BY date DESC, createdAt DESC")
     fun getAllRecords(): Flow<List<RecordEntity>>

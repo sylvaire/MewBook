@@ -2,6 +2,7 @@ package com.mewbook.app.ui.screens.statistics
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -57,10 +58,12 @@ import com.mewbook.app.ui.components.MewCompactTopAppBar
 import com.mewbook.app.ui.theme.ExpenseRed
 import com.mewbook.app.ui.theme.IncomeGreen
 import com.mewbook.app.util.formatCurrency
+import java.time.LocalDate
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun StatisticsScreen(
+    onNavigateToCategoryExpense: (categoryId: Long, periodStart: LocalDate, periodEnd: LocalDate) -> Unit = { _, _, _ -> },
     viewModel: StatisticsViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -107,7 +110,14 @@ fun StatisticsScreen(
                 if (uiState.expenseByCategory.isNotEmpty()) {
                     ExpenseBreakdown(
                         expenseByCategory = uiState.expenseByCategory,
-                        categories = uiState.categories
+                        categories = uiState.categories,
+                        onCategoryClick = { categoryId ->
+                            onNavigateToCategoryExpense(
+                                categoryId,
+                                uiState.periodStart,
+                                uiState.periodEnd
+                            )
+                        }
                     )
                 }
 
@@ -258,7 +268,8 @@ fun SummarySection(
 @Composable
 fun ExpenseBreakdown(
     expenseByCategory: Map<Long, Double>,
-    categories: Map<Long, com.mewbook.app.domain.model.Category>
+    categories: Map<Long, com.mewbook.app.domain.model.Category>,
+    onCategoryClick: (Long) -> Unit
 ) {
     Column(modifier = Modifier.padding(16.dp)) {
         Text(
@@ -285,6 +296,7 @@ fun ExpenseBreakdown(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
+                            .clickable { onCategoryClick(categoryId) }
                             .padding(vertical = 4.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {

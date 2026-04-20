@@ -3,6 +3,7 @@ package com.mewbook.app.data.repository
 import com.mewbook.app.data.local.dao.BudgetDao
 import com.mewbook.app.data.local.entity.BudgetEntity
 import com.mewbook.app.domain.model.Budget
+import com.mewbook.app.domain.model.BudgetPeriodType
 import com.mewbook.app.domain.repository.BudgetRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -14,22 +15,27 @@ class BudgetRepositoryImpl @Inject constructor(
     private val budgetDao: BudgetDao
 ) : BudgetRepository {
 
-    override fun getBudgetsByMonth(ledgerId: Long, month: String): Flow<List<Budget>> {
-        return budgetDao.getBudgetsByMonth(ledgerId, month).map { entities ->
+    override fun getBudgetsByPeriod(ledgerId: Long, periodType: BudgetPeriodType, periodKey: String): Flow<List<Budget>> {
+        return budgetDao.getBudgetsByPeriod(ledgerId, periodType.name, periodKey).map { entities ->
             entities.map { it.toDomain() }
         }
     }
 
-    override suspend fun getBudgetByCategoryAndMonth(categoryId: Long, month: String, ledgerId: Long): Budget? {
-        return budgetDao.getBudgetByCategoryAndMonth(categoryId, month, ledgerId)?.toDomain()
+    override suspend fun getBudgetByCategoryAndPeriod(
+        categoryId: Long,
+        periodType: BudgetPeriodType,
+        periodKey: String,
+        ledgerId: Long
+    ): Budget? {
+        return budgetDao.getBudgetByCategoryAndPeriod(categoryId, periodType.name, periodKey, ledgerId)?.toDomain()
     }
 
-    override suspend fun getTotalBudgetByMonth(month: String, ledgerId: Long): Budget? {
-        return budgetDao.getTotalBudgetByMonth(month, ledgerId)?.toDomain()
+    override suspend fun getTotalBudgetByPeriod(periodType: BudgetPeriodType, periodKey: String, ledgerId: Long): Budget? {
+        return budgetDao.getTotalBudgetByPeriod(periodType.name, periodKey, ledgerId)?.toDomain()
     }
 
-    override suspend fun getTotalBudgetAmountByMonth(month: String, ledgerId: Long): Double {
-        return budgetDao.getTotalBudgetAmountByMonth(month, ledgerId)
+    override suspend fun getTotalBudgetAmountByPeriod(periodType: BudgetPeriodType, periodKey: String, ledgerId: Long): Double {
+        return budgetDao.getTotalBudgetAmountByPeriod(periodType.name, periodKey, ledgerId)
     }
 
     override suspend fun insertBudget(budget: Budget): Long {
@@ -44,15 +50,16 @@ class BudgetRepositoryImpl @Inject constructor(
         budgetDao.deleteBudget(budget.toEntity())
     }
 
-    override suspend fun deleteBudgetsByMonth(ledgerId: Long, month: String) {
-        budgetDao.deleteBudgetsByMonth(ledgerId, month)
+    override suspend fun deleteBudgetsByPeriod(ledgerId: Long, periodType: BudgetPeriodType, periodKey: String) {
+        budgetDao.deleteBudgetsByPeriod(ledgerId, periodType.name, periodKey)
     }
 
     private fun BudgetEntity.toDomain(): Budget {
         return Budget(
             id = id,
             categoryId = categoryId,
-            month = month,
+            periodType = BudgetPeriodType.valueOf(periodType),
+            periodKey = periodKey,
             amount = amount,
             ledgerId = ledgerId
         )
@@ -62,7 +69,8 @@ class BudgetRepositoryImpl @Inject constructor(
         return BudgetEntity(
             id = id,
             categoryId = categoryId,
-            month = month,
+            periodKey = periodKey,
+            periodType = periodType.name,
             amount = amount,
             ledgerId = ledgerId
         )

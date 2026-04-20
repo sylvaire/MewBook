@@ -4,6 +4,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mewbook.app.domain.model.Record
+import com.mewbook.app.domain.repository.LedgerRepository
 import com.mewbook.app.domain.usecase.category.GetCategoriesUseCase
 import com.mewbook.app.domain.usecase.record.GetRecordsUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -29,6 +30,7 @@ data class CategoryExpenseDetailUiState(
 class CategoryExpenseDetailViewModel @Inject constructor(
     getRecordsUseCase: GetRecordsUseCase,
     getCategoriesUseCase: GetCategoriesUseCase,
+    ledgerRepository: LedgerRepository,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
@@ -43,18 +45,21 @@ class CategoryExpenseDetailViewModel @Inject constructor(
 
     val uiState: StateFlow<CategoryExpenseDetailUiState> = combine(
         getRecordsUseCase.getExpenseByCategoryAndDateRange(categoryId, periodStart, periodEnd),
-        getCategoriesUseCase.getAll()
-    ) { records, categories ->
+        getCategoriesUseCase.getAll(),
+        ledgerRepository.getDefaultLedgerFlow()
+    ) { records, categories, activeLedger ->
         val cat = categories.find { it.id == categoryId }
         val name = cat?.name ?: "未知"
         val subtitle = formatPeriodSubtitle(periodStart, periodEnd)
+        val activeLedgerId = activeLedger?.id ?: 1L
+        val filteredRecords = records.filter { it.ledgerId == activeLedgerId }
         CategoryExpenseDetailUiState(
             categoryName = name,
             categoryIcon = cat?.icon ?: "more_horiz",
             categoryColor = cat?.color ?: 0xFF808080,
             periodSubtitle = subtitle,
-            records = records,
-            totalExpense = records.sumOf { it.amount },
+            records = filteredRecords,
+            totalExpense = filteredRecords.sumOf { it.amount },
             isLoading = false
         )
     }.stateIn(

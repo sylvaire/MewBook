@@ -28,7 +28,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -39,9 +38,12 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import com.mewbook.app.domain.model.Account
 import com.mewbook.app.domain.model.AccountType
+import com.mewbook.app.domain.policy.AccountDefaultsPolicy
+import com.mewbook.app.domain.policy.AccountNamingPolicy
 import com.mewbook.app.domain.repository.AccountRepository
 import com.mewbook.app.domain.repository.LedgerRepository
 import com.mewbook.app.ui.components.AccountTypeIconBadge
@@ -79,7 +81,7 @@ class AddAccountViewModel @Inject constructor(
         balance: Double
     ) {
         viewModelScope.launch {
-            _uiState.update { it.copy(isSaving = true, isDuplicateName = false) }
+            _uiState.update { it.copy(isSaving = true, isDuplicateName = false, error = null) }
 
             // 如果名称为空且该类型没有默认名称，则提示用户输入
             if (name.isBlank() && getDefaultNameForType(type).isEmpty()) {
@@ -88,11 +90,16 @@ class AddAccountViewModel @Inject constructor(
             }
 
             // 检查是否使用默认名称
-            val finalName = name.ifBlank { getDefaultNameForType(type) }
+            val finalName = name.ifBlank { getDefaultNameForType(type) }.trim()
+            val ledgerId = ledgerRepository.getDefaultLedger()?.id ?: 1L
 
             // 检查是否有重名账户
             val existingAccounts = accountRepository.getAllAccounts().first()
-            val isDuplicate = existingAccounts.any { account: Account -> account.name == finalName }
+            val isDuplicate = AccountNamingPolicy.hasDuplicateNameInLedger(
+                accounts = existingAccounts,
+                ledgerId = ledgerId,
+                candidateName = finalName
+            )
 
             if (isDuplicate) {
                 _uiState.update { it.copy(isSaving = false, isDuplicateName = true, error = "账户名称已存在，请修改") }
@@ -100,7 +107,9 @@ class AddAccountViewModel @Inject constructor(
             }
 
             try {
-                val ledgerId = ledgerRepository.getDefaultLedger()?.id ?: 1L
+                val ledgerAccounts = existingAccounts.filter { it.ledgerId == ledgerId }
+                val shouldSetAsDefault = AccountDefaultsPolicy.resolveDefaultAccountId(ledgerAccounts) == null
+                val nextSortOrder = (ledgerAccounts.maxOfOrNull { it.sortOrder } ?: -1) + 1
                 val account = Account(
                     id = 0,
                     name = finalName,
@@ -108,8 +117,8 @@ class AddAccountViewModel @Inject constructor(
                     balance = balance,
                     icon = getDefaultIconNameForType(type),
                     color = getDefaultColorForType(type),
-                    isDefault = false,
-                    sortOrder = 0,
+                    isDefault = shouldSetAsDefault,
+                    sortOrder = nextSortOrder,
                     ledgerId = ledgerId
                 )
                 accountRepository.insertAccount(account)
@@ -160,7 +169,7 @@ fun AddAccountScreen(
     preselectedType: AccountType? = null,
     viewModel: AddAccountViewModel = hiltViewModel()
 ) {
-    val uiState by viewModel.uiState.collectAsState()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var selectedType by remember { mutableStateOf(preselectedType ?: AccountType.BANK) }
     var accountName by remember { mutableStateOf("") }
     var balance by remember { mutableStateOf("") }

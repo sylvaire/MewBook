@@ -65,7 +65,9 @@ data class BackupAccount(
 data class BackupBudget(
     val id: Long,
     val categoryId: Long?,
-    val month: String,
+    val periodType: String = "MONTH",
+    val periodKey: String? = null,
+    val month: String? = null,
     val amount: Double,
     val ledgerId: Long
 )

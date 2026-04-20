@@ -13,7 +13,7 @@ import java.time.ZoneOffset
 import java.util.UUID
 
 object BackupMigration {
-    const val CURRENT_SCHEMA_VERSION = 3
+    const val CURRENT_SCHEMA_VERSION = 4
 
     private val json = Json {
         ignoreUnknownKeys = true
@@ -36,7 +36,7 @@ object BackupMigration {
                     records = envelope.payload.records,
                     categories = envelope.payload.categories,
                     accounts = envelope.payload.accounts,
-                    budgets = envelope.payload.budgets,
+                    budgets = envelope.payload.budgets.map(::normalizeBudget),
                     ledgers = if (envelope.payload.ledgers.isEmpty()) defaultLedgers() else envelope.payload.ledgers
                 )
             )
@@ -58,6 +58,16 @@ object BackupMigration {
 
     fun encodeEnvelope(envelope: BackupEnvelope): String {
         return json.encodeToString(BackupEnvelope.serializer(), envelope)
+    }
+
+    private fun normalizeBudget(budget: BackupBudget): BackupBudget {
+        val resolvedPeriodType = budget.periodType.ifBlank { "MONTH" }
+        val resolvedPeriodKey = budget.periodKey ?: budget.month ?: ""
+        return budget.copy(
+            periodType = resolvedPeriodType,
+            periodKey = resolvedPeriodKey,
+            month = if (resolvedPeriodType == "MONTH") resolvedPeriodKey else budget.month
+        )
     }
 
     private fun migrateLegacyExportV1(legacy: LegacyExportV1): BackupEnvelope {

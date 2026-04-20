@@ -2,6 +2,8 @@ package com.mewbook.app.di
 
 import android.content.Context
 import androidx.room.Room
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import com.mewbook.app.data.local.dao.AccountDao
 import com.mewbook.app.data.local.dao.BudgetDao
 import com.mewbook.app.data.local.dao.CategoryDao
@@ -20,6 +22,17 @@ import javax.inject.Singleton
 @InstallIn(SingletonComponent::class)
 object DatabaseModule {
 
+    private val MIGRATION_2_3 = object : Migration(2, 3) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE budgets ADD COLUMN periodType TEXT NOT NULL DEFAULT 'MONTH'")
+            db.execSQL("DROP INDEX IF EXISTS index_budgets_categoryId_month")
+            db.execSQL(
+                "CREATE UNIQUE INDEX IF NOT EXISTS index_budgets_ledgerId_categoryId_periodType_month " +
+                    "ON budgets(ledgerId, categoryId, periodType, month)"
+            )
+        }
+    }
+
     @Provides
     @Singleton
     fun provideDatabase(
@@ -30,7 +43,7 @@ object DatabaseModule {
             MewBookDatabase::class.java,
             MewBookDatabase.DATABASE_NAME
         )
-            .fallbackToDestructiveMigration()
+            .addMigrations(MIGRATION_2_3)
             .build()
     }
 

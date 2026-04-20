@@ -25,8 +25,8 @@ enum class AccountType {
 object DefaultAccounts {
     val defaultAccounts = listOf(
         Account(name = "现金", type = AccountType.CASH, balance = 0.0, icon = "account_balance_wallet", color = 0xFF4CAF50, isDefault = true, sortOrder = 0, ledgerId = 1),
-        Account(name = "银行卡", type = AccountType.BANK, balance = 0.0, icon = "account_balance", color = 0xFF2196F3, isDefault = true, sortOrder = 1, ledgerId = 1),
-        Account(name = "支付宝", type = AccountType.ALIPAY, balance = 0.0, icon = "alipay", color = 0xFF1890FF, isDefault = true, sortOrder = 2, ledgerId = 1),
-        Account(name = "微信", type = AccountType.WECHAT, balance = 0.0, icon = "wechat", color = 0xFF07C160, isDefault = true, sortOrder = 3, ledgerId = 1)
+        Account(name = "银行卡", type = AccountType.BANK, balance = 0.0, icon = "account_balance", color = 0xFF2196F3, isDefault = false, sortOrder = 1, ledgerId = 1),
+        Account(name = "支付宝", type = AccountType.ALIPAY, balance = 0.0, icon = "alipay", color = 0xFF1890FF, isDefault = false, sortOrder = 2, ledgerId = 1),
+        Account(name = "微信", type = AccountType.WECHAT, balance = 0.0, icon = "wechat", color = 0xFF07C160, isDefault = false, sortOrder = 3, ledgerId = 1)
     )
 }

@@ -1,5 +1,6 @@
 package com.mewbook.app.ui.screens.home
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -13,20 +14,24 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyItemScope
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ManageSearch
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ChevronLeft
-import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -51,6 +56,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.mewbook.app.domain.policy.HomeScreenLayoutPolicy
+import com.mewbook.app.ui.components.BudgetPeriodNavigator
+import com.mewbook.app.ui.components.BudgetPeriodTypeSelector
 import com.mewbook.app.ui.components.RecordItem
 import com.mewbook.app.ui.components.MewCompactTopAppBar
 import com.mewbook.app.ui.screens.add.AddEditRecordSheet
@@ -59,7 +67,6 @@ import com.mewbook.app.ui.theme.ClayDesign
 import com.mewbook.app.ui.theme.ExpenseRed
 import com.mewbook.app.ui.theme.IncomeGreen
 import com.mewbook.app.util.formatCurrency
-import java.time.format.DateTimeFormatter
 
 // ============================================
 // Warm Claymorphism Home Screen
@@ -76,14 +83,18 @@ fun HomeScreen(
     var pendingDeleteRecordId by remember { mutableLongStateOf(0L) }
     var showDeleteConfirmDialog by remember { mutableStateOf(false) }
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    val records by viewModel.records.collectAsStateWithLifecycle()
-    val totalIncome by viewModel.totalIncome.collectAsStateWithLifecycle()
-    val totalExpense by viewModel.totalExpense.collectAsStateWithLifecycle()
-    val totalBudget by viewModel.totalBudget.collectAsStateWithLifecycle()
-    val budgetRemaining by viewModel.budgetRemaining.collectAsStateWithLifecycle()
 
     LaunchedEffect(uiState.showAddEditSheet) {
         onAddSheetVisibilityChanged(uiState.showAddEditSheet)
+    }
+
+    BackHandler(
+        enabled = HomeScreenLayoutPolicy.consumeBackPress(
+            isSearchMode = uiState.isSearchMode,
+            isAddEditSheetVisible = uiState.showAddEditSheet
+        )
+    ) {
+        viewModel.exitSearchMode()
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -91,19 +102,39 @@ fun HomeScreen(
             topBar = {
                 // 温暖渐变顶部导航栏
                 MewCompactTopAppBar(
-                    title = "喵喵记账",
-                    titleContent = {
-                        Text(
-                            text = "🐱",
-                            style = MaterialTheme.typography.titleLarge
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = "喵喵记账",
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold,
-                            maxLines = 1
-                        )
+                    title = if (uiState.isSearchMode) "搜索记录" else "喵喵记账",
+                    titleContent = if (uiState.isSearchMode) {
+                        null
+                    } else {
+                        {
+                            Text(
+                                text = "🐱",
+                                style = MaterialTheme.typography.titleLarge
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "喵喵记账",
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1
+                            )
+                        }
+                    },
+                    actions = {
+                        IconButton(
+                            onClick = {
+                                if (uiState.isSearchMode) {
+                                    viewModel.exitSearchMode()
+                                } else {
+                                    viewModel.enterSearchMode()
+                                }
+                            }
+                        ) {
+                            Icon(
+                                imageVector = if (uiState.isSearchMode) Icons.Filled.Close else Icons.Filled.Search,
+                                contentDescription = if (uiState.isSearchMode) "关闭搜索" else "搜索记录"
+                            )
+                        }
                     }
                 )
             },
@@ -135,92 +166,131 @@ fun HomeScreen(
                     }
                 }
             }
-        ) { paddingValues ->
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues)
-                    .background(MaterialTheme.colorScheme.background)
-            ) {
-                // 月份选择器
-                MonthSelector(
-                    selectedMonth = uiState.selectedMonth,
-                    onMonthChange = { viewModel.selectMonth(it) }
-                )
+            ) { paddingValues ->
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(paddingValues)
+                        .background(MaterialTheme.colorScheme.background)
+                ) {
+                    if (uiState.isSearchMode) {
+                        HomeSearchField(
+                            query = uiState.searchQuery,
+                            onQueryChange = { viewModel.updateSearchQuery(it) }
+                        )
+                    } else {
+                        BudgetPeriodTypeSelector(
+                            selectedPeriodType = uiState.selectedPeriodType,
+                            onSelect = { viewModel.selectPeriodType(it) },
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                        )
 
-                // 概要卡片 - Claymorphism 风格
-                SummaryCard(
-                    totalIncome = totalIncome,
-                    totalExpense = totalExpense,
-                    totalBudget = totalBudget,
-                    budgetRemaining = budgetRemaining
-                )
-
-                // 记录列表
-                if (uiState.isLoading) {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        CircularProgressIndicator(
-                            color = MaterialTheme.colorScheme.primary
+                        BudgetPeriodNavigator(
+                            periodLabel = uiState.periodLabel,
+                            canGoNext = uiState.canGoNext,
+                            onPrevious = { viewModel.previousPeriod() },
+                            onNext = { viewModel.nextPeriod() },
+                            modifier = Modifier.padding(horizontal = 12.dp)
                         )
                     }
-                } else if (records.isEmpty()) {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center
-                        ) {
-                            Text(
-                                text = "🍊",
-                                style = MaterialTheme.typography.displayLarge
-                            )
-                            Spacer(modifier = Modifier.height(16.dp))
-                            Text(
-                                text = "还没有记录",
-                                style = MaterialTheme.typography.titleMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Text(
-                                text = "点击 + 添加第一笔记录",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+
+                    when {
+                        !uiState.isSearchMode && uiState.isLoading -> {
+                            Box(
+                                modifier = Modifier.fillMaxSize(),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                CircularProgressIndicator(
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
+
+                        uiState.isSearchMode && uiState.searchQuery.isBlank() -> {
+                            SearchStateMessage(
+                                title = "搜索当前账本记录",
+                                subtitle = "支持搜索备注、分类、金额和账户名"
                             )
                         }
-                    }
-                } else {
-                    LazyColumn(
-                        contentPadding = PaddingValues(
-                            start = 16.dp,
-                            end = 16.dp,
-                            top = 8.dp,
-                            bottom = 100.dp // 为 FAB 留出空间
-                        ),
-                        verticalArrangement = Arrangement.spacedBy(ClayDesign.CardSpacing)
-                    ) {
-                        items(records, key = { it.id }) { record ->
-                            val category = uiState.categories[record.categoryId]
-                            RecordItem(
-                                record = record,
-                                categoryName = category?.name ?: "未知",
-                                categoryIcon = category?.icon ?: "more_horiz",
-                                categoryColor = category?.color ?: 0xFF808080,
-                                onClick = { viewModel.showEditSheet(record) }
+
+                        uiState.isSearchMode && uiState.records.isEmpty() -> {
+                            SearchStateMessage(
+                                title = "没有找到结果",
+                                subtitle = "换个关键词试试，比如分类、金额或账户名"
+                            )
+                        }
+
+                        !uiState.isSearchMode && uiState.records.isEmpty() -> {
+                            Box(
+                                modifier = Modifier.fillMaxSize(),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.Center
+                                ) {
+                                    Text(
+                                        text = "🍊",
+                                        style = MaterialTheme.typography.displayLarge
+                                    )
+                                    Spacer(modifier = Modifier.height(16.dp))
+                                    Text(
+                                        text = "还没有记录",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Text(
+                                        text = "点击 + 添加第一笔记录",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                                    )
+                                }
+                            }
+                        }
+
+                        else -> {
+                            if (uiState.isSearchMode) {
+                                Text(
+                                    text = "找到 ${uiState.searchResultCount} 条记录",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(horizontal = 18.dp, vertical = 4.dp)
+                                )
+                            }
+                            HomeRecordList(
+                                records = uiState.records,
+                                categories = uiState.categories,
+                                summaryHeader = if (
+                                    HomeScreenLayoutPolicy.showSummaryAsScrollableHeader(
+                                        isSearchMode = uiState.isSearchMode,
+                                        hasRecords = uiState.records.isNotEmpty()
+                                    )
+                                ) {
+                                    {
+                                        SummaryCard(
+                                            totalIncome = uiState.totalIncome,
+                                            totalExpense = uiState.totalExpense,
+                                            totalBudget = uiState.totalBudget,
+                                            budgetRemaining = uiState.budgetRemaining
+                                        )
+                                    }
+                                } else {
+                                    null
+                                },
+                                onRecordClick = { record -> viewModel.showEditSheet(record) }
                             )
                         }
                     }
                 }
             }
-        }
 
         if (uiState.showAddEditSheet) {
             AddEditRecordSheet(
                 categories = uiState.categories.values.toList(),
                 accounts = uiState.accounts,
+                recentNotesByCategory = uiState.recentNotesByCategory,
+                defaultAccountId = uiState.defaultAccountId,
+                defaultDate = uiState.anchorDate,
                 editingRecord = uiState.editingRecord,
                 onDismiss = { viewModel.hideAddEditSheet() },
                 onSave = { amount, type, categoryId, note, date, accountId ->
@@ -269,72 +339,149 @@ fun HomeScreen(
 }
 
 @Composable
-fun MonthSelector(
-    selectedMonth: java.time.YearMonth,
-    onMonthChange: (java.time.YearMonth) -> Unit
+private fun HomeSearchField(
+    query: String,
+    onQueryChange: (String) -> Unit
 ) {
-    val isDarkTheme = isSystemInDarkTheme()
-
-    Surface(
+    Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 8.dp),
-        color = Color.Transparent
+            .padding(horizontal = 16.dp, vertical = 10.dp)
+            .shadow(
+                elevation = 6.dp,
+                shape = RoundedCornerShape(20.dp),
+                spotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)
+            ),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
+                .padding(horizontal = 14.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // 左侧按钮 - 黏土圆形
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .shadow(4.dp, CircleShape, spotColor = MaterialTheme.colorScheme.primary.copy(alpha = if (isDarkTheme) 0.08f else 0.2f))
-                    .background(MaterialTheme.colorScheme.surface, CircleShape),
-                contentAlignment = Alignment.Center
-            ) {
-                IconButton(
-                    onClick = { onMonthChange(selectedMonth.minusMonths(1)) },
-                    modifier = Modifier.size(40.dp)
-                ) {
-                    Icon(
-                        Icons.Filled.ChevronLeft,
-                        contentDescription = "上一月",
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                }
-            }
-
-            // 月份文字
-            Text(
-                text = selectedMonth.format(DateTimeFormatter.ofPattern("yyyy年MM月")),
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onBackground
+            Icon(
+                imageVector = Icons.Filled.Search,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary
             )
-
-            // 右侧按钮 - 黏土圆形
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .shadow(4.dp, CircleShape, spotColor = MaterialTheme.colorScheme.primary.copy(alpha = if (isDarkTheme) 0.08f else 0.2f))
-                    .background(MaterialTheme.colorScheme.surface, CircleShape),
-                contentAlignment = Alignment.Center
-            ) {
+            Spacer(modifier = Modifier.width(10.dp))
+            BasicTextField(
+                value = query,
+                onValueChange = onQueryChange,
+                singleLine = true,
+                modifier = Modifier.weight(1f),
+                textStyle = MaterialTheme.typography.bodyLarge.copy(
+                    color = MaterialTheme.colorScheme.onSurface
+                ),
+                cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                decorationBox = { innerTextField ->
+                    Box(modifier = Modifier.fillMaxWidth()) {
+                        if (query.isBlank()) {
+                            Text(
+                                text = "搜索备注、分类、金额、账户",
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        innerTextField()
+                    }
+                }
+            )
+            if (query.isNotBlank()) {
                 IconButton(
-                    onClick = { onMonthChange(selectedMonth.plusMonths(1)) },
-                    modifier = Modifier.size(40.dp)
+                    onClick = { onQueryChange("") },
+                    modifier = Modifier.size(32.dp)
                 ) {
                     Icon(
-                        Icons.Filled.ChevronRight,
-                        contentDescription = "下一月",
-                        tint = MaterialTheme.colorScheme.primary
+                        imageVector = Icons.Filled.Close,
+                        contentDescription = "清空搜索"
                     )
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun SearchStateMessage(
+    title: String,
+    subtitle: String
+) {
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Surface(
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f),
+                tonalElevation = 0.dp,
+                shadowElevation = 0.dp
+            ) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Rounded.ManageSearch,
+                    contentDescription = null,
+                    modifier = Modifier
+                        .padding(18.dp)
+                        .size(34.dp),
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+            }
+            Spacer(modifier = Modifier.height(14.dp))
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+@Composable
+private fun HomeRecordList(
+    records: List<com.mewbook.app.domain.model.Record>,
+    categories: Map<Long, com.mewbook.app.domain.model.Category>,
+    summaryHeader: (@Composable LazyItemScope.() -> Unit)?,
+    onRecordClick: (com.mewbook.app.domain.model.Record) -> Unit
+) {
+    LazyColumn(
+        contentPadding = PaddingValues(
+            start = 16.dp,
+            end = 16.dp,
+            top = 8.dp,
+            bottom = 100.dp
+        ),
+        verticalArrangement = Arrangement.spacedBy(ClayDesign.CardSpacing)
+    ) {
+        if (summaryHeader != null) {
+            item(
+                key = "summary_header",
+                content = summaryHeader
+            )
+        }
+        items(records, key = { it.id }) { record ->
+            val category = categories[record.categoryId]
+            RecordItem(
+                record = record,
+                categoryName = category?.name ?: "未知",
+                categoryIcon = category?.icon ?: "more_horiz",
+                categoryColor = category?.color ?: 0xFF808080,
+                onClick = { onRecordClick(record) }
+            )
         }
     }
 }

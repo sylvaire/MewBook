@@ -109,6 +109,9 @@ private val HeaderDateFormatter: DateTimeFormatter =
 fun AddEditRecordSheet(
     categories: List<Category>,
     accounts: List<Account>,
+    recentNotesByCategory: Map<Long, List<String>>,
+    defaultAccountId: Long?,
+    defaultDate: LocalDate,
     editingRecord: Record?,
     onDismiss: () -> Unit,
     onSave: (Double, RecordType, Long, String?, LocalDate, Long?) -> Unit,
@@ -122,12 +125,18 @@ fun AddEditRecordSheet(
         mutableLongStateOf(editingRecord?.categoryId ?: 0L)
     }
     var selectedAccountId by rememberSaveable(editingKey) {
-        mutableLongStateOf(editingRecord?.accountId ?: 0L)
+        mutableLongStateOf(
+            editingRecord?.accountId ?: if (editingRecord == null) {
+                defaultAccountId ?: 0L
+            } else {
+                0L
+            }
+        )
     }
     var note by rememberSaveable(editingKey) { mutableStateOf(editingRecord?.note.orEmpty()) }
     var noteDraft by rememberSaveable(editingKey) { mutableStateOf(editingRecord?.note.orEmpty()) }
     var selectedDateEpochDay by rememberSaveable(editingKey) {
-        mutableLongStateOf((editingRecord?.date ?: LocalDate.now()).toEpochDay())
+        mutableLongStateOf((editingRecord?.date ?: defaultDate).toEpochDay())
     }
     var amountExpression by rememberSaveable(editingKey) {
         mutableStateOf(editingRecord?.let { AmountExpressionHelper.formatInitialExpression(it.amount) }.orEmpty())
@@ -152,6 +161,9 @@ fun AddEditRecordSheet(
         )
     }
     val selectedCategory = remember(selectedCategoryId, categoriesById) { categoriesById[selectedCategoryId] }
+    val recentNotes = remember(selectedCategoryId, recentNotesByCategory) {
+        recentNotesByCategory[selectedCategoryId].orEmpty()
+    }
     val canSave = selectedCategory != null && AmountExpressionHelper.canSave(amountExpression)
     val showKeyboard = isKeyboardVisible && selectedCategory != null
     val actionTint = if (selectedType == RecordType.EXPENSE) ExpenseRed else IncomeGreen
@@ -163,6 +175,18 @@ fun AddEditRecordSheet(
         if (selectedCategoryId != 0L && categoriesById[selectedCategoryId]?.type != selectedType) {
             selectedCategoryId = 0L
             isKeyboardVisible = false
+        }
+    }
+
+    LaunchedEffect(editingRecord?.id, defaultAccountId) {
+        if (editingRecord == null && selectedAccountId == 0L && defaultAccountId != null) {
+            selectedAccountId = defaultAccountId
+        }
+    }
+
+    LaunchedEffect(editingRecord?.id, defaultDate) {
+        if (editingRecord == null) {
+            selectedDateEpochDay = defaultDate.toEpochDay()
         }
     }
 
@@ -223,6 +247,7 @@ fun AddEditRecordSheet(
                             selectedCategory = category,
                             selectedDate = selectedDate,
                             note = note,
+                            recentNotes = recentNotes,
                             accounts = accounts,
                             selectedAccountId = selectedAccountId,
                             keyboardSurfaceColor = keyboardSurfaceColor.copy(alpha = 0.96f),
@@ -233,6 +258,10 @@ fun AddEditRecordSheet(
                             onNoteClick = {
                                 noteDraft = note
                                 showNoteDialog = true
+                            },
+                            onRecentNoteSelected = {
+                                note = it
+                                noteDraft = it
                             },
                             onAccountSelected = { selectedAccountId = if (selectedAccountId == it.id) 0L else it.id },
                             onKeyPress = { amountExpression = AmountExpressionHelper.append(amountExpression, it) },
@@ -513,6 +542,7 @@ private fun KeyboardPanel(
     selectedCategory: Category,
     selectedDate: LocalDate,
     note: String,
+    recentNotes: List<String>,
     accounts: List<Account>,
     selectedAccountId: Long,
     keyboardSurfaceColor: Color,
@@ -521,6 +551,7 @@ private fun KeyboardPanel(
     canSave: Boolean,
     onDateClick: () -> Unit,
     onNoteClick: () -> Unit,
+    onRecentNoteSelected: (String) -> Unit,
     onAccountSelected: (Account) -> Unit,
     onKeyPress: (Char) -> Unit,
     onDelete: () -> Unit,
@@ -578,6 +609,29 @@ private fun KeyboardPanel(
                     text = note.ifBlank { "添加备注" },
                     onClick = onNoteClick
                 )
+            }
+            if (recentNotes.isNotEmpty()) {
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                    items(recentNotes, key = { it }, contentType = { "recent-note" }) { recentNote ->
+                        FilterChip(
+                            selected = note.trim() == recentNote,
+                            onClick = { onRecentNoteSelected(recentNote) },
+                            label = {
+                                Text(
+                                    text = recentNote,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    maxLines = 1
+                                )
+                            },
+                            colors = FilterChipDefaults.filterChipColors(
+                                containerColor = Color.White.copy(alpha = 0.08f),
+                                labelColor = Color.White.copy(alpha = 0.82f),
+                                selectedContainerColor = keyAccent.copy(alpha = 0.22f),
+                                selectedLabelColor = Color.White
+                            )
+                        )
+                    }
+                }
             }
             AmountConsoleCard(
                 selectedCategory = selectedCategory,

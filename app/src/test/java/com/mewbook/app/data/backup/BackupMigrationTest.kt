@@ -117,6 +117,48 @@ class BackupMigrationTest {
     }
 
     @Test
+    fun parseSchema3Envelope_backfillsBudgetPeriodFields() {
+        val currentJson = """
+            {
+              "schemaVersion": 3,
+              "appVersion": "1.0.2",
+              "exportedAt": "2026-04-18T12:00:00",
+              "payload": {
+                "records": [],
+                "categories": [],
+                "accounts": [],
+                "budgets": [
+                  {
+                    "id": 7,
+                    "categoryId": null,
+                    "month": "2026-04",
+                    "amount": 800.0,
+                    "ledgerId": 1
+                  }
+                ],
+                "ledgers": [
+                  {
+                    "id": 1,
+                    "name": "我的账本",
+                    "type": "PERSONAL",
+                    "icon": "person",
+                    "color": 4283215696,
+                    "createdAt": 1,
+                    "isDefault": true
+                  }
+                ]
+              }
+            }
+        """.trimIndent()
+
+        val envelope = BackupMigration.parseToCurrentEnvelope(currentJson)
+        val budget = envelope.payload.budgets.first()
+
+        assertEquals("MONTH", budget.periodType)
+        assertEquals("2026-04", budget.periodKey)
+    }
+
+    @Test
     fun parseFutureEnvelope_throwsClearError() {
         val futureJson = """
             {

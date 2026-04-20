@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <style name="Theme.MewBook" parent="android:Theme.Material.Light.NoActionBar">
+    </style>
+
+    <style name="Theme.MewBook.Launch" parent="Theme.MewBook">
         <item name="android:windowBackground">@color/splash_background</item>
     </style>
 </resources>

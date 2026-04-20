@@ -113,7 +113,7 @@ fun SettingsScreen(
             SettingsItem(
                 icon = Icons.Filled.AccountBalanceWallet,
                 title = "预算管理",
-                subtitle = "设置月度预算",
+                subtitle = "设置不同周期及类型预算",
                 onClick = onNavigateToBudget
             )
 

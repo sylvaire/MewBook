@@ -1,5 +1,10 @@
 package com.mewbook.app.ui.navigation
 
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -80,6 +85,14 @@ val bottomNavItems = listOf(
 fun MewBookNavHost() {
     val isDarkTheme = isSystemInDarkTheme()
     val navController = rememberNavController()
+    val topLevelRoutes = remember {
+        setOf(
+            Screen.Home.route,
+            Screen.Statistics.route,
+            Screen.Asset.route,
+            Screen.Settings.route
+        )
+    }
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
     var isHomeAddSheetVisible by remember { mutableStateOf(false) }
@@ -173,7 +186,43 @@ fun MewBookNavHost() {
         NavHost(
             navController = navController,
             startDestination = Screen.Home.route,
-            modifier = Modifier.padding(innerPadding)
+            modifier = Modifier.padding(innerPadding),
+            enterTransition = {
+                val initialRoute = initialState.destination.route
+                val targetRoute = targetState.destination.route
+                if (initialRoute in topLevelRoutes && targetRoute in topLevelRoutes) {
+                    fadeIn(animationSpec = tween(durationMillis = 110))
+                } else {
+                    slideInHorizontally(
+                        animationSpec = tween(durationMillis = 170),
+                        initialOffsetX = { it / 10 }
+                    ) + fadeIn(animationSpec = tween(durationMillis = 130))
+                }
+            },
+            exitTransition = {
+                val initialRoute = initialState.destination.route
+                val targetRoute = targetState.destination.route
+                if (initialRoute in topLevelRoutes && targetRoute in topLevelRoutes) {
+                    fadeOut(animationSpec = tween(durationMillis = 90))
+                } else {
+                    slideOutHorizontally(
+                        animationSpec = tween(durationMillis = 120),
+                        targetOffsetX = { -it / 12 }
+                    ) + fadeOut(animationSpec = tween(durationMillis = 90))
+                }
+            },
+            popEnterTransition = {
+                slideInHorizontally(
+                    animationSpec = tween(durationMillis = 150),
+                    initialOffsetX = { -it / 10 }
+                ) + fadeIn(animationSpec = tween(durationMillis = 120))
+            },
+            popExitTransition = {
+                slideOutHorizontally(
+                    animationSpec = tween(durationMillis = 110),
+                    targetOffsetX = { it / 12 }
+                ) + fadeOut(animationSpec = tween(durationMillis = 90))
+            }
         ) {
             composable(Screen.Home.route) {
                 HomeScreen(

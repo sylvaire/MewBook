@@ -21,7 +21,7 @@ class GetRecordsUseCase @Inject constructor(
         return recordRepository.getRecordsByLedgerAndDateRange(ledgerId, startDate, endDate)
     }
 
-    /** 统计页支出构成下钻：与全库按周期汇总一致（不按账本过滤） */
+    /** 提供指定分类在日期区间内的支出记录，后续可在上层继续按账本等维度过滤。 */
     fun getExpenseByCategoryAndDateRange(
         categoryId: Long,
         startDate: LocalDate,

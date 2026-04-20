@@ -3,10 +3,13 @@ package com.mewbook.app.domain.model
 data class Budget(
     val id: Long = 0,
     val categoryId: Long?,   // null表示总预算
-    val month: String,       // 格式: "yyyy-MM"
+    val periodType: BudgetPeriodType = BudgetPeriodType.MONTH,
+    val periodKey: String,
     val amount: Double,
     val ledgerId: Long
-)
+) {
+    val month: String get() = periodKey
+}
 
 data class BudgetWithSpending(
     val budget: Budget,

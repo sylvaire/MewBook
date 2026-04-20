@@ -12,17 +12,22 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface BudgetDao {
 
-    @Query("SELECT * FROM budgets WHERE ledgerId = :ledgerId AND month = :month")
-    fun getBudgetsByMonth(ledgerId: Long, month: String): Flow<List<BudgetEntity>>
+    @Query("SELECT * FROM budgets WHERE ledgerId = :ledgerId AND periodType = :periodType AND month = :periodKey")
+    fun getBudgetsByPeriod(ledgerId: Long, periodType: String, periodKey: String): Flow<List<BudgetEntity>>
 
-    @Query("SELECT * FROM budgets WHERE categoryId = :categoryId AND month = :month AND ledgerId = :ledgerId")
-    suspend fun getBudgetByCategoryAndMonth(categoryId: Long, month: String, ledgerId: Long): BudgetEntity?
+    @Query("SELECT * FROM budgets WHERE categoryId = :categoryId AND periodType = :periodType AND month = :periodKey AND ledgerId = :ledgerId")
+    suspend fun getBudgetByCategoryAndPeriod(
+        categoryId: Long,
+        periodType: String,
+        periodKey: String,
+        ledgerId: Long
+    ): BudgetEntity?
 
-    @Query("SELECT * FROM budgets WHERE categoryId IS NULL AND month = :month AND ledgerId = :ledgerId")
-    suspend fun getTotalBudgetByMonth(month: String, ledgerId: Long): BudgetEntity?
+    @Query("SELECT * FROM budgets WHERE categoryId IS NULL AND periodType = :periodType AND month = :periodKey AND ledgerId = :ledgerId")
+    suspend fun getTotalBudgetByPeriod(periodType: String, periodKey: String, ledgerId: Long): BudgetEntity?
 
-    @Query("SELECT COALESCE(SUM(amount), 0) FROM budgets WHERE month = :month AND ledgerId = :ledgerId")
-    suspend fun getTotalBudgetAmountByMonth(month: String, ledgerId: Long): Double
+    @Query("SELECT COALESCE(SUM(amount), 0) FROM budgets WHERE periodType = :periodType AND month = :periodKey AND ledgerId = :ledgerId")
+    suspend fun getTotalBudgetAmountByPeriod(periodType: String, periodKey: String, ledgerId: Long): Double
 
     @Query("SELECT * FROM budgets")
     suspend fun getAllBudgetsOnce(): List<BudgetEntity>
@@ -39,8 +44,8 @@ interface BudgetDao {
     @Delete
     suspend fun deleteBudget(budget: BudgetEntity)
 
-    @Query("DELETE FROM budgets WHERE ledgerId = :ledgerId AND month = :month")
-    suspend fun deleteBudgetsByMonth(ledgerId: Long, month: String)
+    @Query("DELETE FROM budgets WHERE ledgerId = :ledgerId AND periodType = :periodType AND month = :periodKey")
+    suspend fun deleteBudgetsByPeriod(ledgerId: Long, periodType: String, periodKey: String)
 
     @Query("DELETE FROM budgets")
     suspend fun deleteAllBudgets()

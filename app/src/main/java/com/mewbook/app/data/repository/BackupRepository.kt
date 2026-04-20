@@ -175,7 +175,9 @@ class BackupRepository @Inject constructor(
     private fun BudgetEntity.toBackup() = BackupBudget(
         id = id,
         categoryId = categoryId,
-        month = month,
+        periodType = periodType,
+        periodKey = periodKey,
+        month = if (periodType == "MONTH") periodKey else null,
         amount = amount,
         ledgerId = ledgerId
     )
@@ -239,7 +241,8 @@ class BackupRepository @Inject constructor(
     private fun BackupBudget.toEntity() = BudgetEntity(
         id = id,
         categoryId = categoryId,
-        month = month,
+        periodKey = periodKey ?: month ?: error("Backup budget period key missing"),
+        periodType = periodType,
         amount = amount,
         ledgerId = ledgerId
     )

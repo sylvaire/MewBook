@@ -12,10 +12,10 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface LedgerDao {
 
-    @Query("SELECT * FROM ledgers ORDER BY isDefault DESC, createdAt ASC")
+    @Query("SELECT * FROM ledgers ORDER BY createdAt ASC")
     fun getAllLedgers(): Flow<List<LedgerEntity>>
 
-    @Query("SELECT * FROM ledgers ORDER BY isDefault DESC, createdAt ASC")
+    @Query("SELECT * FROM ledgers ORDER BY createdAt ASC")
     suspend fun getAllLedgersOnce(): List<LedgerEntity>
 
     @Query("SELECT * FROM ledgers WHERE id = :id")

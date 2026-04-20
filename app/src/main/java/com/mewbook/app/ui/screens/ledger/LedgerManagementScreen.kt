@@ -14,13 +14,14 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ReceiptLong
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
@@ -29,8 +30,10 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -39,7 +42,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -54,14 +56,23 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.mewbook.app.domain.model.Account
 import com.mewbook.app.domain.model.Ledger
 import com.mewbook.app.domain.model.LedgerType
+import com.mewbook.app.domain.policy.AccountDefaultsPolicy
+import com.mewbook.app.domain.policy.LedgerMoveDirection
+import com.mewbook.app.domain.policy.LedgerOrderingPolicy
+import com.mewbook.app.domain.repository.AccountRepository
 import com.mewbook.app.domain.repository.LedgerRepository
+import com.mewbook.app.ui.components.AccountTypeIconBadge
 import com.mewbook.app.ui.components.MewCompactTopAppBar
+import com.mewbook.app.ui.components.toDisplayName
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -70,12 +81,17 @@ data class LedgerManagementUiState(
     val ledgers: List<Ledger> = emptyList(),
     val isLoading: Boolean = true,
     val showAddDialog: Boolean = false,
-    val pendingDelete: Ledger? = null
+    val pendingDelete: Ledger? = null,
+    val settingsLedger: Ledger? = null,
+    val settingsAccounts: List<Account> = emptyList(),
+    val isSettingsLoading: Boolean = false,
+    val isSavingSettings: Boolean = false
 )
 
 @HiltViewModel
 class LedgerManagementViewModel @Inject constructor(
-    private val ledgerRepository: LedgerRepository
+    private val ledgerRepository: LedgerRepository,
+    private val accountRepository: AccountRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(LedgerManagementUiState())
@@ -84,10 +100,13 @@ class LedgerManagementViewModel @Inject constructor(
     init {
         viewModelScope.launch {
             ledgerRepository.getAllLedgers().collect { ledgers ->
-                _uiState.update {
-                    it.copy(
+                _uiState.update { state ->
+                    state.copy(
                         ledgers = ledgers,
-                        isLoading = false
+                        isLoading = false,
+                        settingsLedger = state.settingsLedger?.let { current ->
+                            ledgers.firstOrNull { it.id == current.id }
+                        }
                     )
                 }
             }
@@ -100,6 +119,43 @@ class LedgerManagementViewModel @Inject constructor(
 
     fun hideAddDialog() {
         _uiState.update { it.copy(showAddDialog = false) }
+    }
+
+    fun openLedgerSettings(ledger: Ledger) {
+        _uiState.update {
+            it.copy(
+                settingsLedger = ledger,
+                settingsAccounts = emptyList(),
+                isSettingsLoading = true,
+                isSavingSettings = false
+            )
+        }
+
+        viewModelScope.launch {
+            val accounts = accountRepository.getAccountsByLedger(ledger.id).first()
+                .sortedBy(Account::sortOrder)
+            _uiState.update { state ->
+                if (state.settingsLedger?.id != ledger.id) {
+                    state
+                } else {
+                    state.copy(
+                        settingsAccounts = accounts,
+                        isSettingsLoading = false
+                    )
+                }
+            }
+        }
+    }
+
+    fun dismissLedgerSettings() {
+        _uiState.update {
+            it.copy(
+                settingsLedger = null,
+                settingsAccounts = emptyList(),
+                isSettingsLoading = false,
+                isSavingSettings = false
+            )
+        }
     }
 
     fun requestDelete(ledger: Ledger) {
@@ -141,31 +197,68 @@ class LedgerManagementViewModel @Inject constructor(
     fun setDefaultLedger(ledger: Ledger) {
         viewModelScope.launch {
             ledgerRepository.setDefaultLedger(ledger.id)
+            _uiState.update { state ->
+                state.copy(
+                    settingsLedger = state.settingsLedger?.let { current ->
+                        if (current.id == ledger.id) current.copy(isDefault = true) else current
+                    }
+                )
+            }
+        }
+    }
+
+    fun setDefaultAccount(accountId: Long) {
+        val selectedLedger = _uiState.value.settingsLedger ?: return
+        val existingAccounts = _uiState.value.settingsAccounts
+        val updatedAccounts = AccountDefaultsPolicy.applyDefaultSelection(existingAccounts, accountId)
+
+        if (updatedAccounts == existingAccounts) {
+            return
+        }
+
+        viewModelScope.launch {
+            _uiState.update { it.copy(isSavingSettings = true) }
+            updatedAccounts.zip(existingAccounts).forEach { (updated, original) ->
+                if (updated.isDefault != original.isDefault) {
+                    accountRepository.updateAccount(updated)
+                }
+            }
+            _uiState.update { state ->
+                if (state.settingsLedger?.id != selectedLedger.id) {
+                    state
+                } else {
+                    state.copy(
+                        settingsAccounts = updatedAccounts,
+                        isSavingSettings = false
+                    )
+                }
+            }
         }
     }
 
     fun moveLedgerUp(ledgerId: Long) {
         viewModelScope.launch {
-            val sortableLedgers = _uiState.value.ledgers.filter { !it.isDefault }
-            val currentIndex = sortableLedgers.indexOfFirst { it.id == ledgerId }
-            if (currentIndex <= 0) return@launch
-
-            val currentLedger = sortableLedgers[currentIndex]
-            val previousLedger = sortableLedgers[currentIndex - 1]
-            swapLedgerOrder(currentLedger, previousLedger)
+            swapLedgersForMove(ledgerId, LedgerMoveDirection.UP)
         }
     }
 
     fun moveLedgerDown(ledgerId: Long) {
         viewModelScope.launch {
-            val sortableLedgers = _uiState.value.ledgers.filter { !it.isDefault }
-            val currentIndex = sortableLedgers.indexOfFirst { it.id == ledgerId }
-            if (currentIndex == -1 || currentIndex >= sortableLedgers.lastIndex) return@launch
-
-            val currentLedger = sortableLedgers[currentIndex]
-            val nextLedger = sortableLedgers[currentIndex + 1]
-            swapLedgerOrder(currentLedger, nextLedger)
+            swapLedgersForMove(ledgerId, LedgerMoveDirection.DOWN)
         }
+    }
+
+    private suspend fun swapLedgersForMove(ledgerId: Long, direction: LedgerMoveDirection) {
+        val orderedLedgers = LedgerOrderingPolicy.displayOrder(_uiState.value.ledgers)
+        val (firstId, secondId) = LedgerOrderingPolicy.swapPairForMove(
+            ledgers = orderedLedgers,
+            ledgerId = ledgerId,
+            direction = direction
+        ) ?: return
+
+        val firstLedger = orderedLedgers.firstOrNull { it.id == firstId } ?: return
+        val secondLedger = orderedLedgers.firstOrNull { it.id == secondId } ?: return
+        swapLedgerOrder(firstLedger, secondLedger)
     }
 
     private suspend fun swapLedgerOrder(first: Ledger, second: Ledger) {
@@ -180,12 +273,27 @@ fun LedgerManagementScreen(
     onNavigateBack: () -> Unit,
     viewModel: LedgerManagementViewModel = hiltViewModel()
 ) {
-    val uiState by viewModel.uiState.collectAsState()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val displayLedgers = remember(uiState.ledgers) {
+        LedgerOrderingPolicy.displayOrder(uiState.ledgers)
+    }
 
     if (uiState.showAddDialog) {
         AddLedgerDialog(
             onDismiss = { viewModel.hideAddDialog() },
             onConfirm = { name, type -> viewModel.addLedger(name, type) }
+        )
+    }
+
+    uiState.settingsLedger?.let { ledger ->
+        LedgerSettingsDialog(
+            ledger = ledger,
+            accounts = uiState.settingsAccounts,
+            isLoading = uiState.isSettingsLoading,
+            isSaving = uiState.isSavingSettings,
+            onDismiss = { viewModel.dismissLedgerSettings() },
+            onSetDefaultLedger = { viewModel.setDefaultLedger(ledger) },
+            onSelectDefaultAccount = { accountId -> viewModel.setDefaultAccount(accountId) }
         )
     }
 
@@ -219,17 +327,11 @@ fun LedgerManagementScreen(
             )
         },
         floatingActionButton = {
-            IconButton(onClick = { viewModel.showAddDialog() }) {
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primary)
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.Add,
-                        contentDescription = "添加分支",
-                        modifier = Modifier.padding(14.dp),
-                        tint = MaterialTheme.colorScheme.onPrimary
-                    )
-                }
+            FloatingActionButton(
+                onClick = { viewModel.showAddDialog() },
+                containerColor = MaterialTheme.colorScheme.primary
+            ) {
+                Icon(Icons.Filled.Add, contentDescription = "添加分支")
             }
         }
     ) { paddingValues ->
@@ -240,7 +342,7 @@ fun LedgerManagementScreen(
                 .padding(horizontal = 16.dp)
         ) {
             Text(
-                text = "点击设为默认分支，长按删除，使用右侧箭头自定义排序",
+                text = "点击分支进入编辑，长按删除，使用右侧箭头自定义排序",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(vertical = 12.dp)
@@ -250,17 +352,189 @@ fun LedgerManagementScreen(
                 modifier = Modifier.fillMaxSize(),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                itemsIndexed(uiState.ledgers, key = { _, ledger -> ledger.id }) { index, ledger ->
+                itemsIndexed(displayLedgers, key = { _, ledger -> ledger.id }) { index, ledger ->
                     LedgerItem(
                         ledger = ledger,
-                        canMoveUp = !ledger.isDefault && uiState.ledgers.take(index).any { !it.isDefault },
-                        canMoveDown = !ledger.isDefault && uiState.ledgers.drop(index + 1).any { !it.isDefault },
-                        onClick = { viewModel.setDefaultLedger(ledger) },
+                        canMoveUp = index > 0,
+                        canMoveDown = index < displayLedgers.lastIndex,
+                        onClick = { viewModel.openLedgerSettings(ledger) },
                         onLongPress = { viewModel.requestDelete(ledger) },
                         onMoveUp = { viewModel.moveLedgerUp(ledger.id) },
                         onMoveDown = { viewModel.moveLedgerDown(ledger.id) }
                     )
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun LedgerSettingsDialog(
+    ledger: Ledger,
+    accounts: List<Account>,
+    isLoading: Boolean,
+    isSaving: Boolean,
+    onDismiss: () -> Unit,
+    onSetDefaultLedger: () -> Unit,
+    onSelectDefaultAccount: (Long) -> Unit
+) {
+    val defaultAccountId = AccountDefaultsPolicy.resolveDefaultAccountId(accounts)
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("编辑分支") },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+            ) {
+                Text(
+                    text = ledger.name,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Text(
+                    text = if (ledger.isDefault) "当前默认分支" else ledger.type.displayName(),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (ledger.isDefault) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    }
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Button(
+                    onClick = onSetDefaultLedger,
+                    enabled = !ledger.isDefault && !isSaving,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(if (ledger.isDefault) "当前默认分支" else "设为默认分支")
+                }
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                Text(
+                    text = "默认账户",
+                    style = MaterialTheme.typography.titleSmall
+                )
+                Text(
+                    text = "仅在当前分支内生效",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                when {
+                    isLoading -> {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            CircularProgressIndicator(modifier = Modifier.size(18.dp))
+                            Text(
+                                text = "加载账户中…",
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                        }
+                    }
+
+                    accounts.isEmpty() -> {
+                        Text(
+                            text = "这个分支还没有账户，添加账户后可在这里设置默认账户。",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
+                    else -> {
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            accounts.forEach { account ->
+                                DefaultAccountItem(
+                                    account = account,
+                                    isSelected = account.id == defaultAccountId,
+                                    enabled = !isSaving,
+                                    onClick = { onSelectDefaultAccount(account.id) }
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("完成")
+            }
+        }
+    )
+}
+
+@Composable
+private fun DefaultAccountItem(
+    account: Account,
+    isSelected: Boolean,
+    enabled: Boolean,
+    onClick: () -> Unit
+) {
+    Card(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isSelected) {
+                MaterialTheme.colorScheme.primaryContainer
+            } else {
+                MaterialTheme.colorScheme.surface
+            }
+        )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            AccountTypeIconBadge(
+                type = account.type,
+                accentColor = Color(account.color),
+                containerSize = 32.dp,
+                iconSize = 18.dp,
+                emphasized = isSelected
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = account.name,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Text(
+                    text = if (isSelected) "当前默认账户" else account.type.toDisplayName(),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = if (isSelected) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    }
+                )
+            }
+            if (isSelected) {
+                Icon(
+                    imageVector = Icons.Filled.CheckCircle,
+                    contentDescription = "默认账户",
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(18.dp)
+                )
+            } else {
+                Text(
+                    text = "设为默认",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary
+                )
             }
         }
     }
@@ -308,41 +582,48 @@ private fun LedgerItem(
                     color = if (ledger.isDefault) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            if (ledger.isDefault) {
-                Icon(
-                    imageVector = Icons.Filled.CheckCircle,
-                    contentDescription = "默认分支",
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier
-                        .padding(end = 6.dp)
-                        .size(18.dp)
-                )
-            }
             Column(
-                horizontalAlignment = Alignment.End,
-                verticalArrangement = Arrangement.spacedBy(2.dp)
+                horizontalAlignment = Alignment.End
             ) {
-                IconButton(
-                    onClick = onMoveUp,
-                    enabled = canMoveUp,
-                    modifier = Modifier.size(28.dp)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    Icon(
-                        Icons.Filled.KeyboardArrowUp,
-                        contentDescription = "上移",
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-                IconButton(
-                    onClick = onMoveDown,
-                    enabled = canMoveDown,
-                    modifier = Modifier.size(28.dp)
-                ) {
-                    Icon(
-                        Icons.Filled.KeyboardArrowDown,
-                        contentDescription = "下移",
-                        modifier = Modifier.size(18.dp)
-                    )
+                    if (ledger.isDefault) {
+                        Icon(
+                            imageVector = Icons.Filled.CheckCircle,
+                            contentDescription = "默认分支",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                    Column(
+                        horizontalAlignment = Alignment.End,
+                        verticalArrangement = Arrangement.spacedBy(2.dp)
+                    ) {
+                        IconButton(
+                            onClick = onMoveUp,
+                            enabled = canMoveUp,
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Icon(
+                                Icons.Filled.KeyboardArrowUp,
+                                contentDescription = "上移",
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                        IconButton(
+                            onClick = onMoveDown,
+                            enabled = canMoveDown,
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Icon(
+                                Icons.Filled.KeyboardArrowDown,
+                                contentDescription = "下移",
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
                 }
             }
         }

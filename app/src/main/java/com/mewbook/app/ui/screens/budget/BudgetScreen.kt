@@ -24,7 +24,11 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -34,7 +38,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -47,20 +50,24 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mewbook.app.domain.model.BudgetWithSpending
+import com.mewbook.app.domain.model.Category
+import com.mewbook.app.domain.model.BudgetPeriodType
 import com.mewbook.app.ui.components.MewCompactTopAppBar
+import com.mewbook.app.ui.components.BudgetPeriodNavigator
+import com.mewbook.app.ui.components.BudgetPeriodTypeSelector
 import com.mewbook.app.ui.theme.BudgetDanger
 import com.mewbook.app.ui.theme.BudgetSafe
 import com.mewbook.app.ui.theme.BudgetWarning
 import com.mewbook.app.util.formatCurrency
-import java.time.format.DateTimeFormatter
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BudgetScreen(
     viewModel: BudgetViewModel = hiltViewModel()
 ) {
-    val uiState by viewModel.uiState.collectAsState()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     Scaffold(
         topBar = {
@@ -84,20 +91,33 @@ fun BudgetScreen(
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                // 月份选择器
                 item {
-                    MonthSelector(
-                        selectedMonth = uiState.currentMonth,
-                        onMonthChange = { viewModel.selectMonth(it) }
+                    BudgetPeriodTypeSelector(
+                        selectedPeriodType = uiState.selectedPeriodType,
+                        onSelect = { viewModel.selectPeriodType(it) }
+                    )
+                }
+
+                item {
+                    BudgetPeriodNavigator(
+                        periodLabel = uiState.periodLabel,
+                        canGoNext = uiState.canGoNext,
+                        onPrevious = { viewModel.previousPeriod() },
+                        onNext = { viewModel.nextPeriod() }
                     )
                 }
 
                 // 总预算卡片
                 item {
                     TotalBudgetCard(
+                        title = when (uiState.selectedPeriodType) {
+                            BudgetPeriodType.DAY -> "本日预算"
+                            BudgetPeriodType.WEEK -> "本周预算"
+                            BudgetPeriodType.MONTH -> "本月预算"
+                        },
                         totalBudget = uiState.totalBudget,
                         totalSpent = uiState.totalSpent,
-                        onAddClick = { viewModel.showAddDialog(null) }
+                        onAddClick = { viewModel.showTotalBudgetDialog() }
                     )
                 }
 
@@ -110,68 +130,47 @@ fun BudgetScreen(
                     )
                 }
 
-                items(uiState.categoryBudgets.filter { it.budget.categoryId != null }) { budgetWithSpending ->
+                items(uiState.categoryBudgets) { budgetWithSpending ->
                     CategoryBudgetItem(
                         budgetWithSpending = budgetWithSpending,
                         categoryName = uiState.categories[budgetWithSpending.budget.categoryId]?.name ?: "未知",
                         categoryColor = uiState.categories[budgetWithSpending.budget.categoryId]?.color ?: 0xFF808080,
-                        onEditClick = { viewModel.showAddDialog(budgetWithSpending.budget.categoryId) },
+                        onEditClick = { viewModel.showCategoryBudgetDialog(budgetWithSpending.budget.categoryId) },
                         onDeleteClick = { viewModel.deleteBudget(budgetWithSpending.budget) }
                     )
                 }
 
                 item {
                     TextButton(
-                        onClick = { viewModel.showAddDialog(null) },
+                        onClick = { viewModel.showCategoryBudgetDialog() },
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Icon(Icons.Default.Add, contentDescription = null)
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("添加预算")
+                        Text("添加分类预算")
                     }
                 }
             }
         }
 
-        // 添加/编辑预算对话框
         if (uiState.showAddDialog) {
             BudgetDialog(
                 budget = uiState.editingBudget,
+                dialogType = uiState.dialogType,
+                selectedCategory = uiState.dialogCategoryId?.let(uiState.categories::get),
+                availableCategories = uiState.availableCategoryOptions,
+                periodLabel = uiState.periodLabel,
                 onDismiss = { viewModel.hideDialog() },
-                onSave = { amount -> viewModel.saveBudget(uiState.editingBudget?.categoryId, amount) }
+                onCategorySelected = { categoryId -> viewModel.updateDialogCategory(categoryId) },
+                onSave = { amount -> viewModel.saveBudget(amount) }
             )
         }
     }
 }
 
 @Composable
-fun MonthSelector(
-    selectedMonth: java.time.YearMonth,
-    onMonthChange: (java.time.YearMonth) -> Unit
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        IconButton(onClick = { onMonthChange(selectedMonth.minusMonths(1)) }) {
-            Icon(Icons.Filled.ChevronLeft, contentDescription = "上一月")
-        }
-
-        Text(
-            text = selectedMonth.format(DateTimeFormatter.ofPattern("yyyy年MM月")),
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold
-        )
-
-        IconButton(onClick = { onMonthChange(selectedMonth.plusMonths(1)) }) {
-            Icon(Icons.Filled.ChevronRight, contentDescription = "下一月")
-        }
-    }
-}
-
-@Composable
 fun TotalBudgetCard(
+    title: String,
     totalBudget: com.mewbook.app.domain.model.Budget?,
     totalSpent: Double,
     onAddClick: () -> Unit
@@ -206,14 +205,15 @@ fun TotalBudgetCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "本月预算",
+                    text = title,
                     style = MaterialTheme.typography.titleMedium
                 )
-                if (totalBudget == null) {
-                    TextButton(onClick = onAddClick) {
-                        Icon(Icons.Default.Add, contentDescription = null)
-                        Text("设置预算")
-                    }
+                TextButton(onClick = onAddClick) {
+                    Icon(
+                        imageVector = if (totalBudget == null) Icons.Default.Add else Icons.Default.Add,
+                        contentDescription = null
+                    )
+                    Text(if (totalBudget == null) "设置预算" else "编辑预算")
                 }
             }
 
@@ -350,36 +350,106 @@ fun CategoryBudgetItem(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BudgetDialog(
     budget: com.mewbook.app.domain.model.Budget?,
+    dialogType: BudgetDialogType,
+    selectedCategory: Category?,
+    availableCategories: List<Category>,
+    periodLabel: String,
     onDismiss: () -> Unit,
+    onCategorySelected: (Long) -> Unit,
     onSave: (Double) -> Unit
 ) {
     var amountText by remember { mutableStateOf(budget?.amount?.toString() ?: "") }
+    var categoryMenuExpanded by remember { mutableStateOf(false) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(if (budget != null) "编辑预算" else "添加预算") },
-        text = {
-            OutlinedTextField(
-                value = amountText,
-                onValueChange = { newValue ->
-                    if (newValue.isEmpty() || newValue.matches(Regex("^\\d*\\.?\\d{0,2}$"))) {
-                        amountText = newValue
-                    }
-                },
-                label = { Text("预算金额") },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                modifier = Modifier.fillMaxWidth()
+        title = {
+            Text(
+                when {
+                    dialogType == BudgetDialogType.TOTAL && budget != null -> "编辑总预算"
+                    dialogType == BudgetDialogType.TOTAL -> "设置总预算"
+                    budget != null -> "编辑分类预算"
+                    else -> "添加分类预算"
+                }
             )
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(
+                    text = periodLabel,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                if (dialogType == BudgetDialogType.CATEGORY) {
+                    ExposedDropdownMenuBox(
+                        expanded = categoryMenuExpanded,
+                        onExpandedChange = { canExpand ->
+                            categoryMenuExpanded = canExpand && availableCategories.isNotEmpty()
+                        }
+                    ) {
+                        OutlinedTextField(
+                            value = selectedCategory?.name ?: "",
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { Text("预算分类") },
+                            placeholder = {
+                                Text(
+                                    if (availableCategories.isEmpty()) {
+                                        "所有支出分类都已设置预算"
+                                    } else {
+                                        "请选择分类"
+                                    }
+                                )
+                            },
+                            trailingIcon = {
+                                ExposedDropdownMenuDefaults.TrailingIcon(expanded = categoryMenuExpanded)
+                            },
+                            modifier = Modifier
+                                .menuAnchor()
+                                .fillMaxWidth()
+                        )
+
+                        DropdownMenu(
+                            expanded = categoryMenuExpanded,
+                            onDismissRequest = { categoryMenuExpanded = false }
+                        ) {
+                            availableCategories.forEach { category ->
+                                DropdownMenuItem(
+                                    text = { Text(category.name) },
+                                    onClick = {
+                                        onCategorySelected(category.id)
+                                        categoryMenuExpanded = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+                OutlinedTextField(
+                    value = amountText,
+                    onValueChange = { newValue ->
+                        if (newValue.isEmpty() || newValue.matches(Regex("^\\d*\\.?\\d{0,2}$"))) {
+                            amountText = newValue
+                        }
+                    },
+                    label = { Text("预算金额") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
         },
         confirmButton = {
             TextButton(
                 onClick = {
                     amountText.toDoubleOrNull()?.let { onSave(it) }
                 },
-                enabled = amountText.toDoubleOrNull() != null && (amountText.toDoubleOrNull() ?: 0.0) > 0
+                enabled = amountText.toDoubleOrNull() != null &&
+                    (amountText.toDoubleOrNull() ?: 0.0) > 0 &&
+                    (dialogType == BudgetDialogType.TOTAL || selectedCategory != null)
             ) {
                 Text("保存")
             }

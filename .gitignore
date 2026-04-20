@@ -27,3 +27,5 @@ signing/
 # OS / misc
 Thumbs.db
 .DS_Store
+
+.planning/

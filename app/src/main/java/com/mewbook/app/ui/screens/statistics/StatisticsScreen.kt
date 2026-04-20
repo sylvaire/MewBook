@@ -33,7 +33,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -52,8 +51,10 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mewbook.app.ui.components.MewCompactTopAppBar
 import com.mewbook.app.ui.theme.ExpenseRed
 import com.mewbook.app.ui.theme.IncomeGreen
@@ -66,7 +67,7 @@ fun StatisticsScreen(
     onNavigateToCategoryExpense: (categoryId: Long, periodStart: LocalDate, periodEnd: LocalDate) -> Unit = { _, _, _ -> },
     viewModel: StatisticsViewModel = hiltViewModel()
 ) {
-    val uiState by viewModel.uiState.collectAsState()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     Scaffold(
         topBar = {
@@ -173,29 +174,38 @@ private fun PeriodNavigator(
     onPrevious: () -> Unit,
     onNext: () -> Unit
 ) {
-    Row(
+    Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp),
-        verticalAlignment = Alignment.CenterVertically
+            .padding(horizontal = 16.dp)
     ) {
-        IconButton(onClick = onPrevious) {
-            Icon(
-                imageVector = Icons.Filled.ChevronLeft,
-                contentDescription = "上一周期"
-            )
-        }
         Text(
             text = periodLabel,
-            modifier = Modifier.weight(1f),
+            modifier = Modifier
+                .align(Alignment.Center)
+                .fillMaxWidth()
+                .padding(horizontal = 48.dp),
             style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold
+            fontWeight = FontWeight.SemiBold,
+            textAlign = TextAlign.Center
         )
-        IconButton(onClick = onNext, enabled = canGoNext) {
-            Icon(
-                imageVector = Icons.Filled.ChevronRight,
-                contentDescription = "下一周期"
-            )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(onClick = onPrevious) {
+                Icon(
+                    imageVector = Icons.Filled.ChevronLeft,
+                    contentDescription = "上一周期"
+                )
+            }
+            IconButton(onClick = onNext, enabled = canGoNext) {
+                Icon(
+                    imageVector = Icons.Filled.ChevronRight,
+                    contentDescription = "下一周期"
+                )
+            }
         }
     }
 }

@@ -2,11 +2,17 @@ package com.mewbook.app.ui.screens.home
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.mewbook.app.data.preferences.HomePreferencesRepository
 import com.mewbook.app.domain.model.Account
+import com.mewbook.app.domain.model.Budget
+import com.mewbook.app.domain.model.BudgetPeriodType
 import com.mewbook.app.domain.model.Category
 import com.mewbook.app.domain.model.Ledger
 import com.mewbook.app.domain.model.Record
 import com.mewbook.app.domain.model.RecordType
+import com.mewbook.app.domain.policy.AccountDefaultsPolicy
+import com.mewbook.app.domain.policy.HomeRecordSearchPolicy
+import com.mewbook.app.domain.policy.RecentNoteHistory
 import com.mewbook.app.domain.repository.AccountRepository
 import com.mewbook.app.domain.repository.BudgetRepository
 import com.mewbook.app.domain.repository.LedgerRepository
@@ -29,9 +35,41 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.LocalDateTime
-import java.time.YearMonth
 import java.util.UUID
 import javax.inject.Inject
+import com.mewbook.app.util.PeriodDateRange
+
+private data class HomePeriodState(
+    val selectedPeriodType: BudgetPeriodType,
+    val anchorDate: LocalDate
+)
+
+private data class HomeSummaryState(
+    val records: List<Record>,
+    val totalIncome: Double,
+    val totalExpense: Double,
+    val totalBudget: Double,
+    val budgetRemaining: Double
+)
+
+private data class HomeOverlayState(
+    val isLoading: Boolean,
+    val error: String?,
+    val showAddEditSheet: Boolean,
+    val editingRecord: Record?
+)
+
+private data class HomeSearchState(
+    val isSearchMode: Boolean,
+    val searchQuery: String
+)
+
+private data class HomeContextState(
+    val categories: List<Category>,
+    val activeLedger: Ledger?,
+    val allRecords: List<Record>,
+    val accounts: List<Account>
+)
 
 data class HomeUiState(
     val records: List<Record> = emptyList(),
@@ -43,11 +81,19 @@ data class HomeUiState(
     val totalBudget: Double = 0.0,
     val budgetRemaining: Double = 0.0,
     val budgetProgress: Float = 0f,
-    val selectedMonth: YearMonth = YearMonth.now(),
+    val selectedPeriodType: BudgetPeriodType = BudgetPeriodType.MONTH,
+    val anchorDate: LocalDate = LocalDate.now(),
+    val periodLabel: String = "",
+    val canGoNext: Boolean = false,
     val isLoading: Boolean = true,
     val error: String? = null,
     val showAddEditSheet: Boolean = false,
-    val editingRecord: Record? = null
+    val editingRecord: Record? = null,
+    val isSearchMode: Boolean = false,
+    val searchQuery: String = "",
+    val searchResultCount: Int = 0,
+    val recentNotesByCategory: Map<Long, List<String>> = emptyMap(),
+    val defaultAccountId: Long? = null
 )
 
 @HiltViewModel
@@ -61,44 +107,109 @@ class HomeViewModel @Inject constructor(
     private val initializeDefaultLedgerUseCase: InitializeDefaultLedgerUseCase,
     private val ledgerRepository: LedgerRepository,
     private val accountRepository: AccountRepository,
-    private val budgetRepository: BudgetRepository
+    private val budgetRepository: BudgetRepository,
+    private val homePreferencesRepository: HomePreferencesRepository
 ) : ViewModel() {
 
-    private val _selectedMonth = MutableStateFlow(YearMonth.now())
+    private val _selectedPeriodType = MutableStateFlow(BudgetPeriodType.MONTH)
+    private val _anchorDate = MutableStateFlow(LocalDate.now())
     private val _isLoading = MutableStateFlow(true)
     private val _error = MutableStateFlow<String?>(null)
     private val _showAddEditSheet = MutableStateFlow(false)
     private val _editingRecord = MutableStateFlow<Record?>(null)
-
-    val uiState: StateFlow<HomeUiState> = combine(
-        _selectedMonth,
-        _isLoading,
-        _error,
-        _showAddEditSheet,
-        _editingRecord,
-        getCategoriesUseCase.getAll(),
-        ledgerRepository.getDefaultLedgerFlow(),
-        accountRepository.getAllAccounts()
-    ) { flows ->
-        val month = flows[0] as YearMonth
-        val isLoading = flows[1] as Boolean
-        val error = flows[2] as String?
-        val showSheet = flows[3] as Boolean
-        val editingRecord = flows[4] as Record?
-        val categories = flows[5] as List<Category>
-        val activeLedger = flows[6] as Ledger?
-        val accounts = flows[7] as List<Account>
-        val activeLedgerId = activeLedger?.id ?: 1L
-
-        HomeUiState(
-            selectedMonth = month,
+    private val _isSearchMode = MutableStateFlow(false)
+    private val _searchQuery = MutableStateFlow("")
+    private val _records = MutableStateFlow<List<Record>>(emptyList())
+    private val _totalIncome = MutableStateFlow(0.0)
+    private val _totalExpense = MutableStateFlow(0.0)
+    private val _totalBudget = MutableStateFlow(0.0)
+    private val _budgetRemaining = MutableStateFlow(0.0)
+    private val periodState = combine(_selectedPeriodType, _anchorDate) { selectedPeriodType, anchorDate ->
+        HomePeriodState(selectedPeriodType = selectedPeriodType, anchorDate = anchorDate)
+    }
+    private val summaryState = combine(_records, _totalIncome, _totalExpense, _totalBudget, _budgetRemaining) { records, totalIncome, totalExpense, totalBudget, budgetRemaining ->
+        HomeSummaryState(
+            records = records,
+            totalIncome = totalIncome,
+            totalExpense = totalExpense,
+            totalBudget = totalBudget,
+            budgetRemaining = budgetRemaining
+        )
+    }
+    private val overlayState = combine(_isLoading, _error, _showAddEditSheet, _editingRecord) { isLoading, error, showAddEditSheet, editingRecord ->
+        HomeOverlayState(
             isLoading = isLoading,
             error = error,
-            showAddEditSheet = showSheet,
-            editingRecord = editingRecord,
+            showAddEditSheet = showAddEditSheet,
+            editingRecord = editingRecord
+        )
+    }
+    private val searchState = combine(_isSearchMode, _searchQuery) { isSearchMode, searchQuery ->
+        HomeSearchState(
+            isSearchMode = isSearchMode,
+            searchQuery = searchQuery
+        )
+    }
+    private val contextState = combine(
+        getCategoriesUseCase.getAll(),
+        ledgerRepository.getDefaultLedgerFlow(),
+        getRecordsUseCase.getAll(),
+        accountRepository.getAllAccounts()
+    ) { categories, activeLedger, allRecords, accounts ->
+        HomeContextState(
+            categories = categories,
             activeLedger = activeLedger,
-            categories = categories.associateBy { it.id },
-            accounts = accounts.filter { it.ledgerId == activeLedgerId }
+            allRecords = allRecords,
+            accounts = accounts
+        )
+    }
+
+    val uiState: StateFlow<HomeUiState> = combine(periodState, summaryState, overlayState, contextState, searchState) { period, summary, overlay, context, search ->
+        val activeLedgerId = context.activeLedger?.id ?: 1L
+        val categoriesById = context.categories.associateBy { it.id }
+        val accountsById = context.accounts.associateBy { it.id }
+        val ledgerAccounts = context.accounts.filter { it.ledgerId == activeLedgerId }
+        val (periodStart, periodEnd) = PeriodDateRange.dateRange(period.selectedPeriodType, period.anchorDate)
+        val canGoNext = PeriodDateRange.canGoToNextPeriod(period.selectedPeriodType, period.anchorDate)
+        val searchResults = HomeRecordSearchPolicy.search(
+            query = search.searchQuery,
+            activeLedgerId = activeLedgerId,
+            records = context.allRecords,
+            categoriesById = categoriesById,
+            accountsById = accountsById
+        )
+        val displayedRecords = when {
+            search.isSearchMode && search.searchQuery.isBlank() -> emptyList()
+            search.isSearchMode -> searchResults
+            else -> summary.records
+        }
+
+        HomeUiState(
+            records = displayedRecords,
+            categories = categoriesById,
+            accounts = ledgerAccounts,
+            activeLedger = context.activeLedger,
+            totalIncome = summary.totalIncome,
+            totalExpense = summary.totalExpense,
+            totalBudget = summary.totalBudget,
+            budgetRemaining = summary.budgetRemaining,
+            budgetProgress = if (summary.totalBudget > 0) (summary.totalExpense / summary.totalBudget).toFloat().coerceIn(0f, 1f) else 0f,
+            selectedPeriodType = period.selectedPeriodType,
+            anchorDate = period.anchorDate,
+            periodLabel = PeriodDateRange.formatPeriodLabel(period.selectedPeriodType, periodStart, periodEnd),
+            canGoNext = canGoNext,
+            isLoading = overlay.isLoading,
+            error = overlay.error,
+            showAddEditSheet = overlay.showAddEditSheet,
+            editingRecord = overlay.editingRecord,
+            isSearchMode = search.isSearchMode,
+            searchQuery = search.searchQuery,
+            searchResultCount = searchResults.size,
+            recentNotesByCategory = RecentNoteHistory.notesByCategory(
+                records = context.allRecords,
+                ledgerId = activeLedgerId
+            ),
+            defaultAccountId = AccountDefaultsPolicy.resolveDefaultAccountId(ledgerAccounts)
         )
     }.stateIn(
         viewModelScope,
@@ -106,24 +217,10 @@ class HomeViewModel @Inject constructor(
         HomeUiState()
     )
 
-    private val _records = MutableStateFlow<List<Record>>(emptyList())
-    val records: StateFlow<List<Record>> = _records.asStateFlow()
-
-    private val _totalIncome = MutableStateFlow(0.0)
-    val totalIncome: StateFlow<Double> = _totalIncome.asStateFlow()
-
-    private val _totalExpense = MutableStateFlow(0.0)
-    val totalExpense: StateFlow<Double> = _totalExpense.asStateFlow()
-
-    private val _totalBudget = MutableStateFlow(0.0)
-    val totalBudget: StateFlow<Double> = _totalBudget.asStateFlow()
-
-    private val _budgetRemaining = MutableStateFlow(0.0)
-    val budgetRemaining: StateFlow<Double> = _budgetRemaining.asStateFlow()
-
     init {
         initializeData()
-        observeLedgerRecords()
+        restoreSelectedPeriodType()
+        observePeriodData()
     }
 
     private fun initializeData() {
@@ -133,24 +230,39 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    private fun observeLedgerRecords() {
+    private fun restoreSelectedPeriodType() {
         viewModelScope.launch {
-            combine(_selectedMonth, ledgerRepository.getDefaultLedgerFlow()) { month, ledger ->
-                month to (ledger?.id ?: 1L)
-            }.collectLatest { (month, ledgerId) ->
-                _isLoading.update { true }
-                try {
-                    val monthStr = month.format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM"))
-                    val totalBudgetAmount = budgetRepository.getTotalBudgetAmountByMonth(monthStr, ledgerId)
-                    _totalBudget.update { totalBudgetAmount }
+            homePreferencesRepository.selectedHomePeriod.collectLatest { savedPeriodType ->
+                _selectedPeriodType.update { savedPeriodType }
+            }
+        }
+    }
 
-                    getRecordsUseCase.getByLedgerMonth(ledgerId, monthStr).collectLatest { recordList ->
+    private fun observePeriodData() {
+        viewModelScope.launch {
+            combine(_selectedPeriodType, _anchorDate, ledgerRepository.getDefaultLedgerFlow()) { periodType, anchorDate, ledger ->
+                Triple(periodType, anchorDate, ledger?.id ?: 1L)
+            }.collectLatest { (periodType, anchorDate, ledgerId) ->
+                _isLoading.update { true }
+                _error.update { null }
+                try {
+                    val (periodStart, periodEnd) = PeriodDateRange.dateRange(periodType, anchorDate)
+                    val periodKey = PeriodDateRange.periodKey(periodType, anchorDate)
+
+                    combine(
+                        getRecordsUseCase.getByLedgerAndDateRange(ledgerId, periodStart, periodEnd),
+                        budgetRepository.getBudgetsByPeriod(ledgerId, periodType, periodKey)
+                    ) { recordList, budgets ->
+                        val income = recordList.filter { it.type == RecordType.INCOME }.sumOf { it.amount }
+                        val expense = recordList.filter { it.type == RecordType.EXPENSE }.sumOf { it.amount }
+                        val totalBudgetAmount = resolveDisplayedBudgetAmount(budgets)
+                        Triple(recordList, income to expense, totalBudgetAmount)
+                    }.collectLatest { (recordList, totals, totalBudgetAmount) ->
                         _records.update { recordList }
-                        val income = recordList.filter { it.type == RecordType.INCOME }.sumOf { r -> r.amount }
-                        val expense = recordList.filter { it.type == RecordType.EXPENSE }.sumOf { r -> r.amount }
-                        _totalIncome.update { income }
-                        _totalExpense.update { expense }
-                        _budgetRemaining.update { totalBudgetAmount - expense }
+                        _totalIncome.update { totals.first }
+                        _totalExpense.update { totals.second }
+                        _totalBudget.update { totalBudgetAmount }
+                        _budgetRemaining.update { totalBudgetAmount - totals.second }
                         _isLoading.update { false }
                     }
                 } catch (e: Exception) {
@@ -161,13 +273,48 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    fun selectMonth(month: YearMonth) {
-        _selectedMonth.update { month }
+    fun selectPeriodType(periodType: BudgetPeriodType) {
+        if (_selectedPeriodType.value == periodType) {
+            return
+        }
+        _selectedPeriodType.update { periodType }
+        viewModelScope.launch {
+            homePreferencesRepository.setSelectedHomePeriod(periodType)
+        }
+    }
+
+    fun previousPeriod() {
+        val periodType = _selectedPeriodType.value
+        _anchorDate.update { current -> PeriodDateRange.shiftAnchor(periodType, current, -1) }
+    }
+
+    fun nextPeriod() {
+        val periodType = _selectedPeriodType.value
+        _anchorDate.update { current ->
+            if (PeriodDateRange.canGoToNextPeriod(periodType, current)) {
+                PeriodDateRange.shiftAnchor(periodType, current, 1)
+            } else {
+                current
+            }
+        }
     }
 
     fun showAddSheet() {
         _editingRecord.update { null }
         _showAddEditSheet.update { true }
+    }
+
+    fun enterSearchMode() {
+        _isSearchMode.update { true }
+    }
+
+    fun exitSearchMode() {
+        _isSearchMode.update { false }
+        _searchQuery.update { "" }
+    }
+
+    fun updateSearchQuery(query: String) {
+        _searchQuery.update { query }
     }
 
     fun showEditSheet(record: Record) {
@@ -255,7 +402,7 @@ class HomeViewModel @Inject constructor(
     fun deleteRecord(id: Long) {
         viewModelScope.launch {
             // 删除记录前，先还原账户余额
-            val record = _records.value.find { rec -> rec.id == id }
+            val record = _editingRecord.value ?: uiState.value.records.find { rec -> rec.id == id }
             if (record?.accountId != null) {
                 val accId = record.accountId
                 val account = accountRepository.getAccountById(accId)
@@ -266,5 +413,10 @@ class HomeViewModel @Inject constructor(
             }
             deleteRecordUseCase(id)
         }
+    }
+
+    private fun resolveDisplayedBudgetAmount(budgets: List<Budget>): Double {
+        return budgets.find { it.categoryId == null }?.amount
+            ?: budgets.filter { it.categoryId != null }.sumOf { it.amount }
     }
 }

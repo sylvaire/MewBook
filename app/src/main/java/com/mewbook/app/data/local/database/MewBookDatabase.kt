@@ -25,7 +25,7 @@ import com.mewbook.app.data.local.entity.RecordEntity
         BudgetEntity::class,
         LedgerEntity::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 @TypeConverters(Converters::class)

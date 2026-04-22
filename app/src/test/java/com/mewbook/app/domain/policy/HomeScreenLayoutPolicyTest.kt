@@ -7,6 +7,45 @@ import org.junit.Test
 class HomeScreenLayoutPolicyTest {
 
     @Test
+    fun resetSearchOnRouteChange_onlyWhenLeavingHomeRoute() {
+        assertTrue(
+            HomeScreenLayoutPolicy.resetSearchOnRouteChange(
+                previousRoute = "home",
+                currentRoute = "settings",
+                homeRoute = "home"
+            )
+        )
+        assertFalse(
+            HomeScreenLayoutPolicy.resetSearchOnRouteChange(
+                previousRoute = "home",
+                currentRoute = "home",
+                homeRoute = "home"
+            )
+        )
+        assertFalse(
+            HomeScreenLayoutPolicy.resetSearchOnRouteChange(
+                previousRoute = "settings",
+                currentRoute = "home",
+                homeRoute = "home"
+            )
+        )
+        assertFalse(
+            HomeScreenLayoutPolicy.resetSearchOnRouteChange(
+                previousRoute = null,
+                currentRoute = "home",
+                homeRoute = "home"
+            )
+        )
+        assertFalse(
+            HomeScreenLayoutPolicy.resetSearchOnRouteChange(
+                previousRoute = "home",
+                currentRoute = null,
+                homeRoute = "home"
+            )
+        )
+    }
+
+    @Test
     fun consumeBackPress_returnsTrueOnlyForSearchModeWithoutEditor() {
         assertTrue(
             HomeScreenLayoutPolicy.consumeBackPress(
@@ -29,21 +68,21 @@ class HomeScreenLayoutPolicyTest {
     }
 
     @Test
-    fun showSummaryAsScrollableHeader_onlyForNormalHomeWithRecords() {
+    fun showHomeHeaderAsScrollableContent_onlyForNormalHomeWithRecords() {
         assertTrue(
-            HomeScreenLayoutPolicy.showSummaryAsScrollableHeader(
+            HomeScreenLayoutPolicy.showHomeHeaderAsScrollableContent(
                 isSearchMode = false,
                 hasRecords = true
             )
         )
         assertFalse(
-            HomeScreenLayoutPolicy.showSummaryAsScrollableHeader(
+            HomeScreenLayoutPolicy.showHomeHeaderAsScrollableContent(
                 isSearchMode = true,
                 hasRecords = true
             )
         )
         assertFalse(
-            HomeScreenLayoutPolicy.showSummaryAsScrollableHeader(
+            HomeScreenLayoutPolicy.showHomeHeaderAsScrollableContent(
                 isSearchMode = false,
                 hasRecords = false
             )

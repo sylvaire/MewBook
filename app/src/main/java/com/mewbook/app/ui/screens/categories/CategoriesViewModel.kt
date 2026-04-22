@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mewbook.app.domain.model.Category
 import com.mewbook.app.domain.model.RecordType
+import com.mewbook.app.domain.policy.CategorySelectionPolicy
 import com.mewbook.app.domain.usecase.category.AddCategoryUseCase
 import com.mewbook.app.domain.usecase.category.DeleteCategoryUseCase
 import com.mewbook.app.domain.usecase.category.GetCategoriesUseCase
@@ -125,9 +126,7 @@ class CategoriesViewModel @Inject constructor(
 
     fun moveCategoryUp(category: Category) {
         viewModelScope.launch {
-            val siblings = _uiState.value.categories
-                .filter { it.type == category.type && it.parentId == category.parentId }
-                .sortedBy { it.sortOrder }
+            val siblings = reorderableSiblings(category)
             val currentIndex = siblings.indexOfFirst { it.id == category.id }
             if (currentIndex <= 0) return@launch
 
@@ -140,9 +139,7 @@ class CategoriesViewModel @Inject constructor(
 
     fun moveCategoryDown(category: Category) {
         viewModelScope.launch {
-            val siblings = _uiState.value.categories
-                .filter { it.type == category.type && it.parentId == category.parentId }
-                .sortedBy { it.sortOrder }
+            val siblings = reorderableSiblings(category)
             val currentIndex = siblings.indexOfFirst { it.id == category.id }
             if (currentIndex == -1 || currentIndex >= siblings.lastIndex) return@launch
 
@@ -150,6 +147,16 @@ class CategoriesViewModel @Inject constructor(
             val next = siblings[currentIndex + 1]
             updateCategoryUseCase(current.copy(sortOrder = next.sortOrder))
             updateCategoryUseCase(next.copy(sortOrder = current.sortOrder))
+        }
+    }
+
+    private fun reorderableSiblings(category: Category): List<Category> {
+        return if (category.parentId == null) {
+            CategorySelectionPolicy.visibleTopLevelCategories(_uiState.value.categories, category.type)
+        } else {
+            _uiState.value.categories
+                .filter { it.type == category.type && it.parentId == category.parentId }
+                .sortedBy { it.sortOrder }
         }
     }
 }

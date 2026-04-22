@@ -2,6 +2,7 @@ package com.mewbook.app.data.preferences
 
 import android.content.Context
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -22,9 +23,15 @@ class HomePreferencesRepository @Inject constructor(
 ) {
     private val selectedHomePeriodKey: Preferences.Key<String> =
         stringPreferencesKey("selected_home_period")
+    private val showHomeOverviewCardsKey: Preferences.Key<Boolean> =
+        booleanPreferencesKey("show_home_overview_cards")
 
     val selectedHomePeriod: Flow<BudgetPeriodType> = context.homePreferencesDataStore.data.map { preferences ->
         HomePeriodSelectionPolicy.fromStorageValue(preferences[selectedHomePeriodKey])
+    }
+
+    val showHomeOverviewCards: Flow<Boolean> = context.homePreferencesDataStore.data.map { preferences ->
+        preferences[showHomeOverviewCardsKey] ?: true
     }
 
     suspend fun setSelectedHomePeriod(periodType: BudgetPeriodType) {
@@ -33,7 +40,17 @@ class HomePreferencesRepository @Inject constructor(
         }
     }
 
+    suspend fun setShowHomeOverviewCards(show: Boolean) {
+        context.homePreferencesDataStore.edit { preferences ->
+            preferences[showHomeOverviewCardsKey] = show
+        }
+    }
+
     suspend fun getSelectedHomePeriodOnce(): BudgetPeriodType {
         return selectedHomePeriod.first()
+    }
+
+    suspend fun getShowHomeOverviewCardsOnce(): Boolean {
+        return showHomeOverviewCards.first()
     }
 }

@@ -18,6 +18,7 @@ import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.AccountTree
+import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.AlertDialog
@@ -27,6 +28,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -49,11 +51,13 @@ fun SettingsScreen(
     onNavigateToCategories: () -> Unit,
     onNavigateToDavSettings: () -> Unit,
     onNavigateToBudget: () -> Unit,
+    onNavigateToRecurringTemplates: () -> Unit,
     onNavigateToExport: () -> Unit,
     onNavigateToLedgerManagement: () -> Unit,
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
+    val showHomeOverviewCards by viewModel.showHomeOverviewCards.collectAsStateWithLifecycle()
     var showThemeDialog = androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
 
     if (showThemeDialog.value) {
@@ -96,6 +100,14 @@ fun SettingsScreen(
                 onClick = { showThemeDialog.value = true }
             )
 
+            SettingsSwitchItem(
+                icon = Icons.Filled.AccountBalanceWallet,
+                title = "首页收支概览",
+                subtitle = "控制首页是否显示支出、收入、结余和剩余预算",
+                checked = showHomeOverviewCards,
+                onCheckedChange = viewModel::setShowHomeOverviewCards
+            )
+
             SettingsItem(
                 icon = Icons.Filled.AccountTree,
                 title = "分支管理",
@@ -117,6 +129,13 @@ fun SettingsScreen(
                 onClick = onNavigateToBudget
             )
 
+            SettingsItem(
+                icon = Icons.Filled.CalendarMonth,
+                title = "周期模板",
+                subtitle = "工资、房租、订阅等固定记账",
+                onClick = onNavigateToRecurringTemplates
+            )
+
             Spacer(modifier = Modifier.height(16.dp))
 
             Text(
@@ -129,14 +148,14 @@ fun SettingsScreen(
             SettingsItem(
                 icon = Icons.Filled.CloudSync,
                 title = "DAV同步",
-                subtitle = "导入导出数据到WebDAV",
+                subtitle = "云端导入导出与同步预览",
                 onClick = onNavigateToDavSettings
             )
 
             SettingsItem(
                 icon = Icons.Filled.Download,
-                title = "数据导出",
-                subtitle = "导出CSV/JSON格式",
+                title = "迁移与备份",
+                subtitle = "外部导入、本地备份、还原与格式导出",
                 onClick = onNavigateToExport
             )
 
@@ -251,6 +270,59 @@ fun SettingsItem(
                 imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+@Composable
+fun SettingsSwitchItem(
+    icon: ImageVector,
+    title: String,
+    subtitle: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { onCheckedChange(!checked) }
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary
+            )
+
+            Spacer(modifier = Modifier.width(16.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.bodyLarge
+                )
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+
+            Switch(
+                checked = checked,
+                onCheckedChange = onCheckedChange
             )
         }
     }

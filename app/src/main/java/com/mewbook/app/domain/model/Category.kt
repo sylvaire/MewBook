@@ -39,18 +39,17 @@ object DefaultCategories {
         Category(name = "保险", icon = "health_and_safety", color = 0xFF90CAF9, type = RecordType.EXPENSE, isDefault = true, sortOrder = 22),
         Category(name = "零食", icon = "cookie", color = 0xFFFFCC80, type = RecordType.EXPENSE, isDefault = true, sortOrder = 23),
         Category(name = "还款", icon = "payments", color = 0xFF80CBC4, type = RecordType.EXPENSE, isDefault = true, sortOrder = 24),
-        Category(name = "地铁", icon = "train", color = 0xFF78909C, type = RecordType.EXPENSE, isDefault = true, sortOrder = 25),
-        Category(name = "理财", icon = "savings", color = 0xFFA5D6A7, type = RecordType.EXPENSE, isDefault = true, sortOrder = 26),
-        Category(name = "运动", icon = "directions_run", color = 0xFF66BB6A, type = RecordType.EXPENSE, isDefault = true, sortOrder = 27),
-        Category(name = "服饰", icon = "checkroom", color = 0xFFB39DDB, type = RecordType.EXPENSE, isDefault = true, sortOrder = 28),
-        Category(name = "居家", icon = "weekend", color = 0xFFBCAAA4, type = RecordType.EXPENSE, isDefault = true, sortOrder = 29),
-        Category(name = "快递", icon = "local_shipping", color = 0xFFB0BEC5, type = RecordType.EXPENSE, isDefault = true, sortOrder = 30),
-        Category(name = "孩子", icon = "boy", color = 0xFFFFAB91, type = RecordType.EXPENSE, isDefault = true, sortOrder = 31),
-        Category(name = "社交", icon = "forum", color = 0xFFF48FB1, type = RecordType.EXPENSE, isDefault = true, sortOrder = 32),
-        Category(name = "学习", icon = "auto_stories", color = 0xFF9FA8DA, type = RecordType.EXPENSE, isDefault = true, sortOrder = 33),
-        Category(name = "礼金", icon = "attach_money", color = 0xFFFFD180, type = RecordType.EXPENSE, isDefault = true, sortOrder = 34),
-        Category(name = "礼物", icon = "card_giftcard", color = 0xFFE1BEE7, type = RecordType.EXPENSE, isDefault = true, sortOrder = 35),
-        Category(name = "其他", icon = "more_horiz", color = 0xFF9E9E9E, type = RecordType.EXPENSE, isDefault = true, sortOrder = 36)
+        Category(name = "理财", icon = "savings", color = 0xFFA5D6A7, type = RecordType.EXPENSE, isDefault = true, sortOrder = 25),
+        Category(name = "运动", icon = "directions_run", color = 0xFF66BB6A, type = RecordType.EXPENSE, isDefault = true, sortOrder = 26),
+        Category(name = "服饰", icon = "checkroom", color = 0xFFB39DDB, type = RecordType.EXPENSE, isDefault = true, sortOrder = 27),
+        Category(name = "居家", icon = "weekend", color = 0xFFBCAAA4, type = RecordType.EXPENSE, isDefault = true, sortOrder = 28),
+        Category(name = "快递", icon = "local_shipping", color = 0xFFB0BEC5, type = RecordType.EXPENSE, isDefault = true, sortOrder = 29),
+        Category(name = "孩子", icon = "boy", color = 0xFFFFAB91, type = RecordType.EXPENSE, isDefault = true, sortOrder = 30),
+        Category(name = "社交", icon = "forum", color = 0xFFF48FB1, type = RecordType.EXPENSE, isDefault = true, sortOrder = 31),
+        Category(name = "学习", icon = "auto_stories", color = 0xFF9FA8DA, type = RecordType.EXPENSE, isDefault = true, sortOrder = 32),
+        Category(name = "礼金", icon = "attach_money", color = 0xFFFFD180, type = RecordType.EXPENSE, isDefault = true, sortOrder = 33),
+        Category(name = "礼物", icon = "card_giftcard", color = 0xFFE1BEE7, type = RecordType.EXPENSE, isDefault = true, sortOrder = 34),
+        Category(name = "其他", icon = "more_horiz", color = 0xFF9E9E9E, type = RecordType.EXPENSE, isDefault = true, sortOrder = 35)
     )
 
     val incomeCategories = listOf(

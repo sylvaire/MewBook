@@ -41,6 +41,14 @@ class ExportDataUseCase @Inject constructor(
     }
 }
 
+class PreviewImportDataUseCase @Inject constructor(
+    private val davRepository: DavRepository
+) {
+    suspend operator fun invoke(config: DavConfig): Result<com.mewbook.app.data.backup.BackupRestorePreview> {
+        return davRepository.previewImportData(config)
+    }
+}
+
 class ImportDataUseCase @Inject constructor(
     private val davRepository: DavRepository
 ) {

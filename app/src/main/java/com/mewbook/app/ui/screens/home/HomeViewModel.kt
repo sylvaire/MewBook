@@ -11,11 +11,13 @@ import com.mewbook.app.domain.model.Ledger
 import com.mewbook.app.domain.model.Record
 import com.mewbook.app.domain.model.RecordType
 import com.mewbook.app.domain.policy.AccountDefaultsPolicy
+import com.mewbook.app.domain.policy.HomeQuickEntryCategoryPolicy
 import com.mewbook.app.domain.policy.HomeRecordSearchPolicy
 import com.mewbook.app.domain.policy.RecentNoteHistory
 import com.mewbook.app.domain.repository.AccountRepository
 import com.mewbook.app.domain.repository.BudgetRepository
 import com.mewbook.app.domain.repository.LedgerRepository
+import com.mewbook.app.domain.repository.RecurringTemplateRepository
 import com.mewbook.app.domain.usecase.category.GetCategoriesUseCase
 import com.mewbook.app.domain.usecase.category.InitializeDefaultCategoriesUseCase
 import com.mewbook.app.domain.usecase.ledger.InitializeDefaultLedgerUseCase
@@ -56,12 +58,27 @@ private data class HomeOverlayState(
     val isLoading: Boolean,
     val error: String?,
     val showAddEditSheet: Boolean,
-    val editingRecord: Record?
+    val editingRecord: Record?,
+    val newRecordType: RecordType?,
+    val addEntryMode: HomeAddEntryMode
+)
+
+private data class HomeEditorState(
+    val showAddEditSheet: Boolean,
+    val editingRecord: Record?,
+    val newRecordType: RecordType?,
+    val addEntryMode: HomeAddEntryMode
 )
 
 private data class HomeSearchState(
     val isSearchMode: Boolean,
     val searchQuery: String
+)
+
+private data class HomeInteractionState(
+    val overlay: HomeOverlayState,
+    val search: HomeSearchState,
+    val showHomeOverviewCards: Boolean
 )
 
 private data class HomeContextState(
@@ -89,12 +106,21 @@ data class HomeUiState(
     val error: String? = null,
     val showAddEditSheet: Boolean = false,
     val editingRecord: Record? = null,
+    val newRecordType: RecordType? = null,
+    val addEntryMode: HomeAddEntryMode = HomeAddEntryMode.FULL,
     val isSearchMode: Boolean = false,
     val searchQuery: String = "",
     val searchResultCount: Int = 0,
     val recentNotesByCategory: Map<Long, List<String>> = emptyMap(),
-    val defaultAccountId: Long? = null
+    val defaultAccountId: Long? = null,
+    val showHomeOverviewCards: Boolean = true,
+    val quickCategories: List<Category> = emptyList()
 )
+
+enum class HomeAddEntryMode {
+    FULL,
+    QUICK
+}
 
 @HiltViewModel
 class HomeViewModel @Inject constructor(
@@ -108,6 +134,7 @@ class HomeViewModel @Inject constructor(
     private val ledgerRepository: LedgerRepository,
     private val accountRepository: AccountRepository,
     private val budgetRepository: BudgetRepository,
+    private val recurringTemplateRepository: RecurringTemplateRepository,
     private val homePreferencesRepository: HomePreferencesRepository
 ) : ViewModel() {
 
@@ -117,6 +144,9 @@ class HomeViewModel @Inject constructor(
     private val _error = MutableStateFlow<String?>(null)
     private val _showAddEditSheet = MutableStateFlow(false)
     private val _editingRecord = MutableStateFlow<Record?>(null)
+    private val _newRecordType = MutableStateFlow<RecordType?>(null)
+    private val _addEntryMode = MutableStateFlow(HomeAddEntryMode.FULL)
+    private val _lastRecordType = MutableStateFlow<RecordType?>(null)
     private val _isSearchMode = MutableStateFlow(false)
     private val _searchQuery = MutableStateFlow("")
     private val _records = MutableStateFlow<List<Record>>(emptyList())
@@ -124,6 +154,7 @@ class HomeViewModel @Inject constructor(
     private val _totalExpense = MutableStateFlow(0.0)
     private val _totalBudget = MutableStateFlow(0.0)
     private val _budgetRemaining = MutableStateFlow(0.0)
+    private val _showHomeOverviewCards = MutableStateFlow(true)
     private val periodState = combine(_selectedPeriodType, _anchorDate) { selectedPeriodType, anchorDate ->
         HomePeriodState(selectedPeriodType = selectedPeriodType, anchorDate = anchorDate)
     }
@@ -136,18 +167,35 @@ class HomeViewModel @Inject constructor(
             budgetRemaining = budgetRemaining
         )
     }
-    private val overlayState = combine(_isLoading, _error, _showAddEditSheet, _editingRecord) { isLoading, error, showAddEditSheet, editingRecord ->
+    private val editorState = combine(_showAddEditSheet, _editingRecord, _newRecordType, _addEntryMode) { showAddEditSheet, editingRecord, newRecordType, addEntryMode ->
+        HomeEditorState(
+            showAddEditSheet = showAddEditSheet,
+            editingRecord = editingRecord,
+            newRecordType = newRecordType,
+            addEntryMode = addEntryMode
+        )
+    }
+    private val overlayState = combine(_isLoading, _error, editorState) { isLoading, error, editorState ->
         HomeOverlayState(
             isLoading = isLoading,
             error = error,
-            showAddEditSheet = showAddEditSheet,
-            editingRecord = editingRecord
+            showAddEditSheet = editorState.showAddEditSheet,
+            editingRecord = editorState.editingRecord,
+            newRecordType = editorState.newRecordType,
+            addEntryMode = editorState.addEntryMode
         )
     }
     private val searchState = combine(_isSearchMode, _searchQuery) { isSearchMode, searchQuery ->
         HomeSearchState(
             isSearchMode = isSearchMode,
             searchQuery = searchQuery
+        )
+    }
+    private val interactionState = combine(overlayState, searchState, _showHomeOverviewCards) { overlay, search, showHomeOverviewCards ->
+        HomeInteractionState(
+            overlay = overlay,
+            search = search,
+            showHomeOverviewCards = showHomeOverviewCards
         )
     }
     private val contextState = combine(
@@ -164,7 +212,9 @@ class HomeViewModel @Inject constructor(
         )
     }
 
-    val uiState: StateFlow<HomeUiState> = combine(periodState, summaryState, overlayState, contextState, searchState) { period, summary, overlay, context, search ->
+    val uiState: StateFlow<HomeUiState> = combine(periodState, summaryState, contextState, interactionState) { period, summary, context, interaction ->
+        val overlay = interaction.overlay
+        val search = interaction.search
         val activeLedgerId = context.activeLedger?.id ?: 1L
         val categoriesById = context.categories.associateBy { it.id }
         val accountsById = context.accounts.associateBy { it.id }
@@ -202,6 +252,8 @@ class HomeViewModel @Inject constructor(
             error = overlay.error,
             showAddEditSheet = overlay.showAddEditSheet,
             editingRecord = overlay.editingRecord,
+            newRecordType = overlay.newRecordType,
+            addEntryMode = overlay.addEntryMode,
             isSearchMode = search.isSearchMode,
             searchQuery = search.searchQuery,
             searchResultCount = searchResults.size,
@@ -209,7 +261,14 @@ class HomeViewModel @Inject constructor(
                 records = context.allRecords,
                 ledgerId = activeLedgerId
             ),
-            defaultAccountId = AccountDefaultsPolicy.resolveDefaultAccountId(ledgerAccounts)
+            defaultAccountId = AccountDefaultsPolicy.resolveDefaultAccountId(ledgerAccounts),
+            showHomeOverviewCards = interaction.showHomeOverviewCards,
+            quickCategories = HomeQuickEntryCategoryPolicy.suggest(
+                categories = context.categories,
+                records = context.allRecords,
+                ledgerId = activeLedgerId,
+                type = overlay.newRecordType ?: RecordType.EXPENSE
+            )
         )
     }.stateIn(
         viewModelScope,
@@ -220,6 +279,7 @@ class HomeViewModel @Inject constructor(
     init {
         initializeData()
         restoreSelectedPeriodType()
+        restoreHomeOverviewVisibility()
         observePeriodData()
     }
 
@@ -227,6 +287,7 @@ class HomeViewModel @Inject constructor(
         viewModelScope.launch {
             initializeDefaultLedgerUseCase()
             initializeDefaultCategoriesUseCase()
+            recurringTemplateRepository.autoCloseDueTemplates()
         }
     }
 
@@ -234,6 +295,14 @@ class HomeViewModel @Inject constructor(
         viewModelScope.launch {
             homePreferencesRepository.selectedHomePeriod.collectLatest { savedPeriodType ->
                 _selectedPeriodType.update { savedPeriodType }
+            }
+        }
+    }
+
+    private fun restoreHomeOverviewVisibility() {
+        viewModelScope.launch {
+            homePreferencesRepository.showHomeOverviewCards.collectLatest { show ->
+                _showHomeOverviewCards.update { show }
             }
         }
     }
@@ -299,8 +368,17 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    fun showAddSheet() {
+    fun showAddSheet(initialType: RecordType? = null) {
         _editingRecord.update { null }
+        _newRecordType.update { initialType ?: _lastRecordType.value ?: RecordType.EXPENSE }
+        _addEntryMode.update { HomeAddEntryMode.FULL }
+        _showAddEditSheet.update { true }
+    }
+
+    fun showQuickAddSheet(initialType: RecordType) {
+        _editingRecord.update { null }
+        _newRecordType.update { initialType }
+        _addEntryMode.update { HomeAddEntryMode.QUICK }
         _showAddEditSheet.update { true }
     }
 
@@ -319,12 +397,22 @@ class HomeViewModel @Inject constructor(
 
     fun showEditSheet(record: Record) {
         _editingRecord.update { record }
+        _newRecordType.update { record.type }
+        _addEntryMode.update { HomeAddEntryMode.FULL }
         _showAddEditSheet.update { true }
+    }
+
+    fun expandQuickAddSheet() {
+        if (_showAddEditSheet.value) {
+            _addEntryMode.update { HomeAddEntryMode.FULL }
+        }
     }
 
     fun hideAddEditSheet() {
         _showAddEditSheet.update { false }
         _editingRecord.update { null }
+        _newRecordType.update { null }
+        _addEntryMode.update { HomeAddEntryMode.FULL }
     }
 
     fun saveRecord(
@@ -395,6 +483,7 @@ class HomeViewModel @Inject constructor(
                     }
                 }
             }
+            _lastRecordType.update { type }
             hideAddEditSheet()
         }
     }

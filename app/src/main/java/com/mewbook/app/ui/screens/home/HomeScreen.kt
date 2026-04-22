@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyItemScope
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -22,7 +21,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -33,6 +31,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -41,6 +40,7 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -56,12 +56,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.mewbook.app.domain.model.RecordType
+import com.mewbook.app.domain.model.Record
+import com.mewbook.app.domain.model.Category
 import com.mewbook.app.domain.policy.HomeScreenLayoutPolicy
 import com.mewbook.app.ui.components.BudgetPeriodNavigator
 import com.mewbook.app.ui.components.BudgetPeriodTypeSelector
 import com.mewbook.app.ui.components.RecordItem
 import com.mewbook.app.ui.components.MewCompactTopAppBar
 import com.mewbook.app.ui.screens.add.AddEditRecordSheet
+import com.mewbook.app.ui.screens.add.QuickAddRecordSheet
 import com.mewbook.app.ui.theme.BudgetWarning
 import com.mewbook.app.ui.theme.ClayDesign
 import com.mewbook.app.ui.theme.ExpenseRed
@@ -76,6 +80,7 @@ import com.mewbook.app.util.formatCurrency
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
+    searchResetToken: Int = 0,
     onAddSheetVisibilityChanged: (Boolean) -> Unit = {},
     viewModel: HomeViewModel = hiltViewModel()
 ) {
@@ -88,6 +93,12 @@ fun HomeScreen(
         onAddSheetVisibilityChanged(uiState.showAddEditSheet)
     }
 
+    LaunchedEffect(searchResetToken) {
+        if (searchResetToken > 0) {
+            viewModel.exitSearchMode()
+        }
+    }
+
     BackHandler(
         enabled = HomeScreenLayoutPolicy.consumeBackPress(
             isSearchMode = uiState.isSearchMode,
@@ -96,6 +107,11 @@ fun HomeScreen(
     ) {
         viewModel.exitSearchMode()
     }
+
+    val showScrollableHomeHeader = HomeScreenLayoutPolicy.showHomeHeaderAsScrollableContent(
+        isSearchMode = uiState.isSearchMode,
+        hasRecords = uiState.records.isNotEmpty()
+    )
 
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
@@ -194,10 +210,30 @@ fun HomeScreen(
                         )
                     }
 
+                    if (!uiState.isSearchMode && !uiState.isLoading && !showScrollableHomeHeader) {
+                        if (uiState.showHomeOverviewCards) {
+                            SummaryCard(
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                                totalIncome = uiState.totalIncome,
+                                totalExpense = uiState.totalExpense,
+                                totalBudget = uiState.totalBudget,
+                                budgetRemaining = uiState.budgetRemaining
+                            )
+                        }
+
+                        HomeQuickEntryCard(
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                            onExpenseClick = { viewModel.showQuickAddSheet(RecordType.EXPENSE) },
+                            onIncomeClick = { viewModel.showQuickAddSheet(RecordType.INCOME) }
+                        )
+                    }
+
                     when {
                         !uiState.isSearchMode && uiState.isLoading -> {
                             Box(
-                                modifier = Modifier.fillMaxSize(),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxWidth(),
                                 contentAlignment = Alignment.Center
                             ) {
                                 CircularProgressIndicator(
@@ -209,43 +245,29 @@ fun HomeScreen(
                         uiState.isSearchMode && uiState.searchQuery.isBlank() -> {
                             SearchStateMessage(
                                 title = "搜索当前账本记录",
-                                subtitle = "支持搜索备注、分类、金额和账户名"
+                                subtitle = "支持搜索备注、分类、金额和账户名",
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxWidth()
                             )
                         }
 
                         uiState.isSearchMode && uiState.records.isEmpty() -> {
                             SearchStateMessage(
                                 title = "没有找到结果",
-                                subtitle = "换个关键词试试，比如分类、金额或账户名"
+                                subtitle = "换个关键词试试，比如分类、金额或账户名",
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxWidth()
                             )
                         }
 
                         !uiState.isSearchMode && uiState.records.isEmpty() -> {
-                            Box(
-                                modifier = Modifier.fillMaxSize(),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Column(
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                    verticalArrangement = Arrangement.Center
-                                ) {
-                                    Text(
-                                        text = "🍊",
-                                        style = MaterialTheme.typography.displayLarge
-                                    )
-                                    Spacer(modifier = Modifier.height(16.dp))
-                                    Text(
-                                        text = "还没有记录",
-                                        style = MaterialTheme.typography.titleMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                    Text(
-                                        text = "点击 + 添加第一笔记录",
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                                    )
-                                }
-                            }
+                            HomeEmptyState(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxWidth()
+                            )
                         }
 
                         else -> {
@@ -258,20 +280,24 @@ fun HomeScreen(
                                 )
                             }
                             HomeRecordList(
+                                modifier = Modifier.weight(1f),
                                 records = uiState.records,
                                 categories = uiState.categories,
-                                summaryHeader = if (
-                                    HomeScreenLayoutPolicy.showSummaryAsScrollableHeader(
-                                        isSearchMode = uiState.isSearchMode,
-                                        hasRecords = uiState.records.isNotEmpty()
-                                    )
-                                ) {
+                                headerContent = if (showScrollableHomeHeader) {
                                     {
-                                        SummaryCard(
-                                            totalIncome = uiState.totalIncome,
-                                            totalExpense = uiState.totalExpense,
-                                            totalBudget = uiState.totalBudget,
-                                            budgetRemaining = uiState.budgetRemaining
+                                        if (uiState.showHomeOverviewCards) {
+                                            SummaryCard(
+                                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                                                totalIncome = uiState.totalIncome,
+                                                totalExpense = uiState.totalExpense,
+                                                totalBudget = uiState.totalBudget,
+                                                budgetRemaining = uiState.budgetRemaining
+                                            )
+                                        }
+                                        HomeQuickEntryCard(
+                                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                                            onExpenseClick = { viewModel.showQuickAddSheet(RecordType.EXPENSE) },
+                                            onIncomeClick = { viewModel.showQuickAddSheet(RecordType.INCOME) }
                                         )
                                     }
                                 } else {
@@ -284,7 +310,20 @@ fun HomeScreen(
                 }
             }
 
-        if (uiState.showAddEditSheet) {
+        if (uiState.showAddEditSheet && uiState.addEntryMode == HomeAddEntryMode.QUICK && uiState.editingRecord == null) {
+            QuickAddRecordSheet(
+                type = uiState.newRecordType ?: RecordType.EXPENSE,
+                categories = uiState.quickCategories,
+                accounts = uiState.accounts,
+                defaultAccountId = uiState.defaultAccountId,
+                defaultDate = uiState.anchorDate,
+                onDismiss = { viewModel.hideAddEditSheet() },
+                onOpenFullEditor = { viewModel.expandQuickAddSheet() },
+                onSave = { amount, type, categoryId, note, date, accountId ->
+                    viewModel.saveRecord(amount, type, categoryId, note, date, accountId)
+                }
+            )
+        } else if (uiState.showAddEditSheet) {
             AddEditRecordSheet(
                 categories = uiState.categories.values.toList(),
                 accounts = uiState.accounts,
@@ -292,6 +331,7 @@ fun HomeScreen(
                 defaultAccountId = uiState.defaultAccountId,
                 defaultDate = uiState.anchorDate,
                 editingRecord = uiState.editingRecord,
+                initialType = uiState.newRecordType ?: RecordType.EXPENSE,
                 onDismiss = { viewModel.hideAddEditSheet() },
                 onSave = { amount, type, categoryId, note, date, accountId ->
                     viewModel.saveRecord(amount, type, categoryId, note, date, accountId)
@@ -410,10 +450,11 @@ private fun HomeSearchField(
 @Composable
 private fun SearchStateMessage(
     title: String,
-    subtitle: String
+    subtitle: String,
+    modifier: Modifier = Modifier
 ) {
     Box(
-        modifier = Modifier.fillMaxSize(),
+        modifier = modifier,
         contentAlignment = Alignment.Center
     ) {
         Column(
@@ -453,41 +494,83 @@ private fun SearchStateMessage(
 
 @Composable
 private fun HomeRecordList(
-    records: List<com.mewbook.app.domain.model.Record>,
-    categories: Map<Long, com.mewbook.app.domain.model.Category>,
-    summaryHeader: (@Composable LazyItemScope.() -> Unit)?,
+    records: List<Record>,
+    categories: Map<Long, Category>,
+    modifier: Modifier = Modifier,
+    headerContent: (@Composable () -> Unit)? = null,
     onRecordClick: (com.mewbook.app.domain.model.Record) -> Unit
 ) {
     LazyColumn(
+        modifier = modifier.fillMaxWidth(),
         contentPadding = PaddingValues(
-            start = 16.dp,
-            end = 16.dp,
             top = 8.dp,
             bottom = 100.dp
         ),
         verticalArrangement = Arrangement.spacedBy(ClayDesign.CardSpacing)
     ) {
-        if (summaryHeader != null) {
+        if (headerContent != null) {
             item(
-                key = "summary_header",
-                content = summaryHeader
-            )
+                key = "home-scrollable-header",
+                contentType = "header"
+            ) {
+                headerContent()
+            }
         }
-        items(records, key = { it.id }) { record ->
+        items(
+            items = records,
+            key = { it.id },
+            contentType = { "record" }
+        ) { record ->
             val category = categories[record.categoryId]
             RecordItem(
                 record = record,
                 categoryName = category?.name ?: "未知",
                 categoryIcon = category?.icon ?: "more_horiz",
                 categoryColor = category?.color ?: 0xFF808080,
-                onClick = { onRecordClick(record) }
+                onClick = { onRecordClick(record) },
+                modifier = Modifier.padding(horizontal = 16.dp)
             )
         }
     }
 }
 
 @Composable
+private fun HomeQuickEntryCard(
+    modifier: Modifier = Modifier,
+    onExpenseClick: () -> Unit,
+    onIncomeClick: () -> Unit
+) {
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        )
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Button(
+                    onClick = onExpenseClick,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text("快速支出")
+                }
+                OutlinedButton(
+                    onClick = onIncomeClick,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text("快速收入")
+                }
+            }
+        }
+    }
+}
+
+@Composable
 fun SummaryCard(
+    modifier: Modifier = Modifier,
     totalIncome: Double,
     totalExpense: Double,
     totalBudget: Double = 0.0,
@@ -500,9 +583,8 @@ fun SummaryCard(
 
     // Claymorphism 卡片 - 多层阴影
     Card(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp)
             .shadow(
                 elevation = ClayDesign.CardShadowElevation1,
                 shape = RoundedCornerShape(ClayDesign.CardRadius),
@@ -691,6 +773,37 @@ fun SummaryCard(
                     )
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun HomeEmptyState(
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier,
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Text(
+                text = "🍊",
+                style = MaterialTheme.typography.displayLarge
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(
+                text = "还没有记录",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text(
+                text = "点击 + 添加第一笔记录",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+            )
         }
     }
 }

@@ -21,6 +21,11 @@ object BackupMigration {
     }
 
     fun parseToCurrentEnvelope(jsonString: String): BackupEnvelope {
+        val trimmed = jsonString.trimStart { it.isWhitespace() || it == '\uFEFF' }
+        if (!trimmed.startsWith("{")) {
+            return BackupImportPolicy.parseExternalCsv(jsonString)
+        }
+
         val root = json.parseToJsonElement(jsonString) as? JsonObject
             ?: throw IllegalArgumentException("Invalid backup file")
 
@@ -60,6 +65,37 @@ object BackupMigration {
         return json.encodeToString(BackupEnvelope.serializer(), envelope)
     }
 
+    fun summarizeEnvelope(envelope: BackupEnvelope): BackupSnapshotSummary {
+        return BackupSnapshotSummary(
+            records = envelope.payload.records.size,
+            categories = envelope.payload.categories.size,
+            accounts = envelope.payload.accounts.size,
+            budgets = envelope.payload.budgets.size,
+            templates = envelope.payload.templates.size,
+            ledgers = envelope.payload.ledgers.size,
+            hasDavConfig = envelope.payload.davConfig != null,
+            themeMode = envelope.payload.themeMode
+        )
+    }
+
+    fun compareEnvelopes(
+        current: BackupEnvelope,
+        incoming: BackupEnvelope
+    ): BackupRestorePreview {
+        return BackupRestorePreview(
+            current = summarizeEnvelope(current),
+            incoming = summarizeEnvelope(incoming),
+            conflicts = BackupConflictSummary(
+                records = countConflicts(current.payload.records.map { it.id }, incoming.payload.records.map { it.id }),
+                categories = countConflicts(current.payload.categories.map { it.id }, incoming.payload.categories.map { it.id }),
+                accounts = countConflicts(current.payload.accounts.map { it.id }, incoming.payload.accounts.map { it.id }),
+                budgets = countConflicts(current.payload.budgets.map { it.id }, incoming.payload.budgets.map { it.id }),
+                templates = countConflicts(current.payload.templates.map { it.id }, incoming.payload.templates.map { it.id }),
+                ledgers = countConflicts(current.payload.ledgers.map { it.id }, incoming.payload.ledgers.map { it.id })
+            )
+        )
+    }
+
     private fun normalizeBudget(budget: BackupBudget): BackupBudget {
         val resolvedPeriodType = budget.periodType.ifBlank { "MONTH" }
         val resolvedPeriodKey = budget.periodKey ?: budget.month ?: ""
@@ -68,6 +104,13 @@ object BackupMigration {
             periodKey = resolvedPeriodKey,
             month = if (resolvedPeriodType == "MONTH") resolvedPeriodKey else budget.month
         )
+    }
+
+    private fun countConflicts(currentIds: List<Long>, incomingIds: List<Long>): Int {
+        if (currentIds.isEmpty() || incomingIds.isEmpty()) {
+            return 0
+        }
+        return currentIds.toSet().intersect(incomingIds.toSet()).size
     }
 
     private fun migrateLegacyExportV1(legacy: LegacyExportV1): BackupEnvelope {
@@ -129,6 +172,7 @@ object BackupMigration {
             payload = BackupPayload(
                 records = records,
                 categories = categories,
+                templates = emptyList(),
                 ledgers = defaultLedgers()
             )
         )
@@ -180,6 +224,7 @@ object BackupMigration {
                         parentId = it.parentId
                     )
                 },
+                templates = emptyList(),
                 ledgers = ledgers
             )
         )

@@ -9,12 +9,14 @@ import com.mewbook.app.data.repository.BudgetRepositoryImpl
 import com.mewbook.app.data.repository.CategoryRepositoryImpl
 import com.mewbook.app.data.repository.DavRepositoryImpl
 import com.mewbook.app.data.repository.LedgerRepositoryImpl
+import com.mewbook.app.data.repository.RecurringTemplateRepositoryImpl
 import com.mewbook.app.data.repository.RecordRepositoryImpl
 import com.mewbook.app.domain.repository.AccountRepository
 import com.mewbook.app.domain.repository.BudgetRepository
 import com.mewbook.app.domain.repository.CategoryRepository
 import com.mewbook.app.domain.repository.DavRepository
 import com.mewbook.app.domain.repository.LedgerRepository
+import com.mewbook.app.domain.repository.RecurringTemplateRepository
 import com.mewbook.app.domain.repository.RecordRepository
 import dagger.Binds
 import dagger.Module
@@ -73,4 +75,10 @@ abstract class RepositoryModule {
     abstract fun bindLedgerRepository(
         ledgerRepositoryImpl: LedgerRepositoryImpl
     ): LedgerRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindRecurringTemplateRepository(
+        recurringTemplateRepositoryImpl: RecurringTemplateRepositoryImpl
+    ): RecurringTemplateRepository
 }

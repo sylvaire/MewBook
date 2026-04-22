@@ -3,10 +3,12 @@ package com.mewbook.app.ui.screens.dav
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.mewbook.app.data.backup.BackupRestorePreview
 import com.mewbook.app.domain.model.DavConfig
 import com.mewbook.app.domain.usecase.dav.ExportDataUseCase
 import com.mewbook.app.domain.usecase.dav.GetDavConfigUseCase
 import com.mewbook.app.domain.usecase.dav.ImportDataUseCase
+import com.mewbook.app.domain.usecase.dav.PreviewImportDataUseCase
 import com.mewbook.app.domain.usecase.dav.SaveDavConfigUseCase
 import com.mewbook.app.domain.usecase.dav.TestConnectionUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -30,7 +32,9 @@ data class DavSettingsUiState(
     val isLoading: Boolean = false,
     val isTesting: Boolean = false,
     val isExporting: Boolean = false,
+    val isPreviewingImport: Boolean = false,
     val isImporting: Boolean = false,
+    val importPreview: BackupRestorePreview? = null,
     val message: String? = null
 )
 
@@ -40,6 +44,7 @@ class DavSettingsViewModel @Inject constructor(
     private val saveDavConfigUseCase: SaveDavConfigUseCase,
     private val testConnectionUseCase: TestConnectionUseCase,
     private val exportDataUseCase: ExportDataUseCase,
+    private val previewImportDataUseCase: PreviewImportDataUseCase,
     private val importDataUseCase: ImportDataUseCase
 ) : ViewModel() {
 
@@ -154,6 +159,29 @@ class DavSettingsViewModel @Inject constructor(
         }
     }
 
+    fun previewImportData() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isPreviewingImport = true, message = null, importPreview = null) }
+            val state = _uiState.value
+            Log.d(TAG, "previewImportData serverUrl=${state.serverUrl} remotePath=${state.remotePath}")
+            val config = DavConfig(
+                serverUrl = state.serverUrl,
+                username = state.username,
+                password = state.password,
+                remotePath = state.remotePath
+            )
+
+            val result = previewImportDataUseCase(config)
+            _uiState.update {
+                it.copy(
+                    isPreviewingImport = false,
+                    importPreview = result.getOrNull(),
+                    message = if (result.isSuccess) null else "导入预览失败: ${result.exceptionOrNull()?.message}"
+                )
+            }
+        }
+    }
+
     fun importData() {
         viewModelScope.launch {
             _uiState.update { it.copy(isImporting = true, message = null) }
@@ -176,6 +204,15 @@ class DavSettingsViewModel @Inject constructor(
                 )
             }
         }
+    }
+
+    fun confirmImportData() {
+        _uiState.update { it.copy(importPreview = null) }
+        importData()
+    }
+
+    fun clearImportPreview() {
+        _uiState.update { it.copy(importPreview = null, isPreviewingImport = false) }
     }
 
     fun clearMessage() {

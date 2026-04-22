@@ -49,6 +49,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.mewbook.app.domain.policy.HomeScreenLayoutPolicy
 import com.mewbook.app.ui.screens.asset.AccountEditScreen
 import com.mewbook.app.ui.screens.asset.AddAccountScreen
 import com.mewbook.app.ui.screens.asset.AssetScreen
@@ -58,6 +59,7 @@ import com.mewbook.app.ui.screens.dav.DavSettingsScreen
 import com.mewbook.app.ui.screens.export.ExportScreen
 import com.mewbook.app.ui.screens.home.HomeScreen
 import com.mewbook.app.ui.screens.ledger.LedgerManagementScreen
+import com.mewbook.app.ui.screens.recurring.RecurringTemplatesScreen
 import com.mewbook.app.ui.screens.settings.SettingsScreen
 import com.mewbook.app.ui.screens.statistics.CategoryExpenseDetailScreen
 import com.mewbook.app.ui.screens.statistics.StatisticsScreen
@@ -96,11 +98,24 @@ fun MewBookNavHost() {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
     var isHomeAddSheetVisible by remember { mutableStateOf(false) }
+    var previousRoute by remember { mutableStateOf<String?>(null) }
+    var homeSearchResetToken by remember { mutableStateOf(0) }
 
     LaunchedEffect(currentDestination?.route) {
-        if (currentDestination?.route != Screen.Home.route) {
+        val currentRoute = currentDestination?.route
+        if (
+            HomeScreenLayoutPolicy.resetSearchOnRouteChange(
+                previousRoute = previousRoute,
+                currentRoute = currentRoute,
+                homeRoute = Screen.Home.route
+            )
+        ) {
+            homeSearchResetToken += 1
+        }
+        if (currentRoute != Screen.Home.route) {
             isHomeAddSheetVisible = false
         }
+        previousRoute = currentRoute
     }
 
     val showBottomBar = currentDestination?.route in listOf(
@@ -226,6 +241,7 @@ fun MewBookNavHost() {
         ) {
             composable(Screen.Home.route) {
                 HomeScreen(
+                    searchResetToken = homeSearchResetToken,
                     onAddSheetVisibilityChanged = { visible ->
                         isHomeAddSheetVisible = visible
                     }
@@ -276,6 +292,9 @@ fun MewBookNavHost() {
                     onNavigateToBudget = {
                         navController.navigate(Screen.Budget.route)
                     },
+                    onNavigateToRecurringTemplates = {
+                        navController.navigate(Screen.RecurringTemplates.route)
+                    },
                     onNavigateToExport = {
                         navController.navigate(Screen.Export.route)
                     },
@@ -307,6 +326,13 @@ fun MewBookNavHost() {
             }
             composable(Screen.Export.route) {
                 ExportScreen(
+                    onNavigateBack = {
+                        navController.popBackStack()
+                    }
+                )
+            }
+            composable(Screen.RecurringTemplates.route) {
+                RecurringTemplatesScreen(
                     onNavigateBack = {
                         navController.popBackStack()
                     }

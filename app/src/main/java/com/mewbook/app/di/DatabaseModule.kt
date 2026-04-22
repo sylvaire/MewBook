@@ -9,6 +9,7 @@ import com.mewbook.app.data.local.dao.BudgetDao
 import com.mewbook.app.data.local.dao.CategoryDao
 import com.mewbook.app.data.local.dao.DavConfigDao
 import com.mewbook.app.data.local.dao.LedgerDao
+import com.mewbook.app.data.local.dao.RecurringTemplateDao
 import com.mewbook.app.data.local.dao.RecordDao
 import com.mewbook.app.data.local.database.MewBookDatabase
 import dagger.Module
@@ -33,6 +34,40 @@ object DatabaseModule {
         }
     }
 
+    private val MIGRATION_3_4 = object : Migration(3, 4) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                """
+                    CREATE TABLE IF NOT EXISTS recurring_templates (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        name TEXT NOT NULL,
+                        amount REAL NOT NULL,
+                        type TEXT NOT NULL,
+                        categoryId INTEGER NOT NULL,
+                        noteTemplate TEXT,
+                        ledgerId INTEGER NOT NULL,
+                        accountId INTEGER,
+                        scheduleType TEXT NOT NULL,
+                        intervalCount INTEGER NOT NULL,
+                        startDate INTEGER NOT NULL,
+                        nextDueDate INTEGER NOT NULL,
+                        endDate INTEGER,
+                        isEnabled INTEGER NOT NULL DEFAULT 1,
+                        reminderEnabled INTEGER NOT NULL DEFAULT 0,
+                        lastGeneratedDate INTEGER,
+                        createdAt INTEGER NOT NULL,
+                        updatedAt INTEGER NOT NULL
+                    )
+                """.trimIndent()
+            )
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_recurring_templates_ledgerId ON recurring_templates(ledgerId)")
+            db.execSQL(
+                "CREATE INDEX IF NOT EXISTS index_recurring_templates_ledgerId_isEnabled_nextDueDate " +
+                    "ON recurring_templates(ledgerId, isEnabled, nextDueDate)"
+            )
+        }
+    }
+
     @Provides
     @Singleton
     fun provideDatabase(
@@ -43,7 +78,7 @@ object DatabaseModule {
             MewBookDatabase::class.java,
             MewBookDatabase.DATABASE_NAME
         )
-            .addMigrations(MIGRATION_2_3)
+            .addMigrations(MIGRATION_2_3, MIGRATION_3_4)
             .build()
     }
 
@@ -81,5 +116,11 @@ object DatabaseModule {
     @Singleton
     fun provideLedgerDao(database: MewBookDatabase): LedgerDao {
         return database.ledgerDao()
+    }
+
+    @Provides
+    @Singleton
+    fun provideRecurringTemplateDao(database: MewBookDatabase): RecurringTemplateDao {
+        return database.recurringTemplateDao()
     }
 }

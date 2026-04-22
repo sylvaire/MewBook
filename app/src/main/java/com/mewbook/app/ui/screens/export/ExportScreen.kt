@@ -34,9 +34,6 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -55,7 +52,6 @@ fun ExportScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
-    var pendingRestoreUri by remember { mutableStateOf<android.net.Uri?>(null) }
     val createBackupLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument("application/json")
     ) { uri ->
@@ -64,28 +60,103 @@ fun ExportScreen(
     val restoreBackupLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri ->
-        pendingRestoreUri = uri
+        uri?.let(viewModel::previewRestoreFromLocal)
+    }
+    val importRecordsLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        uri?.let(viewModel::previewImportRecords)
     }
 
-    pendingRestoreUri?.let { uri ->
+    uiState.restorePreview?.let { preview ->
         AlertDialog(
-            onDismissRequest = { pendingRestoreUri = null },
+            onDismissRequest = { viewModel.clearRestorePreview() },
             title = { Text("确认本地还原") },
             text = {
-                Text("本地还原会覆盖当前应用中的记录、分类、账户、预算、分支、DAV 配置与主题设置。建议先做一次本地备份。")
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("本地还原会覆盖当前应用中的数据。建议先做一次本地备份。")
+                    Text(
+                        text = "当前数据：记录 ${preview.current.records}、分类 ${preview.current.categories}、账户 ${preview.current.accounts}、预算 ${preview.current.budgets}、模板 ${preview.current.templates}、账本 ${preview.current.ledgers}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = "导入数据：记录 ${preview.incoming.records}、分类 ${preview.incoming.categories}、账户 ${preview.incoming.accounts}、预算 ${preview.incoming.budgets}、模板 ${preview.incoming.templates}、账本 ${preview.incoming.ledgers}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = "可能冲突：记录 ${preview.conflicts.records}、分类 ${preview.conflicts.categories}、账户 ${preview.conflicts.accounts}、预算 ${preview.conflicts.budgets}、模板 ${preview.conflicts.templates}、账本 ${preview.conflicts.ledgers}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             },
             confirmButton = {
                 TextButton(
                     onClick = {
-                        viewModel.restoreFromLocal(uri)
-                        pendingRestoreUri = null
+                        val pendingUri = uiState.pendingRestoreUri
+                        viewModel.clearRestorePreview()
+                        if (pendingUri != null) {
+                            viewModel.restoreFromLocal(pendingUri)
+                        }
                     }
                 ) {
                     Text("继续还原")
                 }
             },
             dismissButton = {
-                TextButton(onClick = { pendingRestoreUri = null }) {
+                TextButton(onClick = { viewModel.clearRestorePreview() }) {
+                    Text("取消")
+                }
+            }
+        )
+    }
+
+    uiState.recordImportPreview?.let { preview ->
+        AlertDialog(
+            onDismissRequest = { viewModel.clearRecordImportPreview() },
+            title = { Text("确认导入记录") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("这会把外部账单记录合并到当前应用，不会清空现有预算、模板和设置。")
+                    Text(
+                        text = "当前数据：记录 ${preview.current.records}、分类 ${preview.current.categories}、账户 ${preview.current.accounts}、账本 ${preview.current.ledgers}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = "导入文件：记录 ${preview.incoming.records}、分类 ${preview.incoming.categories}、账户 ${preview.incoming.accounts}、账本 ${preview.incoming.ledgers}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = "将新增：记录 ${preview.recordsToImport}、分类 ${preview.categoriesToCreate}、账户 ${preview.accountsToCreate}、账本 ${preview.ledgersToCreate}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = "将跳过重复记录 ${preview.duplicateRecords} 条。",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val pendingUri = uiState.pendingRecordImportUri
+                        viewModel.clearRecordImportPreview()
+                        if (pendingUri != null) {
+                            viewModel.importRecords(pendingUri)
+                        }
+                    }
+                ) {
+                    Text("开始导入")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { viewModel.clearRecordImportPreview() }) {
                     Text("取消")
                 }
             }
@@ -121,7 +192,7 @@ fun ExportScreen(
     Scaffold(
         topBar = {
             MewCompactTopAppBar(
-                title = "数据导出",
+                title = "迁移与备份",
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(
@@ -142,16 +213,82 @@ fun ExportScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Text(
-                text = "导出您的记账数据",
+                text = "迁移、备份与还原",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold
             )
 
             Text(
-                text = "选择导出格式，数据将以您选择的格式保存，可用于备份或迁移到其他设备。",
+                text = "这里集中管理本地备份、格式导出与数据还原。每次还原前都会先展示数据预览和冲突提示。",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+
+            uiState.currentSnapshotSummary?.let { summary ->
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            text = "当前数据概览",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            text = "记录 ${summary.records}、分类 ${summary.categories}、账户 ${summary.accounts}、预算 ${summary.budgets}、模板 ${summary.templates}、账本 ${summary.ledgers}",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        Text(
+                            text = if (summary.hasExistingData) {
+                                "已有数据，执行还原会覆盖当前本地内容。"
+                            } else {
+                                "当前没有本地数据，可以直接开始导入或备份。"
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Text(
+                text = "导入其他记账 App",
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.SemiBold
+            )
+
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text(
+                        text = "支持导入常见 CSV 导出列，例如日期、类型、分类、子分类、金额、备注和账户。",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    OutlinedButton(
+                        onClick = {
+                            importRecordsLauncher.launch(
+                                arrayOf("text/*", "text/csv", "application/csv", "application/vnd.ms-excel")
+                            )
+                        },
+                        enabled = !uiState.isBackingUpLocally &&
+                            !uiState.isRestoringLocally &&
+                            !uiState.isPreviewingRestore &&
+                            !uiState.isPreviewingRecordImport &&
+                            !uiState.isImportingRecords
+                    ) {
+                        if (uiState.isPreviewingRecordImport || uiState.isImportingRecords) {
+                            CircularProgressIndicator(modifier = Modifier.height(18.dp), strokeWidth = 2.dp)
+                        } else {
+                            Text("选择 CSV 文件")
+                        }
+                    }
+                }
+            }
 
             Spacer(modifier = Modifier.height(8.dp))
 
@@ -170,7 +307,11 @@ fun ExportScreen(
                 ) {
                     Button(
                         onClick = { createBackupLauncher.launch(viewModel.suggestedBackupFileName()) },
-                        enabled = !uiState.isBackingUpLocally && !uiState.isRestoringLocally,
+                        enabled = !uiState.isBackingUpLocally &&
+                            !uiState.isRestoringLocally &&
+                            !uiState.isPreviewingRestore &&
+                            !uiState.isPreviewingRecordImport &&
+                            !uiState.isImportingRecords,
                         modifier = Modifier.weight(1f)
                     ) {
                         if (uiState.isBackingUpLocally) {
@@ -182,7 +323,11 @@ fun ExportScreen(
 
                     OutlinedButton(
                         onClick = { restoreBackupLauncher.launch(arrayOf("application/json")) },
-                        enabled = !uiState.isBackingUpLocally && !uiState.isRestoringLocally,
+                        enabled = !uiState.isBackingUpLocally &&
+                            !uiState.isRestoringLocally &&
+                            !uiState.isPreviewingRestore &&
+                            !uiState.isPreviewingRecordImport &&
+                            !uiState.isImportingRecords,
                         modifier = Modifier.weight(1f)
                     ) {
                         if (uiState.isRestoringLocally) {
@@ -226,7 +371,7 @@ fun ExportScreen(
                     )
                 ) {
                     Text(
-                        text = "导出失败: ${uiState.error}",
+                        text = "操作失败: ${uiState.error}",
                         modifier = Modifier.padding(16.dp),
                         color = MaterialTheme.colorScheme.onErrorContainer
                     )
@@ -236,12 +381,12 @@ fun ExportScreen(
             Spacer(modifier = Modifier.height(16.dp))
 
             Text(
-                text = "导出的数据包含：",
+                text = "迁移说明：",
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Text(
-                text = "• 本地备份/还原：完整应用数据（记录、分类、账户、预算、分支、DAV配置、主题）\n• 分享导出 CSV：便于表格查看\n• 分享导出 JSON：统一版本化备份快照",
+                text = "• 导入其他记账 App：读取常见 CSV 导出列并先预览，再按去重策略合并到当前账本\n• 本地备份/还原：完整应用数据（记录、分类、账户、预算、周期模板、分支、DAV配置、主题）\n• 分享导出 CSV：便于表格查看和迁移到其他工具\n• 分享导出 JSON：统一版本化备份快照，适合跨设备恢复",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

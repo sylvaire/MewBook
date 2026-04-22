@@ -9,6 +9,7 @@ interface DavRepository {
     suspend fun saveDavConfig(config: DavConfig)
     suspend fun testConnection(config: DavConfig): Result<Boolean>
     suspend fun exportData(config: DavConfig): Result<Boolean>
+    suspend fun previewImportData(config: DavConfig): Result<com.mewbook.app.data.backup.BackupRestorePreview>
     suspend fun importData(config: DavConfig): Result<Boolean>
     suspend fun updateLastSyncTime(time: Long)
 }

@@ -2,6 +2,14 @@ package com.mewbook.app.domain.policy
 
 object HomeScreenLayoutPolicy {
 
+    fun resetSearchOnRouteChange(
+        previousRoute: String?,
+        currentRoute: String?,
+        homeRoute: String
+    ): Boolean {
+        return previousRoute == homeRoute && currentRoute != null && currentRoute != homeRoute
+    }
+
     fun consumeBackPress(
         isSearchMode: Boolean,
         isAddEditSheetVisible: Boolean
@@ -9,7 +17,7 @@ object HomeScreenLayoutPolicy {
         return isSearchMode && !isAddEditSheetVisible
     }
 
-    fun showSummaryAsScrollableHeader(
+    fun showHomeHeaderAsScrollableContent(
         isSearchMode: Boolean,
         hasRecords: Boolean
     ): Boolean {

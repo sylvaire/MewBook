@@ -43,12 +43,27 @@ class BudgetCategoryBudgetPolicyTest {
         assertEquals(listOf(1L, 2L), result)
     }
 
+    @Test
+    fun availableExpenseCategories_hidesLegacySubwayCategory() {
+        val result = BudgetCategoryBudgetPolicy.availableExpenseCategories(
+            categories = listOf(
+                category(id = 1L, type = RecordType.EXPENSE, name = "地铁"),
+                category(id = 2L, type = RecordType.EXPENSE, name = "交通")
+            ),
+            budgets = emptyList(),
+            editingBudget = null
+        ).map(Category::id)
+
+        assertEquals(listOf(2L), result)
+    }
+
     private fun category(
         id: Long,
-        type: RecordType
+        type: RecordType,
+        name: String = "Category-$id"
     ) = Category(
         id = id,
-        name = "Category-$id",
+        name = name,
         icon = "more_horiz",
         color = 0xFF808080,
         type = type,

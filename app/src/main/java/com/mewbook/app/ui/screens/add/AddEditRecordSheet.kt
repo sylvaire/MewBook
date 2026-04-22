@@ -90,6 +90,7 @@ import com.mewbook.app.domain.model.Account
 import com.mewbook.app.domain.model.Category
 import com.mewbook.app.domain.model.Record
 import com.mewbook.app.domain.model.RecordType
+import com.mewbook.app.domain.policy.CategorySelectionPolicy
 import com.mewbook.app.ui.components.AccountTypeIconBadge
 import com.mewbook.app.ui.components.CategoryIconBadge
 import com.mewbook.app.ui.components.CategoryChip
@@ -113,18 +114,20 @@ fun AddEditRecordSheet(
     defaultAccountId: Long?,
     defaultDate: LocalDate,
     editingRecord: Record?,
+    initialType: RecordType = RecordType.EXPENSE,
     onDismiss: () -> Unit,
     onSave: (Double, RecordType, Long, String?, LocalDate, Long?) -> Unit,
     onDelete: (Long) -> Unit
 ) {
     val editingKey = editingRecord?.id ?: -1L
-    var selectedTypeName by rememberSaveable(editingKey) {
-        mutableStateOf((editingRecord?.type ?: RecordType.EXPENSE).name)
+    val initialTypeName = initialType.name
+    var selectedTypeName by rememberSaveable(editingKey, initialTypeName) {
+        mutableStateOf((editingRecord?.type ?: initialType).name)
     }
-    var selectedCategoryId by rememberSaveable(editingKey) {
+    var selectedCategoryId by rememberSaveable(editingKey, initialTypeName) {
         mutableLongStateOf(editingRecord?.categoryId ?: 0L)
     }
-    var selectedAccountId by rememberSaveable(editingKey) {
+    var selectedAccountId by rememberSaveable(editingKey, initialTypeName) {
         mutableLongStateOf(
             editingRecord?.accountId ?: if (editingRecord == null) {
                 defaultAccountId ?: 0L
@@ -133,27 +136,29 @@ fun AddEditRecordSheet(
             }
         )
     }
-    var note by rememberSaveable(editingKey) { mutableStateOf(editingRecord?.note.orEmpty()) }
-    var noteDraft by rememberSaveable(editingKey) { mutableStateOf(editingRecord?.note.orEmpty()) }
-    var selectedDateEpochDay by rememberSaveable(editingKey) {
+    var note by rememberSaveable(editingKey, initialTypeName) { mutableStateOf(editingRecord?.note.orEmpty()) }
+    var noteDraft by rememberSaveable(editingKey, initialTypeName) { mutableStateOf(editingRecord?.note.orEmpty()) }
+    var selectedDateEpochDay by rememberSaveable(editingKey, initialTypeName) {
         mutableLongStateOf((editingRecord?.date ?: defaultDate).toEpochDay())
     }
-    var amountExpression by rememberSaveable(editingKey) {
+    var amountExpression by rememberSaveable(editingKey, initialTypeName) {
         mutableStateOf(editingRecord?.let { AmountExpressionHelper.formatInitialExpression(it.amount) }.orEmpty())
     }
     var showDatePicker by rememberSaveable { mutableStateOf(false) }
     var showNoteDialog by rememberSaveable { mutableStateOf(false) }
-    var isKeyboardVisible by rememberSaveable(editingKey) {
+    var isKeyboardVisible by rememberSaveable(editingKey, initialTypeName) {
         mutableStateOf((editingRecord?.categoryId ?: 0L) > 0L)
     }
 
     val selectedType = remember(selectedTypeName) { RecordType.valueOf(selectedTypeName) }
     val selectedDate = remember(selectedDateEpochDay) { LocalDate.ofEpochDay(selectedDateEpochDay) }
     val categoriesById = remember(categories) { categories.associateBy { it.id } }
-    val displayCategories = remember(categories, selectedType) {
-        categories.filter {
-            it.type == selectedType && (it.parentId == null || it.id == selectedCategoryId)
-        }.sortedWith(
+    val displayCategories = remember(categories, selectedType, selectedCategoryId) {
+        CategorySelectionPolicy.recordSelectionCandidates(
+            categories = categories,
+            type = selectedType,
+            selectedCategoryId = selectedCategoryId
+        ).sortedWith(
             compareBy<Category> { it.parentId != null }
                 .thenBy { parentSortOrder(it, categoriesById) }
                 .thenBy { it.sortOrder }

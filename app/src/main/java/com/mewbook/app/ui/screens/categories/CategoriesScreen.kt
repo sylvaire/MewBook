@@ -73,6 +73,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.mewbook.app.ui.components.MewCompactTopAppBar
 import com.mewbook.app.domain.model.Category
 import com.mewbook.app.domain.model.RecordType
+import com.mewbook.app.domain.policy.CategorySelectionPolicy
 import com.mewbook.app.ui.components.CategoryIconBadge
 import com.mewbook.app.ui.components.getIconForCategory
 import kotlin.math.roundToInt
@@ -112,8 +113,14 @@ fun CategoriesScreen(
     val uiState by viewModel.uiState.collectAsState()
     var selectedTabIndex by remember { mutableIntStateOf(0) }
 
-    val expenseCategories = uiState.categories.filter { it.type == RecordType.EXPENSE && it.parentId == null }
-    val incomeCategories = uiState.categories.filter { it.type == RecordType.INCOME && it.parentId == null }
+    val expenseCategories = CategorySelectionPolicy.visibleTopLevelCategories(
+        categories = uiState.categories,
+        type = RecordType.EXPENSE
+    )
+    val incomeCategories = CategorySelectionPolicy.visibleTopLevelCategories(
+        categories = uiState.categories,
+        type = RecordType.INCOME
+    )
 
     // Add Dialog
     if (uiState.showAddDialog) {

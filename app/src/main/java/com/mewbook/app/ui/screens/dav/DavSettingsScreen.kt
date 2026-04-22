@@ -15,6 +15,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.Link
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -29,6 +30,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -49,6 +51,48 @@ fun DavSettingsScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
+
+    uiState.importPreview?.let { preview ->
+        AlertDialog(
+            onDismissRequest = { viewModel.clearImportPreview() },
+            title = { Text("确认 DAV 导入") },
+            text = {
+                Column {
+                    Text("导入会覆盖当前本地数据，建议先执行一次本地备份。")
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "当前数据：记录 ${preview.current.records}、分类 ${preview.current.categories}、账户 ${preview.current.accounts}、预算 ${preview.current.budgets}、模板 ${preview.current.templates}、账本 ${preview.current.ledgers}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = "导入数据：记录 ${preview.incoming.records}、分类 ${preview.incoming.categories}、账户 ${preview.incoming.accounts}、预算 ${preview.incoming.budgets}、模板 ${preview.incoming.templates}、账本 ${preview.incoming.ledgers}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = "可能冲突：记录 ${preview.conflicts.records}、分类 ${preview.conflicts.categories}、账户 ${preview.conflicts.accounts}、预算 ${preview.conflicts.budgets}、模板 ${preview.conflicts.templates}、账本 ${preview.conflicts.ledgers}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.confirmImportData()
+                    }
+                ) {
+                    Text("继续导入")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { viewModel.clearImportPreview() }) {
+                    Text("取消")
+                }
+            }
+        )
+    }
 
     LaunchedEffect(uiState.message) {
         uiState.message?.let {
@@ -198,7 +242,7 @@ fun DavSettingsScreen(
                     Row {
                         OutlinedButton(
                             onClick = { viewModel.exportData() },
-                            enabled = !uiState.isExporting && !uiState.isImporting,
+                            enabled = !uiState.isExporting && !uiState.isImporting && !uiState.isPreviewingImport,
                             modifier = Modifier.weight(1f)
                         ) {
                             if (uiState.isExporting) {
@@ -216,11 +260,11 @@ fun DavSettingsScreen(
                         Spacer(modifier = Modifier.width(8.dp))
 
                         OutlinedButton(
-                            onClick = { viewModel.importData() },
-                            enabled = !uiState.isExporting && !uiState.isImporting,
+                            onClick = { viewModel.previewImportData() },
+                            enabled = !uiState.isExporting && !uiState.isImporting && !uiState.isPreviewingImport,
                             modifier = Modifier.weight(1f)
                         ) {
-                            if (uiState.isImporting) {
+                            if (uiState.isPreviewingImport || uiState.isImporting) {
                                 CircularProgressIndicator(
                                     modifier = Modifier.height(16.dp).width(16.dp),
                                     strokeWidth = 2.dp
@@ -229,7 +273,7 @@ fun DavSettingsScreen(
                                 Icon(Icons.Filled.CloudDownload, contentDescription = null)
                             }
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text("从DAV导入")
+                            Text(if (uiState.isPreviewingImport) "预览中" else "从DAV导入")
                         }
                     }
                 }

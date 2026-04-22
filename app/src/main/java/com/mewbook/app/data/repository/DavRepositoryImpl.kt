@@ -3,6 +3,8 @@ package com.mewbook.app.data.repository
 import com.mewbook.app.data.local.dao.DavConfigDao
 import com.mewbook.app.data.local.entity.DavConfigEntity
 import com.mewbook.app.data.remote.DavRemoteDataSource
+import com.mewbook.app.data.backup.BackupMigration
+import com.mewbook.app.data.backup.BackupRestorePreview
 import com.mewbook.app.domain.model.DavConfig
 import com.mewbook.app.domain.repository.DavRepository
 import kotlinx.coroutines.flow.Flow
@@ -55,6 +57,43 @@ class DavRepositoryImpl @Inject constructor(
                 updateLastSyncTime(System.currentTimeMillis())
             }
             result
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    override suspend fun previewImportData(config: DavConfig): Result<BackupRestorePreview> {
+        return try {
+            val directoryUrl = davRemoteDataSource.buildDirectoryUrl(config.serverUrl, config.remotePath)
+            val propfindResult = davRemoteDataSource.propfind(
+                directoryUrl,
+                config.username,
+                config.password
+            )
+
+            if (propfindResult.isFailure) {
+                return Result.failure(propfindResult.exceptionOrNull() ?: Exception("Failed to list files"))
+            }
+
+            val files = propfindResult.getOrNull() ?: emptyList()
+            val backupFiles = files.filter { it.contains("mewbook_backup_") && it.endsWith(".json") }
+
+            if (backupFiles.isEmpty()) {
+                return Result.failure(Exception("No backup files found"))
+            }
+
+            val latestFile = backupFiles.maxByOrNull { it } ?: return Result.failure(Exception("No backup files found"))
+            val fileUrl = resolveRemoteFileUrl(directoryUrl, latestFile)
+
+            val getResult = davRemoteDataSource.getFile(fileUrl, config.username, config.password)
+            if (getResult.isFailure) {
+                return Result.failure(getResult.exceptionOrNull() ?: Exception("Failed to download file"))
+            }
+
+            val jsonString = getResult.getOrNull() ?: return Result.failure(Exception("Empty file content"))
+            val currentEnvelope = BackupMigration.parseToCurrentEnvelope(backupSnapshotDataSource.exportToJsonString())
+            val incomingEnvelope = BackupMigration.parseToCurrentEnvelope(jsonString)
+            Result.success(BackupMigration.compareEnvelopes(currentEnvelope, incomingEnvelope))
         } catch (e: Exception) {
             Result.failure(e)
         }

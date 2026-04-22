@@ -4,19 +4,26 @@ import android.content.Context
 import android.net.Uri
 import com.mewbook.app.BuildConfig
 import com.mewbook.app.data.backup.BackupAccount
+import com.mewbook.app.data.backup.BackupConflictSummary
 import com.mewbook.app.data.backup.BackupBudget
 import com.mewbook.app.data.backup.BackupCategory
 import com.mewbook.app.data.backup.BackupDavConfig
 import com.mewbook.app.data.backup.BackupEnvelope
 import com.mewbook.app.data.backup.BackupLedger
 import com.mewbook.app.data.backup.BackupMigration
+import com.mewbook.app.data.backup.BackupRestorePreview
+import com.mewbook.app.data.backup.BackupRecurringTemplate
 import com.mewbook.app.data.backup.BackupPayload
 import com.mewbook.app.data.backup.BackupRecord
+import com.mewbook.app.data.backup.BackupRecordImportPreview
+import com.mewbook.app.data.backup.BackupSnapshotSummary
+import com.mewbook.app.data.backup.BackupImportPolicy
 import com.mewbook.app.data.local.dao.AccountDao
 import com.mewbook.app.data.local.dao.BudgetDao
 import com.mewbook.app.data.local.dao.CategoryDao
 import com.mewbook.app.data.local.dao.DavConfigDao
 import com.mewbook.app.data.local.dao.LedgerDao
+import com.mewbook.app.data.local.dao.RecurringTemplateDao
 import com.mewbook.app.data.local.dao.RecordDao
 import com.mewbook.app.data.local.database.MewBookDatabase
 import com.mewbook.app.data.local.entity.AccountEntity
@@ -24,6 +31,7 @@ import com.mewbook.app.data.local.entity.BudgetEntity
 import com.mewbook.app.data.local.entity.CategoryEntity
 import com.mewbook.app.data.local.entity.DavConfigEntity
 import com.mewbook.app.data.local.entity.LedgerEntity
+import com.mewbook.app.data.local.entity.RecurringTemplateEntity
 import com.mewbook.app.data.local.entity.RecordEntity
 import com.mewbook.app.data.preferences.ThemePreferencesRepository
 import androidx.room.withTransaction
@@ -43,6 +51,7 @@ class BackupRepository @Inject constructor(
     private val categoryDao: CategoryDao,
     private val accountDao: AccountDao,
     private val budgetDao: BudgetDao,
+    private val recurringTemplateDao: RecurringTemplateDao,
     private val ledgerDao: LedgerDao,
     private val davConfigDao: DavConfigDao,
     private val themePreferencesRepository: ThemePreferencesRepository
@@ -50,6 +59,25 @@ class BackupRepository @Inject constructor(
 
     override suspend fun exportToJsonString(): String = withContext(Dispatchers.IO) {
         BackupMigration.encodeEnvelope(buildCurrentEnvelope())
+    }
+
+    suspend fun getCurrentSnapshotSummary(): BackupSnapshotSummary = withContext(Dispatchers.IO) {
+        BackupMigration.summarizeEnvelope(buildCurrentEnvelope())
+    }
+
+    suspend fun previewRestoreFromJsonString(jsonString: String): Result<BackupRestorePreview> = withContext(Dispatchers.IO) {
+        runCatching {
+            val currentEnvelope = buildCurrentEnvelope()
+            val incomingEnvelope = BackupMigration.parseToCurrentEnvelope(jsonString)
+            BackupMigration.compareEnvelopes(currentEnvelope, incomingEnvelope)
+        }
+    }
+
+    suspend fun previewRestoreFromUri(uri: Uri): Result<BackupRestorePreview> = withContext(Dispatchers.IO) {
+        runCatching {
+            val jsonString = readText(uri)
+            previewRestoreFromJsonString(jsonString).getOrThrow()
+        }
     }
 
     suspend fun exportToUri(uri: Uri): Result<Boolean> = withContext(Dispatchers.IO) {
@@ -66,11 +94,26 @@ class BackupRepository @Inject constructor(
 
     suspend fun importFromUri(uri: Uri): Result<Boolean> = withContext(Dispatchers.IO) {
         runCatching {
-            val jsonString = context.contentResolver.openInputStream(uri)?.bufferedReader(Charsets.UTF_8).use { reader ->
-                requireNotNull(reader) { "无法读取备份文件" }
-                reader.readText()
-            }
+            val jsonString = readText(uri)
             importFromJsonString(jsonString).getOrThrow()
+        }
+    }
+
+    suspend fun previewImportRecordsFromUri(uri: Uri): Result<BackupRecordImportPreview> = withContext(Dispatchers.IO) {
+        runCatching {
+            val currentEnvelope = buildCurrentEnvelope()
+            val incomingEnvelope = BackupMigration.parseToCurrentEnvelope(readText(uri))
+            BackupImportPolicy.previewRecordImport(currentEnvelope, incomingEnvelope)
+        }
+    }
+
+    suspend fun importRecordsFromUri(uri: Uri): Result<Boolean> = withContext(Dispatchers.IO) {
+        runCatching {
+            val currentEnvelope = buildCurrentEnvelope()
+            val incomingEnvelope = BackupMigration.parseToCurrentEnvelope(readText(uri))
+            val mergedEnvelope = BackupImportPolicy.mergeRecordImport(currentEnvelope, incomingEnvelope)
+            restoreEnvelope(mergedEnvelope)
+            true
         }
     }
 
@@ -87,6 +130,13 @@ class BackupRepository @Inject constructor(
         return "mewbook_backup_v${BackupMigration.CURRENT_SCHEMA_VERSION}_${timestamp}.json"
     }
 
+    private fun readText(uri: Uri): String {
+        return context.contentResolver.openInputStream(uri)?.bufferedReader(Charsets.UTF_8).use { reader ->
+            requireNotNull(reader) { "无法读取文件" }
+            reader.readText()
+        }
+    }
+
     private suspend fun buildCurrentEnvelope(): BackupEnvelope {
         return BackupEnvelope(
             schemaVersion = BackupMigration.CURRENT_SCHEMA_VERSION,
@@ -97,6 +147,7 @@ class BackupRepository @Inject constructor(
                 categories = categoryDao.getAllCategoriesOnce().map { it.toBackup() },
                 accounts = accountDao.getAllAccountsOnce().map { it.toBackup() },
                 budgets = budgetDao.getAllBudgetsOnce().map { it.toBackup() },
+                templates = recurringTemplateDao.getAllTemplatesOnce().map { it.toBackup() },
                 ledgers = ledgerDao.getAllLedgersOnce().map { it.toBackup() },
                 davConfig = davConfigDao.getDavConfigOnce()?.toBackup(),
                 themeMode = themePreferencesRepository.getThemeModeOnce().storageValue
@@ -108,6 +159,7 @@ class BackupRepository @Inject constructor(
         database.withTransaction {
             recordDao.deleteAllRecords()
             budgetDao.deleteAllBudgets()
+            recurringTemplateDao.deleteAllTemplates()
             accountDao.deleteAllAccounts()
             categoryDao.deleteAllCategories()
             ledgerDao.deleteAllLedgers()
@@ -124,6 +176,9 @@ class BackupRepository @Inject constructor(
             }
             if (envelope.payload.budgets.isNotEmpty()) {
                 budgetDao.insertBudgets(envelope.payload.budgets.map { it.toEntity() })
+            }
+            if (envelope.payload.templates.isNotEmpty()) {
+                recurringTemplateDao.insertTemplates(envelope.payload.templates.map { it.toEntity() })
             }
             if (envelope.payload.records.isNotEmpty()) {
                 recordDao.insertRecords(envelope.payload.records.map { it.toEntity() })
@@ -247,6 +302,27 @@ class BackupRepository @Inject constructor(
         ledgerId = ledgerId
     )
 
+    private fun BackupRecurringTemplate.toEntity() = RecurringTemplateEntity(
+        id = id,
+        name = name,
+        amount = amount,
+        type = type,
+        categoryId = categoryId,
+        noteTemplate = noteTemplate,
+        ledgerId = ledgerId,
+        accountId = accountId,
+        scheduleType = scheduleType,
+        intervalCount = intervalCount,
+        startDate = startDate,
+        nextDueDate = nextDueDate,
+        endDate = endDate,
+        isEnabled = isEnabled,
+        reminderEnabled = reminderEnabled,
+        lastGeneratedDate = lastGeneratedDate,
+        createdAt = createdAt,
+        updatedAt = updatedAt
+    )
+
     private fun BackupLedger.toEntity() = LedgerEntity(
         id = id,
         name = name,
@@ -265,5 +341,26 @@ class BackupRepository @Inject constructor(
         remotePath = remotePath,
         isEnabled = isEnabled,
         lastSyncTime = lastSyncTime
+    )
+
+    private fun RecurringTemplateEntity.toBackup() = BackupRecurringTemplate(
+        id = id,
+        name = name,
+        amount = amount,
+        type = type,
+        categoryId = categoryId,
+        noteTemplate = noteTemplate,
+        ledgerId = ledgerId,
+        accountId = accountId,
+        scheduleType = scheduleType,
+        intervalCount = intervalCount,
+        startDate = startDate,
+        nextDueDate = nextDueDate,
+        endDate = endDate,
+        isEnabled = isEnabled,
+        reminderEnabled = reminderEnabled,
+        lastGeneratedDate = lastGeneratedDate,
+        createdAt = createdAt,
+        updatedAt = updatedAt
     )
 }

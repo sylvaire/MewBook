@@ -12,6 +12,7 @@ sealed class Screen(val route: String) {
     data object Categories : Screen("categories")
     data object DavSettings : Screen("dav_settings")
     data object Export : Screen("export")
+    data object RecurringTemplates : Screen("recurring_templates")
     data object AccountEdit : Screen("account_edit/{accountId}") {
         fun createRoute(accountId: Long) = "account_edit/$accountId"
     }

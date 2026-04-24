@@ -133,6 +133,50 @@ class HomeRecordSearchPolicyTest {
         assertEquals(emptyList<Record>(), result)
     }
 
+    @Test
+    fun search_returnsNewestFirstForMatchedRecords() {
+        val resultIds = HomeRecordSearchPolicy.search(
+            query = "早餐",
+            activeLedgerId = 1L,
+            records = listOf(
+                record(
+                    id = 1L,
+                    amount = 8.0,
+                    categoryId = 10L,
+                    note = "早餐包子",
+                    ledgerId = 1L,
+                    accountId = null,
+                    date = LocalDate.of(2026, 4, 18),
+                    createdAt = LocalDateTime.of(2026, 4, 18, 8, 0)
+                ),
+                record(
+                    id = 2L,
+                    amount = 16.0,
+                    categoryId = 10L,
+                    note = "早餐豆浆",
+                    ledgerId = 1L,
+                    accountId = null,
+                    date = LocalDate.of(2026, 4, 20),
+                    createdAt = LocalDateTime.of(2026, 4, 20, 7, 0)
+                ),
+                record(
+                    id = 3L,
+                    amount = 22.0,
+                    categoryId = 10L,
+                    note = "早餐面条",
+                    ledgerId = 1L,
+                    accountId = null,
+                    date = LocalDate.of(2026, 4, 20),
+                    createdAt = LocalDateTime.of(2026, 4, 20, 9, 0)
+                )
+            ),
+            categoriesById = emptyMap(),
+            accountsById = emptyMap()
+        ).map(Record::id)
+
+        assertEquals(listOf(3L, 2L, 1L), resultIds)
+    }
+
     private fun category(id: Long, name: String) = Category(
         id = id,
         name = name,
@@ -162,7 +206,8 @@ class HomeRecordSearchPolicyTest {
         note: String?,
         ledgerId: Long,
         accountId: Long?,
-        date: LocalDate
+        date: LocalDate,
+        createdAt: LocalDateTime = LocalDateTime.of(2026, 4, 20, 8, 0)
     ) = Record(
         id = id,
         amount = amount,
@@ -170,8 +215,8 @@ class HomeRecordSearchPolicyTest {
         categoryId = categoryId,
         note = note,
         date = date,
-        createdAt = LocalDateTime.of(2026, 4, 20, 8, 0),
-        updatedAt = LocalDateTime.of(2026, 4, 20, 8, 0),
+        createdAt = createdAt,
+        updatedAt = createdAt,
         syncId = null,
         ledgerId = ledgerId,
         accountId = accountId

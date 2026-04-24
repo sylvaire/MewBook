@@ -63,6 +63,7 @@ import com.mewbook.app.ui.screens.recurring.RecurringTemplatesScreen
 import com.mewbook.app.ui.screens.settings.SettingsScreen
 import com.mewbook.app.ui.screens.statistics.CategoryExpenseDetailScreen
 import com.mewbook.app.ui.screens.statistics.StatisticsScreen
+import com.mewbook.app.ui.update.AppUpdateUiState
 
 // ============================================
 // Warm Claymorphism Navigation
@@ -84,7 +85,10 @@ val bottomNavItems = listOf(
 )
 
 @Composable
-fun MewBookNavHost() {
+fun MewBookNavHost(
+    updateUiState: AppUpdateUiState,
+    onCheckForUpdates: () -> Unit
+) {
     val isDarkTheme = isSystemInDarkTheme()
     val navController = rememberNavController()
     val topLevelRoutes = remember {
@@ -300,7 +304,9 @@ fun MewBookNavHost() {
                     },
                     onNavigateToLedgerManagement = {
                         navController.navigate(Screen.LedgerManagement.route)
-                    }
+                    },
+                    updateUiState = updateUiState,
+                    onCheckForUpdates = onCheckForUpdates
                 )
             }
             composable(Screen.LedgerManagement.route) {

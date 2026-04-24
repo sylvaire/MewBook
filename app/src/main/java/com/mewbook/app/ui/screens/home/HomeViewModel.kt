@@ -13,6 +13,7 @@ import com.mewbook.app.domain.model.RecordType
 import com.mewbook.app.domain.policy.AccountDefaultsPolicy
 import com.mewbook.app.domain.policy.HomeQuickEntryCategoryPolicy
 import com.mewbook.app.domain.policy.HomeRecordSearchPolicy
+import com.mewbook.app.domain.policy.HomeRecordOrderingPolicy
 import com.mewbook.app.domain.policy.RecentNoteHistory
 import com.mewbook.app.domain.repository.AccountRepository
 import com.mewbook.app.domain.repository.BudgetRepository
@@ -60,14 +61,16 @@ private data class HomeOverlayState(
     val showAddEditSheet: Boolean,
     val editingRecord: Record?,
     val newRecordType: RecordType?,
-    val addEntryMode: HomeAddEntryMode
+    val addEntryMode: HomeAddEntryMode,
+    val browsingRecord: Record?
 )
 
 private data class HomeEditorState(
     val showAddEditSheet: Boolean,
     val editingRecord: Record?,
     val newRecordType: RecordType?,
-    val addEntryMode: HomeAddEntryMode
+    val addEntryMode: HomeAddEntryMode,
+    val browsingRecord: Record?
 )
 
 private data class HomeSearchState(
@@ -108,6 +111,7 @@ data class HomeUiState(
     val editingRecord: Record? = null,
     val newRecordType: RecordType? = null,
     val addEntryMode: HomeAddEntryMode = HomeAddEntryMode.FULL,
+    val browsingRecord: Record? = null,
     val isSearchMode: Boolean = false,
     val searchQuery: String = "",
     val searchResultCount: Int = 0,
@@ -146,6 +150,7 @@ class HomeViewModel @Inject constructor(
     private val _editingRecord = MutableStateFlow<Record?>(null)
     private val _newRecordType = MutableStateFlow<RecordType?>(null)
     private val _addEntryMode = MutableStateFlow(HomeAddEntryMode.FULL)
+    private val _browsingRecord = MutableStateFlow<Record?>(null)
     private val _lastRecordType = MutableStateFlow<RecordType?>(null)
     private val _isSearchMode = MutableStateFlow(false)
     private val _searchQuery = MutableStateFlow("")
@@ -167,12 +172,13 @@ class HomeViewModel @Inject constructor(
             budgetRemaining = budgetRemaining
         )
     }
-    private val editorState = combine(_showAddEditSheet, _editingRecord, _newRecordType, _addEntryMode) { showAddEditSheet, editingRecord, newRecordType, addEntryMode ->
+    private val editorState = combine(_showAddEditSheet, _editingRecord, _newRecordType, _addEntryMode, _browsingRecord) { showAddEditSheet, editingRecord, newRecordType, addEntryMode, browsingRecord ->
         HomeEditorState(
             showAddEditSheet = showAddEditSheet,
             editingRecord = editingRecord,
             newRecordType = newRecordType,
-            addEntryMode = addEntryMode
+            addEntryMode = addEntryMode,
+            browsingRecord = browsingRecord
         )
     }
     private val overlayState = combine(_isLoading, _error, editorState) { isLoading, error, editorState ->
@@ -182,7 +188,8 @@ class HomeViewModel @Inject constructor(
             showAddEditSheet = editorState.showAddEditSheet,
             editingRecord = editorState.editingRecord,
             newRecordType = editorState.newRecordType,
-            addEntryMode = editorState.addEntryMode
+            addEntryMode = editorState.addEntryMode,
+            browsingRecord = editorState.browsingRecord
         )
     }
     private val searchState = combine(_isSearchMode, _searchQuery) { isSearchMode, searchQuery ->
@@ -221,6 +228,9 @@ class HomeViewModel @Inject constructor(
         val ledgerAccounts = context.accounts.filter { it.ledgerId == activeLedgerId }
         val (periodStart, periodEnd) = PeriodDateRange.dateRange(period.selectedPeriodType, period.anchorDate)
         val canGoNext = PeriodDateRange.canGoToNextPeriod(period.selectedPeriodType, period.anchorDate)
+        val browsingRecord = overlay.browsingRecord?.let { selected ->
+            context.allRecords.firstOrNull { it.id == selected.id }
+        }
         val searchResults = HomeRecordSearchPolicy.search(
             query = search.searchQuery,
             activeLedgerId = activeLedgerId,
@@ -230,8 +240,8 @@ class HomeViewModel @Inject constructor(
         )
         val displayedRecords = when {
             search.isSearchMode && search.searchQuery.isBlank() -> emptyList()
-            search.isSearchMode -> searchResults
-            else -> summary.records
+            search.isSearchMode -> HomeRecordOrderingPolicy.newestFirst(searchResults)
+            else -> HomeRecordOrderingPolicy.newestFirst(summary.records)
         }
 
         HomeUiState(
@@ -254,6 +264,7 @@ class HomeViewModel @Inject constructor(
             editingRecord = overlay.editingRecord,
             newRecordType = overlay.newRecordType,
             addEntryMode = overlay.addEntryMode,
+            browsingRecord = browsingRecord,
             isSearchMode = search.isSearchMode,
             searchQuery = search.searchQuery,
             searchResultCount = searchResults.size,
@@ -342,16 +353,6 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    fun selectPeriodType(periodType: BudgetPeriodType) {
-        if (_selectedPeriodType.value == periodType) {
-            return
-        }
-        _selectedPeriodType.update { periodType }
-        viewModelScope.launch {
-            homePreferencesRepository.setSelectedHomePeriod(periodType)
-        }
-    }
-
     fun previousPeriod() {
         val periodType = _selectedPeriodType.value
         _anchorDate.update { current -> PeriodDateRange.shiftAnchor(periodType, current, -1) }
@@ -368,7 +369,12 @@ class HomeViewModel @Inject constructor(
         }
     }
 
+    fun selectAnchorDate(date: LocalDate) {
+        _anchorDate.update { date }
+    }
+
     fun showAddSheet(initialType: RecordType? = null) {
+        _browsingRecord.update { null }
         _editingRecord.update { null }
         _newRecordType.update { initialType ?: _lastRecordType.value ?: RecordType.EXPENSE }
         _addEntryMode.update { HomeAddEntryMode.FULL }
@@ -376,6 +382,7 @@ class HomeViewModel @Inject constructor(
     }
 
     fun showQuickAddSheet(initialType: RecordType) {
+        _browsingRecord.update { null }
         _editingRecord.update { null }
         _newRecordType.update { initialType }
         _addEntryMode.update { HomeAddEntryMode.QUICK }
@@ -396,10 +403,28 @@ class HomeViewModel @Inject constructor(
     }
 
     fun showEditSheet(record: Record) {
+        _browsingRecord.update { null }
         _editingRecord.update { record }
         _newRecordType.update { record.type }
         _addEntryMode.update { HomeAddEntryMode.FULL }
         _showAddEditSheet.update { true }
+    }
+
+    fun showRecordDetail(record: Record) {
+        _showAddEditSheet.update { false }
+        _editingRecord.update { null }
+        _newRecordType.update { null }
+        _addEntryMode.update { HomeAddEntryMode.FULL }
+        _browsingRecord.update { record }
+    }
+
+    fun hideRecordDetail() {
+        _browsingRecord.update { null }
+    }
+
+    fun editRecordFromDetail(record: Record) {
+        _browsingRecord.update { null }
+        showEditSheet(record)
     }
 
     fun expandQuickAddSheet() {
@@ -491,7 +516,9 @@ class HomeViewModel @Inject constructor(
     fun deleteRecord(id: Long) {
         viewModelScope.launch {
             // 删除记录前，先还原账户余额
-            val record = _editingRecord.value ?: uiState.value.records.find { rec -> rec.id == id }
+            val record = _editingRecord.value?.takeIf { it.id == id }
+                ?: _browsingRecord.value?.takeIf { it.id == id }
+                ?: uiState.value.records.find { rec -> rec.id == id }
             if (record?.accountId != null) {
                 val accId = record.accountId
                 val account = accountRepository.getAccountById(accId)
@@ -501,6 +528,7 @@ class HomeViewModel @Inject constructor(
                 }
             }
             deleteRecordUseCase(id)
+            _browsingRecord.update { current -> current?.takeIf { it.id != id } }
         }
     }
 

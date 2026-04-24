@@ -68,6 +68,77 @@ class StatisticsSummaryCalculatorTest {
         assertEquals(18.0, result.expenseByCategory[10L] ?: 0.0, 0.001)
     }
 
+    @Test
+    fun build_groupsIncomeByCategoryForActiveLedgerOnly() {
+        val result = StatisticsSummaryCalculator.build(
+            timeRange = TimeRange.MONTH,
+            anchorDate = LocalDate.of(2026, 4, 19),
+            today = LocalDate.of(2026, 4, 19),
+            activeLedgerId = 1L,
+            records = listOf(
+                record(
+                    amount = 8000.0,
+                    type = RecordType.INCOME,
+                    categoryId = 20L,
+                    date = LocalDate.of(2026, 4, 3),
+                    ledgerId = 1L
+                ),
+                record(
+                    amount = 1200.0,
+                    type = RecordType.INCOME,
+                    categoryId = 21L,
+                    date = LocalDate.of(2026, 4, 8),
+                    ledgerId = 1L
+                ),
+                record(
+                    amount = 300.0,
+                    type = RecordType.INCOME,
+                    categoryId = 20L,
+                    date = LocalDate.of(2026, 4, 15),
+                    ledgerId = 1L
+                ),
+                record(
+                    amount = 50.0,
+                    type = RecordType.EXPENSE,
+                    categoryId = 20L,
+                    date = LocalDate.of(2026, 4, 16),
+                    ledgerId = 1L
+                ),
+                record(
+                    amount = 999.0,
+                    type = RecordType.INCOME,
+                    categoryId = 20L,
+                    date = LocalDate.of(2026, 4, 20),
+                    ledgerId = 2L
+                )
+            ),
+            categories = listOf(
+                Category(
+                    id = 20L,
+                    name = "工资",
+                    icon = "payments",
+                    color = 0xFF4CAF50,
+                    type = RecordType.INCOME,
+                    isDefault = true,
+                    sortOrder = 0
+                ),
+                Category(
+                    id = 21L,
+                    name = "兼职",
+                    icon = "work",
+                    color = 0xFFA8D8EA,
+                    type = RecordType.INCOME,
+                    isDefault = true,
+                    sortOrder = 1
+                )
+            )
+        )
+
+        assertEquals(8300.0, result.incomeByCategory[20L] ?: 0.0, 0.001)
+        assertEquals(1200.0, result.incomeByCategory[21L] ?: 0.0, 0.001)
+        assertEquals(2, result.incomeByCategory.size)
+    }
+
     private fun record(
         amount: Double,
         type: RecordType,

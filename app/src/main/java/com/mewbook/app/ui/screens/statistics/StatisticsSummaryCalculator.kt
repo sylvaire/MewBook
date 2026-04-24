@@ -27,6 +27,10 @@ object StatisticsSummaryCalculator {
 
         val totalIncome = filteredRecords.filter { it.type == RecordType.INCOME }.sumOf { it.amount }
         val totalExpense = filteredRecords.filter { it.type == RecordType.EXPENSE }.sumOf { it.amount }
+        val incomeByCategory = filteredRecords
+            .filter { it.type == RecordType.INCOME }
+            .groupBy { it.categoryId }
+            .mapValues { (_, groupedRecords) -> groupedRecords.sumOf { it.amount } }
         val expenseByCategory = filteredRecords
             .filter { it.type == RecordType.EXPENSE }
             .groupBy { it.categoryId }
@@ -50,6 +54,7 @@ object StatisticsSummaryCalculator {
             categories = categories.associateBy { it.id },
             totalIncome = totalIncome,
             totalExpense = totalExpense,
+            incomeByCategory = incomeByCategory,
             expenseByCategory = expenseByCategory,
             dailyIncome = dailyIncome,
             dailyExpense = dailyExpense,

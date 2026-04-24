@@ -3,8 +3,9 @@ package com.mewbook.app.data.backup
 import java.math.BigDecimal
 import java.time.LocalDate
 import java.time.LocalDateTime
+import java.time.OffsetDateTime
+import java.time.ZoneId
 import java.time.format.DateTimeFormatter
-import java.time.format.DateTimeParseException
 import java.util.Locale
 import java.util.UUID
 
@@ -19,7 +20,12 @@ object BackupImportPolicy {
 
         val dateIndex = requireHeaderIndex(headerIndex, DATE_HEADER_ALIASES, "日期")
         val categoryIndex = requireHeaderIndex(headerIndex, CATEGORY_HEADER_ALIASES, "分类")
-        val amountIndex = requireHeaderIndex(headerIndex, AMOUNT_HEADER_ALIASES, "金额")
+        val amountIndex = findHeaderIndex(headerIndex, AMOUNT_HEADER_ALIASES)
+        val incomeAmountIndex = findHeaderIndex(headerIndex, INCOME_AMOUNT_HEADER_ALIASES)
+        val expenseAmountIndex = findHeaderIndex(headerIndex, EXPENSE_AMOUNT_HEADER_ALIASES)
+        require(amountIndex != null || incomeAmountIndex != null || expenseAmountIndex != null) {
+            "缺少必需列: 金额"
+        }
         val typeIndex = findHeaderIndex(headerIndex, TYPE_HEADER_ALIASES)
         val subCategoryIndex = findHeaderIndex(headerIndex, SUBCATEGORY_HEADER_ALIASES)
         val noteIndex = findHeaderIndex(headerIndex, NOTE_HEADER_ALIASES)
@@ -113,22 +119,32 @@ object BackupImportPolicy {
 
             val rawDate = row.valueAt(dateIndex)
             val rawCategory = row.valueAt(categoryIndex)
-            val rawAmount = row.valueAt(amountIndex)
-            if (rawDate.isBlank() || rawCategory.isBlank() || rawAmount.isBlank()) {
+            val categoryPath = resolveCategoryPath(rawCategory, row.valueAt(subCategoryIndex))
+            if (rawDate.isBlank() || categoryPath.name.isBlank()) {
                 return@forEachIndexed
             }
 
             val ledgerId = ensureLedger(row.valueAt(ledgerIndex))
-            val amount = parseAmount(rawAmount)
-            val type = parseType(row.valueAt(typeIndex), amount)
+            val parsedAmount = resolveAmount(
+                row = row,
+                amountIndex = amountIndex,
+                incomeAmountIndex = incomeAmountIndex,
+                expenseAmountIndex = expenseAmountIndex
+            ) ?: return@forEachIndexed
+            val type = parseType(
+                rawValue = row.valueAt(typeIndex),
+                amount = parsedAmount.signedAmount,
+                typeHint = parsedAmount.typeHint,
+                categoryName = categoryPath.name
+            )
             val categoryId = ensureCategory(
                 type = type,
-                parentName = row.valueAt(subCategoryIndex).takeIf { it.isNotBlank() }?.let { rawCategory },
-                name = row.valueAt(subCategoryIndex).takeIf { it.isNotBlank() } ?: rawCategory
+                parentName = categoryPath.parentName,
+                name = categoryPath.name
             )
             val accountId = ensureAccount(ledgerId, row.valueAt(accountIndex))
             val parsedDate = parseDate(rawDate)
-            val absoluteAmount = amount.abs().toDouble()
+            val absoluteAmount = parsedAmount.signedAmount.abs().toDouble()
             val createdAt = fallbackTimestamp + index
 
             records += BackupRecord(
@@ -343,6 +359,7 @@ object BackupImportPolicy {
     }
 
     private fun parseCsvRows(csv: String): List<List<String>> {
+        val delimiter = detectDelimiter(csv)
         val rows = mutableListOf<List<String>>()
         val row = mutableListOf<String>()
         val cell = StringBuilder()
@@ -361,7 +378,7 @@ object BackupImportPolicy {
                     }
                 }
 
-                char == ',' && !inQuotes -> {
+                char == delimiter && !inQuotes -> {
                     row += cell.toString().trim()
                     cell.clear()
                 }
@@ -391,34 +408,105 @@ object BackupImportPolicy {
         return rows
     }
 
+    private fun detectDelimiter(csv: String): Char {
+        val sampleLine = csv.lineSequence().firstOrNull { it.isNotBlank() } ?: return ','
+        val candidates = listOf(',', ';', '\t', '|', '，')
+        val counts = mutableMapOf<Char, Int>()
+        var inQuotes = false
+        var index = 0
+        while (index < sampleLine.length) {
+            val char = sampleLine[index]
+            when {
+                char == '"' -> {
+                    if (inQuotes && index + 1 < sampleLine.length && sampleLine[index + 1] == '"') {
+                        index += 1
+                    } else {
+                        inQuotes = !inQuotes
+                    }
+                }
+
+                !inQuotes && char in candidates -> {
+                    counts[char] = counts.getOrDefault(char, 0) + 1
+                }
+            }
+            index += 1
+        }
+
+        val bestCandidate = candidates.maxByOrNull { counts.getOrDefault(it, 0) } ?: ','
+        return if (counts.getOrDefault(bestCandidate, 0) > 0) bestCandidate else ','
+    }
+
     private fun parseAmount(rawValue: String): BigDecimal {
-        val cleaned = rawValue
-            .trim()
+        return parseAmountOrNull(rawValue)
+            ?: throw IllegalArgumentException("无法解析金额: $rawValue")
+    }
+
+    private fun parseAmountOrNull(rawValue: String): BigDecimal? {
+        val trimmed = rawValue.trim()
+        if (trimmed.isBlank()) {
+            return null
+        }
+
+        val normalizedParenthesis = trimmed
+            .replace("（", "(")
+            .replace("）", ")")
+        val negativeByParentheses = normalizedParenthesis.startsWith("(") && normalizedParenthesis.endsWith(")")
+        val normalized = normalizedParenthesis
+            .removePrefix("(")
+            .removeSuffix(")")
             .replace("¥", "")
             .replace("￥", "")
+            .replace("元", "")
             .replace(",", "")
+            .replace("，", "")
             .replace(" ", "")
-        return cleaned.toBigDecimalOrNull()
-            ?: throw IllegalArgumentException("无法解析金额: $rawValue")
+            .replace("\u00A0", "")
+            .replace("＋", "+")
+            .replace("−", "-")
+
+        if (normalized.isBlank() || normalized == "--" || normalized == "—" || normalized == "-") {
+            return null
+        }
+
+        val direct = normalized.toBigDecimalOrNull()
+        if (direct != null) {
+            return if (negativeByParentheses) direct.negate() else direct
+        }
+
+        val extracted = NUMBER_PATTERN.find(normalized)?.value?.toBigDecimalOrNull()
+            ?: return null
+        return if (negativeByParentheses) extracted.negate() else extracted
     }
 
     private fun parseDate(rawValue: String): LocalDate {
         val trimmed = rawValue.trim()
+        parseNumericDate(trimmed)?.let { return it }
         DATE_FORMATTERS.forEach { formatter ->
             runCatching { return LocalDate.parse(trimmed, formatter) }
         }
         DATE_TIME_FORMATTERS.forEach { formatter ->
             runCatching { return LocalDateTime.parse(trimmed, formatter).toLocalDate() }
         }
+        runCatching { return OffsetDateTime.parse(trimmed).toLocalDate() }
         return runCatching { LocalDate.parse(trimmed) }
             .getOrElse { throw IllegalArgumentException("无法解析日期: $rawValue") }
     }
 
-    private fun parseType(rawValue: String?, amount: BigDecimal): String {
+    private fun parseType(
+        rawValue: String?,
+        amount: BigDecimal,
+        typeHint: String?,
+        categoryName: String?
+    ): String {
+        if (typeHint != null) {
+            return typeHint
+        }
+
         val normalized = normalizeHeader(rawValue.orEmpty())
         return when {
-            normalized in EXPENSE_TYPE_ALIASES -> "EXPENSE"
-            normalized in INCOME_TYPE_ALIASES -> "INCOME"
+            normalized.isNotBlank() && EXPENSE_TYPE_ALIASES.any { normalized.contains(it) } -> "EXPENSE"
+            normalized.isNotBlank() && INCOME_TYPE_ALIASES.any { normalized.contains(it) } -> "INCOME"
+            INCOME_CATEGORY_HINTS.any { normalizeHeader(categoryName.orEmpty()).contains(it) } -> "INCOME"
             amount.signum() < 0 -> "EXPENSE"
             else -> "EXPENSE"
         }
@@ -432,6 +520,17 @@ object BackupImportPolicy {
             .replace(" ", "")
             .replace("_", "")
             .replace("-", "")
+            .replace("(", "")
+            .replace(")", "")
+            .replace("（", "")
+            .replace("）", "")
+            .replace("【", "")
+            .replace("】", "")
+            .replace("/", "")
+            .replace("\\", "")
+            .replace(":", "")
+            .replace("：", "")
+            .replace(".", "")
     }
 
     private fun normalizeName(value: String): String {
@@ -457,6 +556,87 @@ object BackupImportPolicy {
     private fun List<String>.valueAt(index: Int?): String {
         if (index == null || index !in indices) return ""
         return this[index]
+    }
+
+    private fun resolveAmount(
+        row: List<String>,
+        amountIndex: Int?,
+        incomeAmountIndex: Int?,
+        expenseAmountIndex: Int?
+    ): ParsedAmount? {
+        parseAmountOrNull(row.valueAt(amountIndex))?.let {
+            return ParsedAmount(signedAmount = it, typeHint = null)
+        }
+
+        val expenseAmount = parseAmountOrNull(row.valueAt(expenseAmountIndex))
+        val incomeAmount = parseAmountOrNull(row.valueAt(incomeAmountIndex))
+
+        if (expenseAmount != null && expenseAmount.compareTo(BigDecimal.ZERO) != 0) {
+            return ParsedAmount(
+                signedAmount = expenseAmount.abs().negate(),
+                typeHint = "EXPENSE"
+            )
+        }
+        if (incomeAmount != null && incomeAmount.compareTo(BigDecimal.ZERO) != 0) {
+            return ParsedAmount(
+                signedAmount = incomeAmount.abs(),
+                typeHint = "INCOME"
+            )
+        }
+
+        return when {
+            expenseAmount != null -> ParsedAmount(signedAmount = expenseAmount.abs().negate(), typeHint = "EXPENSE")
+            incomeAmount != null -> ParsedAmount(signedAmount = incomeAmount.abs(), typeHint = "INCOME")
+            else -> null
+        }
+    }
+
+    private fun resolveCategoryPath(rawCategory: String, rawSubCategory: String): CategoryPath {
+        val subCategory = rawSubCategory.trim()
+        if (subCategory.isNotBlank()) {
+            return CategoryPath(
+                parentName = rawCategory.trim().ifBlank { null },
+                name = subCategory
+            )
+        }
+
+        val category = rawCategory.trim()
+        if (category.isBlank()) {
+            return CategoryPath(parentName = null, name = "")
+        }
+
+        val separator = CATEGORY_PATH_SEPARATORS.firstOrNull { category.contains(it) }
+        if (separator == null) {
+            return CategoryPath(parentName = null, name = category)
+        }
+
+        val segments = category.split(separator)
+            .map(String::trim)
+            .filter(String::isNotBlank)
+        if (segments.size < 2) {
+            return CategoryPath(parentName = null, name = category)
+        }
+
+        return CategoryPath(parentName = segments.first(), name = segments.last())
+    }
+
+    private fun parseNumericDate(rawValue: String): LocalDate? {
+        val normalized = rawValue.trim()
+        if (!NUMERIC_DATE_PATTERN.matches(normalized)) {
+            return null
+        }
+
+        val value = normalized.toLongOrNull() ?: return null
+        return when {
+            normalized.length in 5..6 -> runCatching { LocalDate.ofEpochDay(value) }.getOrNull()
+            normalized.length in 7..10 && value >= 1_000_000_000L -> runCatching {
+                java.time.Instant.ofEpochSecond(value).atZone(ZoneId.systemDefault()).toLocalDate()
+            }.getOrNull()
+            normalized.length in 11..13 && value >= 100_000_000_000L -> runCatching {
+                java.time.Instant.ofEpochMilli(value).atZone(ZoneId.systemDefault()).toLocalDate()
+            }.getOrNull()
+            else -> null
+        }
     }
 
     private fun defaultCategoryIcon(type: String, isChild: Boolean): String {
@@ -501,6 +681,16 @@ object BackupImportPolicy {
         val color: Long
     )
 
+    private data class ParsedAmount(
+        val signedAmount: BigDecimal,
+        val typeHint: String?
+    )
+
+    private data class CategoryPath(
+        val parentName: String?,
+        val name: String
+    )
+
     private data class RecordImportPlan(
         val preview: BackupRecordImportPreview,
         val mergedEnvelope: BackupEnvelope
@@ -513,24 +703,77 @@ object BackupImportPolicy {
         DateTimeFormatter.ofPattern("yyyy-MM-dd"),
         DateTimeFormatter.ofPattern("yyyy/M/d"),
         DateTimeFormatter.ofPattern("yyyy/M/dd"),
-        DateTimeFormatter.ofPattern("yyyy年M月d日")
+        DateTimeFormatter.ofPattern("yyyy年M月d日"),
+        DateTimeFormatter.ofPattern("yyyy.MM.dd"),
+        DateTimeFormatter.ofPattern("yyyyMMdd"),
+        DateTimeFormatter.ofPattern("M/d/yyyy"),
+        DateTimeFormatter.ofPattern("MM/dd/yyyy")
     )
 
     private val DATE_TIME_FORMATTERS = listOf(
         DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"),
+        DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"),
         DateTimeFormatter.ofPattern("yyyy/M/d HH:mm:ss"),
+        DateTimeFormatter.ofPattern("yyyy/M/d HH:mm"),
+        DateTimeFormatter.ofPattern("yyyy.MM.dd HH:mm:ss"),
+        DateTimeFormatter.ofPattern("yyyy.MM.dd HH:mm"),
+        DateTimeFormatter.ofPattern("yyyy年M月d日 HH:mm:ss"),
+        DateTimeFormatter.ofPattern("yyyy年M月d日 HH:mm"),
         DateTimeFormatter.ISO_LOCAL_DATE_TIME
     )
 
-    private val DATE_HEADER_ALIASES = setOf("日期", "date", "记账时间", "交易时间", "time")
+    private val DATE_HEADER_ALIASES = setOf(
+        "日期",
+        "date",
+        "time",
+        "datetime",
+        "timestamp",
+        "记账时间",
+        "记账日期",
+        "交易时间",
+        "交易日期",
+        "发生时间",
+        "发生日期"
+    )
     private val TYPE_HEADER_ALIASES = setOf("类型", "type", "收支类型", "收入支出")
-    private val CATEGORY_HEADER_ALIASES = setOf("分类", "category", "一级分类", "分类名称")
-    private val SUBCATEGORY_HEADER_ALIASES = setOf("子分类", "subcategory", "二级分类", "子类")
-    private val AMOUNT_HEADER_ALIASES = setOf("金额", "amount", "money", "sum")
-    private val NOTE_HEADER_ALIASES = setOf("备注", "note", "memo", "remark", "description")
-    private val ACCOUNT_HEADER_ALIASES = setOf("账户", "account", "支付方式", "支付账户", "账户名称")
-    private val LEDGER_HEADER_ALIASES = setOf("账本", "ledger", "book", "账簿")
+    private val CATEGORY_HEADER_ALIASES = setOf(
+        "分类",
+        "category",
+        "一级分类",
+        "一级类目",
+        "类目",
+        "分类名称",
+        "分类路径",
+        "categorypath"
+    )
+    private val SUBCATEGORY_HEADER_ALIASES = setOf(
+        "子分类",
+        "subcategory",
+        "二级分类",
+        "二级类目",
+        "子类",
+        "子类目"
+    )
+    private val AMOUNT_HEADER_ALIASES = setOf("金额", "金额元", "amount", "money", "sum", "交易金额", "收支金额")
+    private val INCOME_AMOUNT_HEADER_ALIASES = setOf("收入金额", "入账金额", "incomeamount")
+    private val EXPENSE_AMOUNT_HEADER_ALIASES = setOf("支出金额", "出账金额", "expenseamount")
+    private val NOTE_HEADER_ALIASES = setOf("备注", "note", "memo", "remark", "description", "说明", "附言")
+    private val ACCOUNT_HEADER_ALIASES = setOf(
+        "账户",
+        "account",
+        "支付方式",
+        "支付账户",
+        "支付工具",
+        "付款账户",
+        "账户名称",
+        "钱包"
+    )
+    private val LEDGER_HEADER_ALIASES = setOf("账本", "ledger", "book", "账簿", "账本名称")
 
-    private val EXPENSE_TYPE_ALIASES = setOf("支出", "expense", "out", "pay", "消费")
-    private val INCOME_TYPE_ALIASES = setOf("收入", "income", "in", "到账", "入账")
+    private val EXPENSE_TYPE_ALIASES = setOf("支出", "expense", "out", "pay", "消费", "付款", "扣款", "转出")
+    private val INCOME_TYPE_ALIASES = setOf("收入", "income", "in", "到账", "入账", "收款", "转入", "退款")
+    private val INCOME_CATEGORY_HINTS = setOf("工资", "薪资", "奖金", "收入", "退款", "分红", "利息")
+    private val CATEGORY_PATH_SEPARATORS = listOf("/", "／", ">", "＞", "|", "｜")
+    private val NUMBER_PATTERN = Regex("[-+]?\\d+(\\.\\d+)?")
+    private val NUMERIC_DATE_PATTERN = Regex("^-?\\d{5,13}$")
 }

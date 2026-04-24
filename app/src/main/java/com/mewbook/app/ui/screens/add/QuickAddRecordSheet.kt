@@ -1,11 +1,13 @@
 package com.mewbook.app.ui.screens.add
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.text.KeyboardOptions
@@ -28,22 +30,19 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import com.mewbook.app.domain.model.Account
 import com.mewbook.app.domain.model.Category
 import com.mewbook.app.domain.model.RecordType
 import java.time.LocalDate
-import java.time.format.DateTimeFormatter
-import java.util.Locale
-
-private val QuickAddDateFormatter: DateTimeFormatter =
-    DateTimeFormatter.ofPattern("M月d日", Locale.SIMPLIFIED_CHINESE)
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -73,11 +72,6 @@ fun QuickAddRecordSheet(
     val amount = AmountExpressionHelper.evaluate(amountExpression)
     val canSave = amount != null && amount > 0.0 && selectedCategoryId > 0L
     val title = if (type == RecordType.EXPENSE) "快速记支出" else "快速记收入"
-    val subtitle = if (type == RecordType.EXPENSE) {
-        "默认选中常用分类和账户，记得更快。"
-    } else {
-        "常用收入分类已预设，适合秒记一笔。"
-    }
 
     LaunchedEffect(type, defaultCategoryId, resolvedDefaultAccountId, categories, accounts) {
         if ((selectedCategoryId == 0L || categories.none { it.id == selectedCategoryId }) && defaultCategoryId > 0L) {
@@ -114,11 +108,6 @@ fun QuickAddRecordSheet(
                             text = title,
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = "$subtitle 日期默认 ${defaultDate.format(QuickAddDateFormatter)}，右下角 + 可进入完整记账。",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
@@ -193,18 +182,26 @@ fun QuickAddRecordSheet(
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     TextButton(
-                        onClick = onDismiss
+                        onClick = onDismiss,
+                        modifier = Modifier
+                            .weight(1f)
+                            .heightIn(min = 48.dp),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp)
                     ) {
-                        Text("取消")
+                        QuickAddActionText("取消")
                     }
                     OutlinedButton(
                         onClick = onOpenFullEditor,
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier
+                            .weight(1f)
+                            .heightIn(min = 48.dp),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp)
                     ) {
-                        Text("完整记账")
+                        QuickAddActionText("完整记账")
                     }
                     Button(
                         onClick = {
@@ -219,12 +216,25 @@ fun QuickAddRecordSheet(
                             )
                         },
                         enabled = canSave,
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier
+                            .weight(1f)
+                            .heightIn(min = 48.dp),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp)
                     ) {
-                        Text("快速保存")
+                        QuickAddActionText("快速保存")
                     }
                 }
             }
         }
     }
+}
+
+@Composable
+private fun QuickAddActionText(text: String) {
+    Text(
+        text = text,
+        modifier = Modifier.fillMaxWidth(),
+        maxLines = 1,
+        textAlign = TextAlign.Center
+    )
 }

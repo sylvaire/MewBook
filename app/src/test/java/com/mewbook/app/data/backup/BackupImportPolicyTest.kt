@@ -3,6 +3,7 @@ package com.mewbook.app.data.backup
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.time.LocalDate
 
 class BackupImportPolicyTest {
 
@@ -115,5 +116,65 @@ class BackupImportPolicyTest {
         assertEquals(1, preview.categoriesToCreate)
         assertEquals(2, merged.payload.records.size)
         assertTrue(merged.payload.categories.any { it.name == "午餐" })
+    }
+
+    @Test
+    fun parseExternalCsv_supportsSeparatedIncomeExpenseColumnsAndSemicolonDelimiter() {
+        val csv = """
+            交易时间;一级分类;二级分类;支出金额;收入金额;账户名称;备注
+            2026/4/20 08:30:00;餐饮;早餐;18.50;;微信;豆浆
+            2026/4/21 09:00:00;工资;; ;5000;银行卡;四月工资
+        """.trimIndent()
+
+        val envelope = BackupImportPolicy.parseExternalCsv(csv)
+
+        assertEquals(2, envelope.payload.records.size)
+        assertTrue(envelope.payload.records.any { it.type == "EXPENSE" && it.amount == 18.5 })
+        assertTrue(envelope.payload.records.any { it.type == "INCOME" && it.amount == 5000.0 })
+    }
+
+    @Test
+    fun parseExternalCsv_supportsCategoryPathEpochDayAndFullWidthSeparators() {
+        val date = LocalDate.of(2026, 4, 21)
+        val csv = """
+            记账日期，分类路径，金额(元)，备注，账户
+            ${date.toEpochDay()}，餐饮/晚餐，（32.80），测试，现金
+        """.trimIndent()
+
+        val envelope = BackupImportPolicy.parseExternalCsv(csv)
+
+        assertEquals(1, envelope.payload.records.size)
+        val record = envelope.payload.records.first()
+        assertEquals("EXPENSE", record.type)
+        assertEquals(32.8, record.amount, 0.0)
+        assertEquals(date.toEpochDay(), record.date)
+        assertTrue(envelope.payload.categories.any { it.name == "餐饮" && it.parentId == null })
+        assertTrue(envelope.payload.categories.any { it.name == "晚餐" && it.parentId != null })
+    }
+
+    @Test
+    fun parseExternalCsv_supportsCompactNumericDateFormat() {
+        val csv = """
+            日期,分类,金额
+            20260421,餐饮,32.8
+        """.trimIndent()
+
+        val envelope = BackupImportPolicy.parseExternalCsv(csv)
+        val record = envelope.payload.records.first()
+
+        assertEquals(LocalDate.of(2026, 4, 21).toEpochDay(), record.date)
+    }
+
+    @Test
+    fun parseExternalCsv_supportsChineseDateTimeWithoutSeconds() {
+        val csv = """
+            日期,分类,金额
+            2020年08月15日 14:11,餐饮,32.8
+        """.trimIndent()
+
+        val envelope = BackupImportPolicy.parseExternalCsv(csv)
+        val record = envelope.payload.records.first()
+
+        assertEquals(LocalDate.of(2020, 8, 15).toEpochDay(), record.date)
     }
 }

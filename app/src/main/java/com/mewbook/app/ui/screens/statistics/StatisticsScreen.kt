@@ -35,7 +35,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -44,17 +43,18 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.mewbook.app.domain.model.Category
 import com.mewbook.app.ui.components.MewCompactTopAppBar
 import com.mewbook.app.ui.theme.ExpenseRed
 import com.mewbook.app.ui.theme.IncomeGreen
@@ -92,13 +92,11 @@ fun StatisticsScreen(
                     .padding(paddingValues)
                     .verticalScroll(rememberScrollState())
             ) {
-                TimeRangeSelector(
+                StatisticsPeriodControls(
                     selectedRange = uiState.timeRange,
-                    onRangeSelected = { viewModel.setTimeRange(it) }
-                )
-                PeriodNavigator(
                     periodLabel = uiState.periodLabel,
                     canGoNext = uiState.canGoNext,
+                    onRangeSelected = { viewModel.setTimeRange(it) },
                     onPrevious = { viewModel.previousPeriod() },
                     onNext = { viewModel.nextPeriod() }
                 )
@@ -109,9 +107,12 @@ fun StatisticsScreen(
                 )
 
                 if (uiState.expenseByCategory.isNotEmpty()) {
-                    ExpenseBreakdown(
-                        expenseByCategory = uiState.expenseByCategory,
+                    CategoryBreakdown(
+                        title = "支出构成",
+                        amountByCategory = uiState.expenseByCategory,
                         categories = uiState.categories,
+                        amountPrefix = "-",
+                        accentColor = ExpenseRed,
                         onCategoryClick = { categoryId ->
                             onNavigateToCategoryExpense(
                                 categoryId,
@@ -119,6 +120,16 @@ fun StatisticsScreen(
                                 uiState.periodEnd
                             )
                         }
+                    )
+                }
+
+                if (uiState.incomeByCategory.isNotEmpty()) {
+                    CategoryBreakdown(
+                        title = "收入构成",
+                        amountByCategory = uiState.incomeByCategory,
+                        categories = uiState.categories,
+                        amountPrefix = "+",
+                        accentColor = IncomeGreen
                     )
                 }
 
@@ -139,72 +150,78 @@ fun StatisticsScreen(
 }
 
 @Composable
-fun TimeRangeSelector(
+private fun StatisticsPeriodControls(
     selectedRange: TimeRange,
-    onRangeSelected: (TimeRange) -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(16.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        TimeRange.entries.forEach { range ->
-            FilterChip(
-                selected = selectedRange == range,
-                onClick = { onRangeSelected(range) },
-                label = {
-                    Text(
-                        when (range) {
-                            TimeRange.WEEK -> "周"
-                            TimeRange.MONTH -> "月"
-                            TimeRange.YEAR -> "年"
-                        }
-                    )
-                }
-            )
-        }
-    }
-}
-
-@Composable
-private fun PeriodNavigator(
     periodLabel: String,
     canGoNext: Boolean,
+    onRangeSelected: (TimeRange) -> Unit,
     onPrevious: () -> Unit,
     onNext: () -> Unit
 ) {
-    Box(
+    Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp)
-    ) {
-        Text(
-            text = periodLabel,
-            modifier = Modifier
-                .align(Alignment.Center)
-                .fillMaxWidth()
-                .padding(horizontal = 48.dp),
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold,
-            textAlign = TextAlign.Center
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
         )
+    ) {
         Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 10.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            IconButton(onClick = onPrevious) {
-                Icon(
-                    imageVector = Icons.Filled.ChevronLeft,
-                    contentDescription = "上一周期"
-                )
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                TimeRange.entries.forEach { range ->
+                    FilterChip(
+                        selected = selectedRange == range,
+                        onClick = { onRangeSelected(range) },
+                        label = {
+                            Text(
+                                when (range) {
+                                    TimeRange.WEEK -> "周"
+                                    TimeRange.MONTH -> "月"
+                                    TimeRange.YEAR -> "年"
+                                },
+                                maxLines = 1
+                            )
+                        }
+                    )
+                }
             }
-            IconButton(onClick = onNext, enabled = canGoNext) {
-                Icon(
-                    imageVector = Icons.Filled.ChevronRight,
-                    contentDescription = "下一周期"
+
+            Row(
+                modifier = Modifier.weight(1f),
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = onPrevious) {
+                    Icon(
+                        imageVector = Icons.Filled.ChevronLeft,
+                        contentDescription = "上一周期"
+                    )
+                }
+                Text(
+                    text = periodLabel,
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    textAlign = TextAlign.Center,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
+                IconButton(onClick = onNext, enabled = canGoNext) {
+                    Icon(
+                        imageVector = Icons.Filled.ChevronRight,
+                        contentDescription = "下一周期"
+                    )
+                }
             }
         }
     }
@@ -276,21 +293,37 @@ fun SummarySection(
 }
 
 @Composable
-fun ExpenseBreakdown(
-    expenseByCategory: Map<Long, Double>,
-    categories: Map<Long, com.mewbook.app.domain.model.Category>,
-    onCategoryClick: (Long) -> Unit
+fun CategoryBreakdown(
+    title: String,
+    amountByCategory: Map<Long, Double>,
+    categories: Map<Long, Category>,
+    amountPrefix: String,
+    accentColor: Color,
+    onCategoryClick: ((Long) -> Unit)? = null
 ) {
+    val total = amountByCategory.values.sum()
+    val topCategories = amountByCategory.entries.sortedByDescending { it.value }.take(5)
+
     Column(modifier = Modifier.padding(16.dp)) {
-        Text(
-            text = "支出构成",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                text = "Top ${topCategories.size}",
+                style = MaterialTheme.typography.labelSmall,
+                color = accentColor,
+                fontWeight = FontWeight.SemiBold
+            )
+        }
 
         Spacer(modifier = Modifier.height(12.dp))
-
-        val total = expenseByCategory.values.sum()
 
         Card(
             modifier = Modifier.fillMaxWidth(),
@@ -298,37 +331,77 @@ fun ExpenseBreakdown(
                 containerColor = MaterialTheme.colorScheme.surface
             )
         ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                expenseByCategory.entries.sortedByDescending { it.value }.take(5).forEach { (categoryId, amount) ->
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                topCategories.forEach { (categoryId, amount) ->
                     val category = categories[categoryId]
-                    val percentage = if (total > 0) (amount / total * 100) else 0.0
+                    val categoryColor = Color(category?.color ?: 0xFF808080)
+                    val percentage = if (total > 0) (amount / total * 100).toFloat() else 0f
+                    val clickableModifier = if (onCategoryClick != null) {
+                        Modifier.clickable { onCategoryClick(categoryId) }
+                    } else {
+                        Modifier
+                    }
 
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clickable { onCategoryClick(categoryId) }
-                            .padding(vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                            .then(clickableModifier),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         Box(
                             modifier = Modifier
                                 .size(12.dp)
                                 .clip(CircleShape)
-                                .background(Color(category?.color ?: 0xFF808080))
+                                .background(categoryColor)
                         )
 
-                        Spacer(modifier = Modifier.width(8.dp))
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = category?.name ?: "未知",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Medium
+                                )
+                                Text(
+                                    text = "${String.format("%.1f", percentage)}%",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(7.dp)
+                                    .clip(RoundedCornerShape(999.dp))
+                                    .background(accentColor.copy(alpha = 0.10f))
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth((percentage / 100f).coerceIn(0f, 1f))
+                                        .height(7.dp)
+                                        .clip(RoundedCornerShape(999.dp))
+                                        .background(categoryColor.copy(alpha = 0.86f))
+                                )
+                            }
+                        }
 
                         Text(
-                            text = category?.name ?: "未知",
+                            text = "$amountPrefix${formatCurrency(amount)}",
                             style = MaterialTheme.typography.bodyMedium,
-                            modifier = Modifier.weight(1f)
-                        )
-
-                        Text(
-                            text = "${formatCurrency(amount)} (${String.format("%.1f", percentage)}%)",
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.Medium
+                            fontWeight = FontWeight.SemiBold,
+                            color = accentColor
                         )
                     }
                 }
@@ -345,7 +418,6 @@ fun IncomeExpenseTrend(
     observedMask: List<Boolean>,
     timeRange: TimeRange
 ) {
-    val density = LocalDensity.current
     Column(modifier = Modifier.padding(16.dp)) {
         Text(
             text = "收支趋势",
@@ -355,20 +427,16 @@ fun IncomeExpenseTrend(
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            TrendLegendItem(label = "收入", color = IncomeGreen)
-            TrendLegendItem(label = "支出", color = ExpenseRed)
-        }
-
-        Spacer(modifier = Modifier.height(8.dp))
-
         Card(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(
                 containerColor = MaterialTheme.colorScheme.surface
             )
         ) {
-            Column(modifier = Modifier.padding(16.dp)) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
                 if (incomeData.isNotEmpty() || expenseData.isNotEmpty()) {
                     val pointCount = maxOf(incomeData.size, expenseData.size, labels.size).coerceAtLeast(1)
                     val normalizedIncome = List(pointCount) { incomeData.getOrElse(it) { 0.0 } }
@@ -386,24 +454,34 @@ fun IncomeExpenseTrend(
                     }
                     val maxValue = (normalizedIncome + normalizedExpense).maxOrNull()?.coerceAtLeast(1.0) ?: 1.0
                     val chartHeight = 208.dp
-                    val selectedGuideColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)
                     val selectedIncome = normalizedIncome.getOrElse(selectedIndex) { 0.0 }
                     val selectedExpense = normalizedExpense.getOrElse(selectedIndex) { 0.0 }
                     val selectedLabel = labels.getOrElse(selectedIndex) { "" }
                     val selectedLabelDisplay = formatFocusedLabel(selectedLabel, timeRange)
                     val selectedBalance = selectedIncome - selectedExpense
-                    val highestExpense = normalizedExpense.maxOrNull() ?: 0.0
-                    val averageExpense = normalizedExpense.average().takeIf { !it.isNaN() } ?: 0.0
-                    val pointRadius = 8.dp
-                    val annotationBandHeight = 10.dp
-                    val chartInnerHeight = chartHeight - annotationBandHeight - pointRadius * 2
-                    val highestExpenseRatio = (highestExpense / maxValue).toFloat().coerceIn(0f, 1f)
-                    val highestExpenseLineOffset = annotationBandHeight + pointRadius + chartInnerHeight * (1f - highestExpenseRatio)
-                    var highestExpenseLabelHeightPx by remember(highestExpense) { mutableIntStateOf(0) }
-                    val highestExpenseLabelOffset = with(density) {
-                        val linePx = highestExpenseLineOffset.roundToPx()
-                        val gapPx = 2.dp.roundToPx()
-                        (linePx - highestExpenseLabelHeightPx - gapPx).coerceAtLeast(0).toDp()
+                    val totalIncome = normalizedIncome.sum()
+                    val totalExpense = normalizedExpense.sum()
+                    val pointRadius = 7.dp
+                    val gridColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.36f)
+                    val selectedGuideColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.20f)
+                    val pointSurfaceColor = MaterialTheme.colorScheme.surface
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        TrendSeriesPill(
+                            label = "收入",
+                            value = "+${formatCurrency(totalIncome)}",
+                            color = IncomeGreen,
+                            modifier = Modifier.weight(1f)
+                        )
+                        TrendSeriesPill(
+                            label = "支出",
+                            value = "-${formatCurrency(totalExpense)}",
+                            color = ExpenseRed,
+                            modifier = Modifier.weight(1f)
+                        )
                     }
 
                     Box(
@@ -411,19 +489,6 @@ fun IncomeExpenseTrend(
                             .fillMaxWidth()
                             .height(chartHeight)
                     ) {
-                        if (highestExpense > 0) {
-                            Text(
-                                text = formatCurrency(highestExpense),
-                                modifier = Modifier
-                                    .align(Alignment.TopStart)
-                                    .padding(start = 4.dp, top = highestExpenseLabelOffset),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = ExpenseRed,
-                                fontWeight = FontWeight.SemiBold,
-                                onTextLayout = { highestExpenseLabelHeightPx = it.size.height }
-                            )
-                        }
-
                         Box(
                             modifier = Modifier
                                 .matchParentSize()
@@ -450,8 +515,8 @@ fun IncomeExpenseTrend(
                                 val pointRadiusPx = pointRadius.toPx()
                                 val xStart = pointRadiusPx
                                 val xEnd = size.width - pointRadiusPx
-                                val yTop = annotationBandHeight.toPx() + pointRadiusPx
-                                val yBottom = size.height - pointRadiusPx
+                                val yTop = 10.dp.toPx() + pointRadiusPx
+                                val yBottom = size.height - 10.dp.toPx() - pointRadiusPx
                                 val chartHeightPx = (yBottom - yTop).coerceAtLeast(1f)
                                 val stepX = if (pointCount > 1) {
                                     (xEnd - xStart) / (pointCount - 1)
@@ -468,29 +533,14 @@ fun IncomeExpenseTrend(
                                     return yBottom - ratio * chartHeightPx
                                 }
                                 val selectedX = xFor(selectedIndex)
-                                val dashedPathEffect = PathEffect.dashPathEffect(
-                                    intervals = floatArrayOf(10.dp.toPx(), 8.dp.toPx()),
-                                    phase = 0f
-                                )
 
-                                if (highestExpense > 0) {
-                                    val highestY = yFor(highestExpense)
+                                repeat(4) { index ->
+                                    val y = yTop + chartHeightPx * index / 3f
                                     drawLine(
-                                        color = ExpenseRed.copy(alpha = 0.32f),
-                                        start = Offset(xStart, highestY),
-                                        end = Offset(xEnd, highestY),
-                                        strokeWidth = 1.5.dp.toPx()
-                                    )
-                                }
-
-                                if (averageExpense > 0) {
-                                    val averageY = yFor(averageExpense)
-                                    drawLine(
-                                        color = ExpenseRed.copy(alpha = 0.22f),
-                                        start = Offset(xStart, averageY),
-                                        end = Offset(xEnd, averageY),
-                                        strokeWidth = 1.dp.toPx(),
-                                        pathEffect = dashedPathEffect
+                                        color = gridColor,
+                                        start = Offset(xStart, y),
+                                        end = Offset(xEnd, y),
+                                        strokeWidth = 1.dp.toPx()
                                     )
                                 }
 
@@ -501,114 +551,80 @@ fun IncomeExpenseTrend(
                                     strokeWidth = 2.dp.toPx()
                                 )
 
-                                val incomePath = Path()
-                                normalizedIncome.forEachIndexed { index, value ->
-                                    val x = xFor(index)
-                                    val y = yFor(value)
-                                    if (index == 0) incomePath.moveTo(x, y) else incomePath.lineTo(x, y)
+                                fun drawSeriesPath(data: List<Double>, color: Color) {
+                                    val path = Path()
+                                    data.forEachIndexed { index, value ->
+                                        val x = xFor(index)
+                                        val y = yFor(value)
+                                        if (index == 0) path.moveTo(x, y) else path.lineTo(x, y)
+                                    }
+                                    drawPath(
+                                        path = path,
+                                        color = color.copy(alpha = 0.94f),
+                                        style = Stroke(
+                                            width = 2.25.dp.toPx(),
+                                            cap = StrokeCap.Round,
+                                            join = StrokeJoin.Round
+                                        )
+                                    )
                                 }
-                                drawPath(
-                                    path = incomePath,
-                                    color = IncomeGreen,
-                                    style = Stroke(width = 1.75.dp.toPx(), cap = StrokeCap.Round)
-                                )
-                                normalizedIncome.forEachIndexed { index, value ->
-                                    val isObserved = normalizedObservedMask.getOrElse(index) { true }
-                                    val radius = if (selectedIndex == index && isObserved) 6.5.dp.toPx() else 5.dp.toPx()
-                                    val solidOuterRadius = radius - 2.dp.toPx()
-                                    val hollowStrokeWidth = 1.5.dp.toPx()
-                                    val hollowRadius = (solidOuterRadius - hollowStrokeWidth / 2f).coerceAtLeast(1.dp.toPx())
-                                    val center = Offset(xFor(index), yFor(value))
-                                    if (selectedIndex == index && isObserved) {
+
+                                fun drawSeriesPoints(data: List<Double>, color: Color) {
+                                    data.forEachIndexed { index, value ->
+                                        val isObserved = normalizedObservedMask.getOrElse(index) { true }
+                                        val isSelected = selectedIndex == index && isObserved
+                                        val radius = if (isSelected) 6.5.dp.toPx() else 5.dp.toPx()
+                                        val solidOuterRadius = radius - 1.9.dp.toPx()
+                                        val hollowStrokeWidth = 1.5.dp.toPx()
+                                        val hollowRadius = (solidOuterRadius - hollowStrokeWidth / 2f).coerceAtLeast(1.dp.toPx())
+                                        val center = Offset(xFor(index), yFor(value))
+                                        if (isSelected) {
+                                            drawCircle(
+                                                color = color.copy(alpha = 0.18f),
+                                                radius = 11.dp.toPx(),
+                                                center = center
+                                            )
+                                        }
                                         drawCircle(
-                                            color = IncomeGreen.copy(alpha = 0.20f),
-                                            radius = 10.dp.toPx(),
+                                            color = pointSurfaceColor,
+                                            radius = radius,
                                             center = center
                                         )
-                                    }
-                                    drawCircle(
-                                        color = Color.White,
-                                        radius = radius,
-                                        center = center
-                                    )
-                                    if (isObserved) {
-                                        drawCircle(
-                                            color = IncomeGreen,
-                                            radius = solidOuterRadius,
-                                            center = center,
-                                            style = Fill
-                                        )
-                                    } else {
-                                        drawCircle(
-                                            color = IncomeGreen.copy(alpha = 0.82f),
-                                            radius = hollowRadius,
-                                            center = center,
-                                            style = Stroke(width = hollowStrokeWidth)
-                                        )
+                                        if (isObserved) {
+                                            drawCircle(
+                                                color = color,
+                                                radius = solidOuterRadius,
+                                                center = center,
+                                                style = Fill
+                                            )
+                                        } else {
+                                            drawCircle(
+                                                color = color.copy(alpha = 0.70f),
+                                                radius = hollowRadius,
+                                                center = center,
+                                                style = Stroke(width = hollowStrokeWidth)
+                                            )
+                                        }
                                     }
                                 }
 
-                                val expensePath = Path()
-                                normalizedExpense.forEachIndexed { index, value ->
-                                    val x = xFor(index)
-                                    val y = yFor(value)
-                                    if (index == 0) expensePath.moveTo(x, y) else expensePath.lineTo(x, y)
-                                }
-                                drawPath(
-                                    path = expensePath,
-                                    color = ExpenseRed,
-                                    style = Stroke(width = 1.75.dp.toPx(), cap = StrokeCap.Round)
-                                )
-                                normalizedExpense.forEachIndexed { index, value ->
-                                    val isObserved = normalizedObservedMask.getOrElse(index) { true }
-                                    val radius = if (selectedIndex == index && isObserved) 6.5.dp.toPx() else 5.dp.toPx()
-                                    val solidOuterRadius = radius - 2.dp.toPx()
-                                    val hollowStrokeWidth = 1.5.dp.toPx()
-                                    val hollowRadius = (solidOuterRadius - hollowStrokeWidth / 2f).coerceAtLeast(1.dp.toPx())
-                                    val center = Offset(xFor(index), yFor(value))
-                                    if (selectedIndex == index && isObserved) {
-                                        drawCircle(
-                                            color = ExpenseRed.copy(alpha = 0.20f),
-                                            radius = 10.dp.toPx(),
-                                            center = center
-                                        )
-                                    }
-                                    drawCircle(
-                                        color = Color.White,
-                                        radius = radius,
-                                        center = center
-                                    )
-                                    if (isObserved) {
-                                        drawCircle(
-                                            color = ExpenseRed,
-                                            radius = solidOuterRadius,
-                                            center = center,
-                                            style = Fill
-                                        )
-                                    } else {
-                                        drawCircle(
-                                            color = ExpenseRed.copy(alpha = 0.82f),
-                                            radius = hollowRadius,
-                                            center = center,
-                                            style = Stroke(width = hollowStrokeWidth)
-                                        )
-                                    }
-                                }
+                                drawSeriesPath(normalizedIncome, IncomeGreen)
+                                drawSeriesPath(normalizedExpense, ExpenseRed)
+                                drawSeriesPoints(normalizedIncome, IncomeGreen)
+                                drawSeriesPoints(normalizedExpense, ExpenseRed)
                             }
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(12.dp))
-
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.primaryContainer
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.58f)
                         )
                     ) {
                         Column(
                             modifier = Modifier.padding(14.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
@@ -621,21 +637,28 @@ fun IncomeExpenseTrend(
                                     fontWeight = FontWeight.Bold
                                 )
                                 Text(
-                                    text = "当前聚焦",
+                                    text = "聚焦点",
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
-                            TrendMetricRow(
-                                label = "收入",
-                                value = "+${formatCurrency(selectedIncome)}",
-                                valueColor = IncomeGreen
-                            )
-                            TrendMetricRow(
-                                label = "支出",
-                                value = "-${formatCurrency(selectedExpense)}",
-                                valueColor = ExpenseRed
-                            )
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                TrendFocusValue(
+                                    label = "收入",
+                                    value = "+${formatCurrency(selectedIncome)}",
+                                    valueColor = IncomeGreen,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                TrendFocusValue(
+                                    label = "支出",
+                                    value = "-${formatCurrency(selectedExpense)}",
+                                    valueColor = ExpenseRed,
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
                             TrendMetricRow(
                                 label = "结余",
                                 value = formatCurrency(selectedBalance),
@@ -643,8 +666,6 @@ fun IncomeExpenseTrend(
                             )
                         }
                     }
-
-                    Spacer(modifier = Modifier.height(10.dp))
 
                     val bottomLabels = buildBottomLabels(labels)
                     Row(
@@ -672,19 +693,79 @@ fun IncomeExpenseTrend(
 }
 
 @Composable
-private fun TrendLegendItem(
+private fun TrendSeriesPill(
     label: String,
-    color: Color
+    value: String,
+    color: Color,
+    modifier: Modifier = Modifier
 ) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Box(
-            modifier = Modifier
-                .size(12.dp)
-                .clip(RoundedCornerShape(2.dp))
-                .background(color)
-        )
-        Spacer(modifier = Modifier.width(4.dp))
-        Text(label, style = MaterialTheme.typography.labelSmall)
+    Card(
+        modifier = modifier,
+        colors = CardDefaults.cardColors(
+            containerColor = color.copy(alpha = 0.08f)
+        ),
+        shape = RoundedCornerShape(18.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(9.dp)
+                        .clip(CircleShape)
+                        .background(color)
+                )
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Text(
+                text = value,
+                style = MaterialTheme.typography.titleSmall,
+                color = color,
+                fontWeight = FontWeight.Bold
+            )
+        }
+    }
+}
+
+@Composable
+private fun TrendFocusValue(
+    label: String,
+    value: String,
+    valueColor: Color,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier,
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.72f)
+        ),
+        shape = RoundedCornerShape(16.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text(
+                text = value,
+                style = MaterialTheme.typography.bodyMedium,
+                color = valueColor,
+                fontWeight = FontWeight.Bold
+            )
+        }
     }
 }
 

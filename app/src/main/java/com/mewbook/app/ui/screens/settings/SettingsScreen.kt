@@ -43,7 +43,11 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.foundation.verticalScroll
 import com.mewbook.app.BuildConfig
 import com.mewbook.app.data.preferences.AppThemeMode
+import com.mewbook.app.domain.model.BudgetPeriodType
+import com.mewbook.app.ui.components.BudgetPeriodTypeSelector
 import com.mewbook.app.ui.components.MewCompactTopAppBar
+import com.mewbook.app.ui.components.displayLabel
+import com.mewbook.app.ui.update.AppUpdateUiState
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -54,10 +58,13 @@ fun SettingsScreen(
     onNavigateToRecurringTemplates: () -> Unit,
     onNavigateToExport: () -> Unit,
     onNavigateToLedgerManagement: () -> Unit,
+    updateUiState: AppUpdateUiState,
+    onCheckForUpdates: () -> Unit,
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
     val showHomeOverviewCards by viewModel.showHomeOverviewCards.collectAsStateWithLifecycle()
+    val selectedHomePeriod by viewModel.selectedHomePeriod.collectAsStateWithLifecycle()
     var showThemeDialog = androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
 
     if (showThemeDialog.value) {
@@ -103,9 +110,14 @@ fun SettingsScreen(
             SettingsSwitchItem(
                 icon = Icons.Filled.AccountBalanceWallet,
                 title = "首页收支概览",
-                subtitle = "控制首页是否显示支出、收入、结余和剩余预算",
+                subtitle = "控制首页是否显示收支概览卡片",
                 checked = showHomeOverviewCards,
                 onCheckedChange = viewModel::setShowHomeOverviewCards
+            )
+
+            HomePeriodPreferenceItem(
+                selectedPeriodType = selectedHomePeriod,
+                onSelect = viewModel::setSelectedHomePeriod
             )
 
             SettingsItem(
@@ -169,10 +181,84 @@ fun SettingsScreen(
             )
 
             SettingsItem(
+                icon = Icons.Filled.Download,
+                title = "检查更新",
+                subtitle = updateStatusSubtitle(updateUiState),
+                onClick = onCheckForUpdates
+            )
+
+            SettingsItem(
                 icon = Icons.Filled.Info,
                 title = "关于喵喵记账",
                 subtitle = "版本 ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
                 onClick = { }
+            )
+        }
+    }
+}
+
+private fun updateStatusSubtitle(updateUiState: AppUpdateUiState): String {
+    return when {
+        updateUiState.isDownloading -> {
+            val percentText = updateUiState.downloadProgressPercent?.let { "$it%" } ?: "进行中"
+            "正在后台下载更新：$percentText"
+        }
+
+        updateUiState.isChecking -> "正在检查 GitHub Release..."
+        updateUiState.availableRelease != null -> "发现新版本 ${updateUiState.availableRelease.versionName}"
+        else -> "当前版本 ${BuildConfig.VERSION_NAME}"
+    }
+}
+
+@Composable
+private fun HomePeriodPreferenceItem(
+    selectedPeriodType: BudgetPeriodType,
+    onSelect: (BudgetPeriodType) -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        )
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.CalendarMonth,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary
+                )
+
+                Spacer(modifier = Modifier.width(16.dp))
+
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "首页显示周期",
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                    Text(
+                        text = "当前：${selectedPeriodType.displayLabel()}，控制首页记录和金额概览的统计范围",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+
+            BudgetPeriodTypeSelector(
+                selectedPeriodType = selectedPeriodType,
+                onSelect = onSelect,
+                modifier = Modifier.padding(top = 12.dp)
             )
         }
     }

@@ -1,6 +1,7 @@
 package com.mewbook.app.ui.screens.export
 
 import android.net.Uri
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mewbook.app.data.backup.BackupRecordImportPreview
@@ -95,6 +96,7 @@ class ExportViewModel @Inject constructor(
 
     fun previewRestoreFromLocal(uri: Uri) {
         viewModelScope.launch {
+            Log.d(TAG, "previewRestoreFromLocal uri=$uri")
             _uiState.value = _uiState.value.copy(
                 isPreviewingRestore = true,
                 error = null,
@@ -106,12 +108,14 @@ class ExportViewModel @Inject constructor(
             val result = backupRepository.previewRestoreFromUri(uri)
             result.fold(
                 onSuccess = { preview ->
+                    Log.d(TAG, "previewRestoreFromLocal success records=${preview.incoming.records}")
                     _uiState.value = _uiState.value.copy(
                         isPreviewingRestore = false,
                         restorePreview = preview
                     )
                 },
                 onFailure = { e ->
+                    Log.e(TAG, "previewRestoreFromLocal failed uri=$uri", e)
                     _uiState.value = _uiState.value.copy(
                         isPreviewingRestore = false,
                         pendingRestoreUri = null,
@@ -124,6 +128,7 @@ class ExportViewModel @Inject constructor(
 
     fun restoreFromLocal(uri: Uri) {
         viewModelScope.launch {
+            Log.d(TAG, "restoreFromLocal uri=$uri")
             _uiState.value = _uiState.value.copy(
                 isRestoringLocally = true,
                 error = null,
@@ -136,6 +141,7 @@ class ExportViewModel @Inject constructor(
             val result = backupRepository.importFromUri(uri)
             result.fold(
                 onSuccess = {
+                    Log.d(TAG, "restoreFromLocal success uri=$uri")
                     _uiState.value = _uiState.value.copy(
                         isRestoringLocally = false,
                         message = "本地还原成功，正在刷新页面状态",
@@ -144,6 +150,7 @@ class ExportViewModel @Inject constructor(
                     loadCurrentSnapshotSummary()
                 },
                 onFailure = { e ->
+                    Log.e(TAG, "restoreFromLocal failed uri=$uri", e)
                     _uiState.value = _uiState.value.copy(
                         isRestoringLocally = false,
                         error = e.message ?: "本地还原失败"
@@ -183,17 +190,20 @@ class ExportViewModel @Inject constructor(
 
     fun backupToLocal(uri: Uri) {
         viewModelScope.launch {
+            Log.d(TAG, "backupToLocal uri=$uri")
             _uiState.value = _uiState.value.copy(isBackingUpLocally = true, error = null, message = null)
 
             val result = backupRepository.exportToUri(uri)
             result.fold(
                 onSuccess = {
+                    Log.d(TAG, "backupToLocal success uri=$uri")
                     _uiState.value = _uiState.value.copy(
                         isBackingUpLocally = false,
                         message = "本地备份成功"
                     )
                 },
                 onFailure = { e ->
+                    Log.e(TAG, "backupToLocal failed uri=$uri", e)
                     _uiState.value = _uiState.value.copy(
                         isBackingUpLocally = false,
                         error = e.message ?: "本地备份失败"
@@ -205,6 +215,7 @@ class ExportViewModel @Inject constructor(
 
     fun previewImportRecords(uri: Uri) {
         viewModelScope.launch {
+            Log.d(TAG, "previewImportRecords uri=$uri")
             _uiState.value = _uiState.value.copy(
                 isPreviewingRecordImport = true,
                 error = null,
@@ -216,12 +227,17 @@ class ExportViewModel @Inject constructor(
             val result = backupRepository.previewImportRecordsFromUri(uri)
             result.fold(
                 onSuccess = { preview ->
+                    Log.d(
+                        TAG,
+                        "previewImportRecords success recordsToImport=${preview.recordsToImport} duplicates=${preview.duplicateRecords}"
+                    )
                     _uiState.value = _uiState.value.copy(
                         isPreviewingRecordImport = false,
                         recordImportPreview = preview
                     )
                 },
                 onFailure = { e ->
+                    Log.e(TAG, "previewImportRecords failed uri=$uri", e)
                     _uiState.value = _uiState.value.copy(
                         isPreviewingRecordImport = false,
                         pendingRecordImportUri = null,
@@ -234,6 +250,7 @@ class ExportViewModel @Inject constructor(
 
     fun importRecords(uri: Uri) {
         viewModelScope.launch {
+            Log.d(TAG, "importRecords uri=$uri")
             _uiState.value = _uiState.value.copy(
                 isImportingRecords = true,
                 error = null,
@@ -245,6 +262,7 @@ class ExportViewModel @Inject constructor(
             val result = backupRepository.importRecordsFromUri(uri)
             result.fold(
                 onSuccess = {
+                    Log.d(TAG, "importRecords success uri=$uri")
                     _uiState.value = _uiState.value.copy(
                         isImportingRecords = false,
                         message = "导入成功，已合并到当前数据"
@@ -252,6 +270,7 @@ class ExportViewModel @Inject constructor(
                     loadCurrentSnapshotSummary()
                 },
                 onFailure = { e ->
+                    Log.e(TAG, "importRecords failed uri=$uri", e)
                     _uiState.value = _uiState.value.copy(
                         isImportingRecords = false,
                         error = e.message ?: "导入失败"
@@ -259,5 +278,9 @@ class ExportViewModel @Inject constructor(
                 }
             )
         }
+    }
+
+    private companion object {
+        const val TAG = "ExportViewModel"
     }
 }

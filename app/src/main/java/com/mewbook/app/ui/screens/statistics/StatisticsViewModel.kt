@@ -31,6 +31,7 @@ data class StatisticsUiState(
     val categories: Map<Long, Category> = emptyMap(),
     val totalIncome: Double = 0.0,
     val totalExpense: Double = 0.0,
+    val incomeByCategory: Map<Long, Double> = emptyMap(),
     val expenseByCategory: Map<Long, Double> = emptyMap(),
     val dailyIncome: List<Double> = emptyList(),
     val dailyExpense: List<Double> = emptyList(),

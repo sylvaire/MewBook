@@ -36,11 +36,11 @@ object HomeRecordSearchPolicy {
                     matchesText(record.note, token) ||
                         matchesText(categoryName, token) ||
                         matchesText(accountName, token) ||
-                        matchesAmount(record.amount, token)
+                    matchesAmount(record.amount, token)
                 }
             }
-            .sortedWith(compareByDescending<Record> { it.date }.thenByDescending { it.createdAt })
             .toList()
+            .let(HomeRecordOrderingPolicy::newestFirst)
     }
 
     private fun matchesText(source: String?, token: String): Boolean {

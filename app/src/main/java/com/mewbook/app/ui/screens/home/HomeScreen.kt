@@ -1,7 +1,17 @@
 package com.mewbook.app.ui.screens.home
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -11,44 +21,55 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.TrendingDown
+import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.automirrored.rounded.ManageSearch
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SelectableDates
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -61,7 +82,6 @@ import com.mewbook.app.domain.model.Record
 import com.mewbook.app.domain.model.Category
 import com.mewbook.app.domain.policy.HomeScreenLayoutPolicy
 import com.mewbook.app.ui.components.BudgetPeriodNavigator
-import com.mewbook.app.ui.components.BudgetPeriodTypeSelector
 import com.mewbook.app.ui.components.RecordItem
 import com.mewbook.app.ui.components.MewCompactTopAppBar
 import com.mewbook.app.ui.screens.add.AddEditRecordSheet
@@ -71,6 +91,9 @@ import com.mewbook.app.ui.theme.ClayDesign
 import com.mewbook.app.ui.theme.ExpenseRed
 import com.mewbook.app.ui.theme.IncomeGreen
 import com.mewbook.app.util.formatCurrency
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneOffset
 
 // ============================================
 // Warm Claymorphism Home Screen
@@ -87,6 +110,8 @@ fun HomeScreen(
     val isDarkTheme = isSystemInDarkTheme()
     var pendingDeleteRecordId by remember { mutableLongStateOf(0L) }
     var showDeleteConfirmDialog by remember { mutableStateOf(false) }
+    var showDatePickerDialog by remember { mutableStateOf(false) }
+    var showQuickFabMenu by remember { mutableStateOf(false) }
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     LaunchedEffect(uiState.showAddEditSheet) {
@@ -106,6 +131,10 @@ fun HomeScreen(
         )
     ) {
         viewModel.exitSearchMode()
+    }
+
+    BackHandler(enabled = showQuickFabMenu) {
+        showQuickFabMenu = false
     }
 
     val showScrollableHomeHeader = HomeScreenLayoutPolicy.showHomeHeaderAsScrollableContent(
@@ -155,32 +184,23 @@ fun HomeScreen(
                 )
             },
             floatingActionButton = {
-                // Claymorphism 浮动按钮 - 多层阴影
-                Box(
-                    modifier = Modifier
-                        .shadow(
-                            elevation = 8.dp,
-                            shape = CircleShape,
-                            spotColor = MaterialTheme.colorScheme.primary.copy(alpha = if (isDarkTheme) 0.18f else 0.4f)
-                        )
-                        .shadow(
-                            elevation = 4.dp,
-                            shape = CircleShape,
-                            spotColor = MaterialTheme.colorScheme.primary.copy(alpha = if (isDarkTheme) 0.10f else 0.25f)
-                        )
-                ) {
-                    FloatingActionButton(
-                        onClick = { viewModel.showAddSheet() },
-                        shape = CircleShape,
-                        containerColor = MaterialTheme.colorScheme.primary
-                    ) {
-                        Icon(
-                            Icons.Filled.Add,
-                            contentDescription = "添加记录",
-                            modifier = Modifier.size(28.dp)
-                        )
+                HomeFloatingAddButton(
+                    isMenuExpanded = showQuickFabMenu,
+                    isDarkTheme = isDarkTheme,
+                    onAddClick = {
+                        showQuickFabMenu = false
+                        viewModel.showAddSheet()
+                    },
+                    onLongPress = { showQuickFabMenu = true },
+                    onQuickExpenseClick = {
+                        showQuickFabMenu = false
+                        viewModel.showQuickAddSheet(RecordType.EXPENSE)
+                    },
+                    onQuickIncomeClick = {
+                        showQuickFabMenu = false
+                        viewModel.showQuickAddSheet(RecordType.INCOME)
                     }
-                }
+                )
             }
             ) { paddingValues ->
                 Column(
@@ -195,17 +215,12 @@ fun HomeScreen(
                             onQueryChange = { viewModel.updateSearchQuery(it) }
                         )
                     } else {
-                        BudgetPeriodTypeSelector(
-                            selectedPeriodType = uiState.selectedPeriodType,
-                            onSelect = { viewModel.selectPeriodType(it) },
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-                        )
-
                         BudgetPeriodNavigator(
                             periodLabel = uiState.periodLabel,
                             canGoNext = uiState.canGoNext,
                             onPrevious = { viewModel.previousPeriod() },
                             onNext = { viewModel.nextPeriod() },
+                            onPeriodLabelClick = { showDatePickerDialog = true },
                             modifier = Modifier.padding(horizontal = 12.dp)
                         )
                     }
@@ -220,12 +235,6 @@ fun HomeScreen(
                                 budgetRemaining = uiState.budgetRemaining
                             )
                         }
-
-                        HomeQuickEntryCard(
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                            onExpenseClick = { viewModel.showQuickAddSheet(RecordType.EXPENSE) },
-                            onIncomeClick = { viewModel.showQuickAddSheet(RecordType.INCOME) }
-                        )
                     }
 
                     when {
@@ -283,32 +292,35 @@ fun HomeScreen(
                                 modifier = Modifier.weight(1f),
                                 records = uiState.records,
                                 categories = uiState.categories,
-                                headerContent = if (showScrollableHomeHeader) {
+                                headerContent = if (showScrollableHomeHeader && uiState.showHomeOverviewCards) {
                                     {
-                                        if (uiState.showHomeOverviewCards) {
-                                            SummaryCard(
-                                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                                                totalIncome = uiState.totalIncome,
-                                                totalExpense = uiState.totalExpense,
-                                                totalBudget = uiState.totalBudget,
-                                                budgetRemaining = uiState.budgetRemaining
-                                            )
-                                        }
-                                        HomeQuickEntryCard(
+                                        SummaryCard(
                                             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                                            onExpenseClick = { viewModel.showQuickAddSheet(RecordType.EXPENSE) },
-                                            onIncomeClick = { viewModel.showQuickAddSheet(RecordType.INCOME) }
+                                            totalIncome = uiState.totalIncome,
+                                            totalExpense = uiState.totalExpense,
+                                            totalBudget = uiState.totalBudget,
+                                            budgetRemaining = uiState.budgetRemaining
                                         )
                                     }
                                 } else {
                                     null
                                 },
-                                onRecordClick = { record -> viewModel.showEditSheet(record) }
+                                onRecordClick = { record -> viewModel.showRecordDetail(record) }
                             )
                         }
                     }
                 }
             }
+
+        uiState.browsingRecord?.let { browsingRecord ->
+            RecordDetailDialog(
+                record = browsingRecord,
+                category = uiState.categories[browsingRecord.categoryId],
+                account = uiState.accounts.firstOrNull { account -> account.id == browsingRecord.accountId },
+                onDismiss = { viewModel.hideRecordDetail() },
+                onEdit = { record -> viewModel.editRecordFromDetail(record) }
+            )
+        }
 
         if (uiState.showAddEditSheet && uiState.addEntryMode == HomeAddEntryMode.QUICK && uiState.editingRecord == null) {
             QuickAddRecordSheet(
@@ -373,6 +385,205 @@ fun HomeScreen(
                         Text("取消")
                     }
                 }
+            )
+        }
+
+        if (showDatePickerDialog) {
+            HomeDatePickerDialog(
+                initialDate = uiState.anchorDate,
+                onDismiss = { showDatePickerDialog = false },
+                onDateSelected = { selectedDate ->
+                    viewModel.selectAnchorDate(selectedDate)
+                    showDatePickerDialog = false
+                }
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun HomeDatePickerDialog(
+    initialDate: LocalDate,
+    onDismiss: () -> Unit,
+    onDateSelected: (LocalDate) -> Unit
+) {
+    val today = remember { LocalDate.now() }
+    val initialDateMillis = initialDate.toDatePickerMillis()
+    val datePickerState = rememberDatePickerState(
+        initialSelectedDateMillis = initialDateMillis,
+        initialDisplayedMonthMillis = initialDateMillis,
+        yearRange = 1900..today.year,
+        selectableDates = object : SelectableDates {
+            override fun isSelectableDate(utcTimeMillis: Long): Boolean {
+                return utcTimeMillis.toDatePickerLocalDate() <= today
+            }
+
+            override fun isSelectableYear(year: Int): Boolean {
+                return year <= today.year
+            }
+        }
+    )
+
+    DatePickerDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            TextButton(
+                enabled = datePickerState.selectedDateMillis != null,
+                onClick = {
+                    datePickerState.selectedDateMillis
+                        ?.toDatePickerLocalDate()
+                        ?.let(onDateSelected)
+                }
+            ) {
+                Text("确定")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("取消")
+            }
+        }
+    ) {
+        DatePicker(
+            state = datePickerState,
+            modifier = Modifier.verticalScroll(rememberScrollState())
+        )
+    }
+}
+
+private fun LocalDate.toDatePickerMillis(): Long {
+    return atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
+}
+
+private fun Long.toDatePickerLocalDate(): LocalDate {
+    return Instant.ofEpochMilli(this).atZone(ZoneOffset.UTC).toLocalDate()
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun HomeFloatingAddButton(
+    isMenuExpanded: Boolean,
+    isDarkTheme: Boolean,
+    onAddClick: () -> Unit,
+    onLongPress: () -> Unit,
+    onQuickExpenseClick: () -> Unit,
+    onQuickIncomeClick: () -> Unit
+) {
+    val haptics = LocalHapticFeedback.current
+    val iconRotation by animateFloatAsState(
+        targetValue = if (isMenuExpanded) 45f else 0f,
+        label = "homeFabIconRotation"
+    )
+
+    Column(
+        horizontalAlignment = Alignment.End,
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        AnimatedVisibility(
+            visible = isMenuExpanded,
+            enter = fadeIn() + slideInVertically(initialOffsetY = { it / 3 }),
+            exit = fadeOut() + slideOutVertically(targetOffsetY = { it / 3 })
+        ) {
+            Column(
+                modifier = Modifier.padding(end = 2.dp),
+                horizontalAlignment = Alignment.End,
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                QuickFabAction(
+                    label = "快速收入",
+                    icon = Icons.AutoMirrored.Filled.TrendingUp,
+                    tint = IncomeGreen,
+                    onClick = onQuickIncomeClick
+                )
+                QuickFabAction(
+                    label = "快速支出",
+                    icon = Icons.AutoMirrored.Filled.TrendingDown,
+                    tint = ExpenseRed,
+                    onClick = onQuickExpenseClick
+                )
+            }
+        }
+
+        Surface(
+            modifier = Modifier
+                .shadow(
+                    elevation = 8.dp,
+                    shape = CircleShape,
+                    spotColor = MaterialTheme.colorScheme.primary.copy(alpha = if (isDarkTheme) 0.18f else 0.4f)
+                )
+                .shadow(
+                    elevation = 4.dp,
+                    shape = CircleShape,
+                    spotColor = MaterialTheme.colorScheme.primary.copy(alpha = if (isDarkTheme) 0.10f else 0.25f)
+                )
+                .size(56.dp)
+                .combinedClickable(
+                    role = Role.Button,
+                    onClickLabel = "添加记录",
+                    onLongClickLabel = "显示快速记账",
+                    onLongClick = {
+                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                        onLongPress()
+                    },
+                    onClick = onAddClick
+                ),
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.primary,
+            contentColor = MaterialTheme.colorScheme.onPrimary,
+            tonalElevation = 0.dp
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    Icons.Filled.Add,
+                    contentDescription = "添加记录，长按显示快速记账",
+                    modifier = Modifier
+                        .size(28.dp)
+                        .graphicsLayer {
+                            rotationZ = iconRotation
+                        }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun QuickFabAction(
+    label: String,
+    icon: ImageVector,
+    tint: Color,
+    onClick: () -> Unit
+) {
+    Surface(
+        modifier = Modifier
+            .shadow(
+                elevation = 6.dp,
+                shape = RoundedCornerShape(24.dp),
+                spotColor = tint.copy(alpha = 0.18f)
+            )
+            .heightIn(min = 48.dp)
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(24.dp),
+        color = MaterialTheme.colorScheme.surface,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        tonalElevation = 3.dp
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 11.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.SemiBold
+            )
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = tint,
+                modifier = Modifier.size(20.dp)
             )
         }
     }
@@ -530,40 +741,6 @@ private fun HomeRecordList(
                 onClick = { onRecordClick(record) },
                 modifier = Modifier.padding(horizontal = 16.dp)
             )
-        }
-    }
-}
-
-@Composable
-private fun HomeQuickEntryCard(
-    modifier: Modifier = Modifier,
-    onExpenseClick: () -> Unit,
-    onIncomeClick: () -> Unit
-) {
-    Card(
-        modifier = modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        )
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Button(
-                    onClick = onExpenseClick,
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Text("快速支出")
-                }
-                OutlinedButton(
-                    onClick = onIncomeClick,
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Text("快速收入")
-                }
-            }
         }
     }
 }

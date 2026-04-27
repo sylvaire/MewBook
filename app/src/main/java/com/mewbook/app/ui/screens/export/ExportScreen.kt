@@ -22,6 +22,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Code
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.TableChart
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -48,12 +49,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.activity.result.contract.ActivityResultContracts
+import com.mewbook.app.data.backup.BackupCategoryImportAction
 import com.mewbook.app.ui.components.MewCompactTopAppBar
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ExportScreen(
     viewModel: ExportViewModel = hiltViewModel(),
+    onNavigateToSmartImport: () -> Unit,
     onNavigateBack: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -163,6 +166,24 @@ fun ExportScreen(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                    if (preview.categoryMappings.isNotEmpty()) {
+                        Text(
+                            text = "分类映射：",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        preview.categoryMappings.take(8).forEach { mapping ->
+                            val actionText = when (mapping.action) {
+                                BackupCategoryImportAction.REUSE_EXISTING -> "迁移到"
+                                BackupCategoryImportAction.CREATE_NEW -> "新建"
+                            }
+                            Text(
+                                text = "${mapping.sourceName} -> $actionText ${mapping.targetName}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
                 }
             },
             confirmButton = {
@@ -290,9 +311,26 @@ fun ExportScreen(
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     Text(
-                        text = "支持导入常见 CSV 导出列，例如日期、类型、分类、子分类、金额、备注和账户。",
+                        text = "支持常见 CSV 导入；如果文件字段比较混乱，也可以用智能导入把文本转换成当前格式。",
                         style = MaterialTheme.typography.bodyMedium
                     )
+                    Button(
+                        onClick = onNavigateToSmartImport,
+                        enabled = !uiState.isBackingUpLocally &&
+                            !uiState.isRestoringLocally &&
+                            !uiState.isPreviewingRestore &&
+                            !uiState.isPreviewingRecordImport &&
+                            !uiState.isImportingRecords,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.AutoAwesome,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("智能导入")
+                    }
                     OutlinedButton(
                         onClick = {
                             Log.d(TAG, "launch import picker via GetContent")
@@ -302,7 +340,8 @@ fun ExportScreen(
                             !uiState.isRestoringLocally &&
                             !uiState.isPreviewingRestore &&
                             !uiState.isPreviewingRecordImport &&
-                            !uiState.isImportingRecords
+                            !uiState.isImportingRecords,
+                        modifier = Modifier.fillMaxWidth()
                     ) {
                         if (uiState.isPreviewingRecordImport || uiState.isImportingRecords) {
                             ButtonLoadingIndicator(color = MaterialTheme.colorScheme.primary)

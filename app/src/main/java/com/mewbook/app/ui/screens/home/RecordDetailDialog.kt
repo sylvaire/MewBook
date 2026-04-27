@@ -30,11 +30,6 @@ import com.mewbook.app.ui.components.CategoryIconBadge
 import com.mewbook.app.ui.theme.ExpenseRed
 import com.mewbook.app.ui.theme.IncomeGreen
 import com.mewbook.app.util.formatCurrency
-import java.time.format.DateTimeFormatter
-import java.util.Locale
-
-private val RecordDetailDateFormatter: DateTimeFormatter =
-    DateTimeFormatter.ofPattern("yyyy年M月d日 EEEE", Locale.SIMPLIFIED_CHINESE)
 
 @Composable
 fun RecordDetailDialog(
@@ -131,9 +126,12 @@ fun RecordDetailDialog(
                         modifier = Modifier.weight(1f)
                     )
                 }
-                RecordDetailRow(label = "日期") {
+                RecordDetailRow(label = "日期时间") {
                     Text(
-                        text = record.date.format(RecordDetailDateFormatter),
+                        text = RecordDetailTimeFormatter.format(
+                            date = record.date,
+                            timeSource = record.createdAt
+                        ),
                         style = MaterialTheme.typography.bodyLarge,
                         modifier = Modifier.weight(1f)
                     )

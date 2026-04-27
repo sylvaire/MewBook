@@ -107,10 +107,26 @@ class BackupRepository @Inject constructor(
         }
     }
 
+    suspend fun previewImportRecordsFromEnvelope(incomingEnvelope: BackupEnvelope): Result<BackupRecordImportPreview> = withContext(Dispatchers.IO) {
+        runCatching {
+            val currentEnvelope = buildCurrentEnvelope()
+            BackupImportPolicy.previewRecordImport(currentEnvelope, incomingEnvelope)
+        }
+    }
+
     suspend fun importRecordsFromUri(uri: Uri): Result<Boolean> = withContext(Dispatchers.IO) {
         runCatching {
             val currentEnvelope = buildCurrentEnvelope()
             val incomingEnvelope = BackupMigration.parseToCurrentEnvelope(readText(uri))
+            val mergedEnvelope = BackupImportPolicy.mergeRecordImport(currentEnvelope, incomingEnvelope)
+            restoreEnvelope(mergedEnvelope)
+            true
+        }
+    }
+
+    suspend fun importRecordsFromEnvelope(incomingEnvelope: BackupEnvelope): Result<Boolean> = withContext(Dispatchers.IO) {
+        runCatching {
+            val currentEnvelope = buildCurrentEnvelope()
             val mergedEnvelope = BackupImportPolicy.mergeRecordImport(currentEnvelope, incomingEnvelope)
             restoreEnvelope(mergedEnvelope)
             true

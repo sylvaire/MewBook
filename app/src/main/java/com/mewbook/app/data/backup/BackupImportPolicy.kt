@@ -1,6 +1,9 @@
 package com.mewbook.app.data.backup
 
+import com.mewbook.app.domain.policy.CategorySemanticCandidate
+import com.mewbook.app.domain.policy.CategorySemanticPolicy
 import java.math.BigDecimal
+import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.OffsetDateTime
@@ -31,6 +34,8 @@ object BackupImportPolicy {
         val noteIndex = findHeaderIndex(headerIndex, NOTE_HEADER_ALIASES)
         val accountIndex = findHeaderIndex(headerIndex, ACCOUNT_HEADER_ALIASES)
         val ledgerIndex = findHeaderIndex(headerIndex, LEDGER_HEADER_ALIASES)
+        val syncIdIndex = findHeaderIndex(headerIndex, SYNC_ID_HEADER_ALIASES)
+        val timestampIndex = findHeaderIndex(headerIndex, TIMESTAMP_HEADER_ALIASES)
 
         val exportedAt = LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)
         val ledgers = mutableListOf<BackupLedger>()
@@ -68,6 +73,7 @@ object BackupImportPolicy {
                 ?.trim()
                 ?.takeIf { it.isNotEmpty() }
                 ?.let { ensureCategory(type, null, it) }
+            val semanticLabel = CategorySemanticPolicy.semanticLabelFor(name, null)
             val key = CategoryPathKey(
                 type = type,
                 parentId = parentId,
@@ -78,12 +84,13 @@ object BackupImportPolicy {
                 categories += BackupCategory(
                     id = id,
                     name = name.trim(),
-                    icon = defaultCategoryIcon(type, parentId != null),
+                    icon = defaultCategoryIcon(type, name, semanticLabel, parentId != null),
                     color = defaultCategoryColor(type),
                     type = type,
                     isDefault = false,
                     sortOrder = categories.count { it.type == type && it.parentId == parentId },
-                    parentId = parentId
+                    parentId = parentId,
+                    semanticLabel = semanticLabel
                 )
                 id
             }
@@ -118,9 +125,10 @@ object BackupImportPolicy {
             }
 
             val rawDate = row.valueAt(dateIndex)
+            val rawTimestamp = row.valueAt(timestampIndex)
             val rawCategory = row.valueAt(categoryIndex)
             val categoryPath = resolveCategoryPath(rawCategory, row.valueAt(subCategoryIndex))
-            if (rawDate.isBlank() || categoryPath.name.isBlank()) {
+            if ((rawDate.isBlank() && rawTimestamp.isBlank()) || categoryPath.name.isBlank()) {
                 return@forEachIndexed
             }
 
@@ -143,9 +151,10 @@ object BackupImportPolicy {
                 name = categoryPath.name
             )
             val accountId = ensureAccount(ledgerId, row.valueAt(accountIndex))
-            val parsedDate = parseDate(rawDate)
+            val parsedDate = parseDateOrTimestamp(rawDate, rawTimestamp)
             val absoluteAmount = parsedAmount.signedAmount.abs().toDouble()
-            val createdAt = fallbackTimestamp + index
+            val createdAt = parseTimestampSeconds(rawTimestamp) ?: fallbackTimestamp + index
+            val syncId = row.valueAt(syncIdIndex).trim().takeIf { it.isNotBlank() } ?: UUID.randomUUID().toString()
 
             records += BackupRecord(
                 id = (index + 1).toLong(),
@@ -156,7 +165,7 @@ object BackupImportPolicy {
                 date = parsedDate.toEpochDay(),
                 createdAt = createdAt,
                 updatedAt = createdAt,
-                syncId = UUID.randomUUID().toString(),
+                syncId = syncId,
                 ledgerId = ledgerId,
                 accountId = accountId
             )
@@ -211,7 +220,6 @@ object BackupImportPolicy {
         val categoryIdMap = mutableMapOf<Long, Long>()
         val accountIdMap = mutableMapOf<Long, Long>()
         val ledgerKeyMap = mergedLedgers.associateBy { normalizeName(it.name) }.toMutableMap()
-        val categoryKeyMap = mergedCategories.associateBy { categoryKey(it) }.toMutableMap()
         val accountKeyMap = mergedAccounts.associateBy { AccountKey(it.ledgerId, normalizeName(it.name)) }.toMutableMap()
         val accountIndexById = mergedAccounts.withIndex().associate { it.value.id to it.index }.toMutableMap()
         val recordFingerprints = mergedRecords.mapTo(mutableSetOf()) { recordFingerprint(it) }
@@ -231,27 +239,64 @@ object BackupImportPolicy {
         }
 
         var categoriesToCreate = 0
+        val categoryMappings = mutableListOf<BackupCategoryImportMapping>()
+        val incomingCategoryById = incoming.payload.categories.associateBy { it.id }
         incoming.payload.categories
             .sortedWith(compareBy<BackupCategory> { it.parentId != null }.thenBy { it.sortOrder }.thenBy { it.id })
             .forEach { incomingCategory ->
                 val targetParentId = incomingCategory.parentId?.let(categoryIdMap::get)
-                val key = CategoryPathKey(
-                    type = incomingCategory.type,
-                    parentId = targetParentId,
-                    normalizedName = normalizeName(incomingCategory.name)
+                val sourceParentName = incomingCategory.parentId?.let(incomingCategoryById::get)?.name
+                val semanticMatch = CategorySemanticPolicy.resolveExistingCategory(
+                    candidates = mergedCategories.map {
+                        CategorySemanticCandidate(
+                            id = it.id,
+                            name = it.name,
+                            type = it.type,
+                            parentId = it.parentId,
+                            semanticLabel = it.semanticLabel
+                        )
+                    },
+                    incomingName = incomingCategory.name,
+                    incomingType = incomingCategory.type,
+                    incomingSemanticLabel = incomingCategory.semanticLabel,
+                    targetParentId = targetParentId
                 )
-                val targetCategory = categoryKeyMap[key] ?: incomingCategory.copy(
-                    id = nextCategoryId++,
-                    parentId = targetParentId,
-                    sortOrder = mergedCategories.count {
-                        it.type == incomingCategory.type && it.parentId == targetParentId
+                val targetCategory = semanticMatch
+                    ?.let { match -> mergedCategories.firstOrNull { it.id == match.categoryId } }
+                    ?: incomingCategory.copy(
+                        id = nextCategoryId++,
+                        parentId = targetParentId,
+                        icon = CategorySemanticPolicy.chooseIcon(
+                            type = incomingCategory.type,
+                            categoryName = incomingCategory.name,
+                            semanticLabel = incomingCategory.semanticLabel,
+                            isChild = targetParentId != null,
+                            proposedIcon = incomingCategory.icon
+                        ),
+                        sortOrder = mergedCategories.count {
+                            it.type == incomingCategory.type && it.parentId == targetParentId
+                        }
+                    ).also { created ->
+                        mergedCategories += created
+                        categoriesToCreate += 1
                     }
-                ).also { created ->
-                    mergedCategories += created
-                    categoryKeyMap[key] = created
-                    categoriesToCreate += 1
-                }
                 categoryIdMap[incomingCategory.id] = targetCategory.id
+                categoryMappings += BackupCategoryImportMapping(
+                    sourceName = incomingCategory.name,
+                    sourceParentName = sourceParentName,
+                    targetName = targetCategory.name,
+                    targetParentName = targetCategory.parentId?.let { parentId ->
+                        mergedCategories.firstOrNull { it.id == parentId }?.name
+                    },
+                    type = incomingCategory.type,
+                    action = if (semanticMatch != null) {
+                        BackupCategoryImportAction.REUSE_EXISTING
+                    } else {
+                        BackupCategoryImportAction.CREATE_NEW
+                    },
+                    icon = targetCategory.icon,
+                    reason = semanticMatch?.reason ?: "新建分类"
+                )
             }
 
         var accountsToCreate = 0
@@ -321,7 +366,8 @@ object BackupImportPolicy {
                 recordsToImport = recordsToImport,
                 categoriesToCreate = categoriesToCreate,
                 accountsToCreate = accountsToCreate,
-                ledgersToCreate = ledgersToCreate
+                ledgersToCreate = ledgersToCreate,
+                categoryMappings = categoryMappings
             ),
             mergedEnvelope = current.copy(
                 payload = current.payload.copy(
@@ -348,14 +394,6 @@ object BackupImportPolicy {
 
     private fun normalizeAmount(value: Double): String {
         return BigDecimal.valueOf(value).stripTrailingZeros().toPlainString()
-    }
-
-    private fun categoryKey(category: BackupCategory): CategoryPathKey {
-        return CategoryPathKey(
-            type = category.type,
-            parentId = category.parentId,
-            normalizedName = normalizeName(category.name)
-        )
     }
 
     private fun parseCsvRows(csv: String): List<List<String>> {
@@ -490,6 +528,32 @@ object BackupImportPolicy {
         runCatching { return OffsetDateTime.parse(trimmed).toLocalDate() }
         return runCatching { LocalDate.parse(trimmed) }
             .getOrElse { throw IllegalArgumentException("无法解析日期: $rawValue") }
+    }
+
+    private fun parseDateOrTimestamp(rawDate: String, rawTimestamp: String): LocalDate {
+        if (rawDate.isNotBlank()) {
+            return parseDate(rawDate)
+        }
+        parseDateFromTimestamp(rawTimestamp)?.let { return it }
+        throw IllegalArgumentException("无法解析日期: $rawDate")
+    }
+
+    private fun parseTimestampSeconds(rawValue: String): Long? {
+        val normalized = rawValue.trim()
+        if (!NUMERIC_DATE_PATTERN.matches(normalized)) {
+            return null
+        }
+        val value = normalized.toLongOrNull() ?: return null
+        return when {
+            normalized.length >= 12 -> value / 1000L
+            normalized.length in 9..11 -> value
+            else -> null
+        }
+    }
+
+    private fun parseDateFromTimestamp(rawValue: String): LocalDate? {
+        return parseTimestampSeconds(rawValue)
+            ?.let { Instant.ofEpochSecond(it).atZone(ZoneId.systemDefault()).toLocalDate() }
     }
 
     private fun parseType(
@@ -639,12 +703,19 @@ object BackupImportPolicy {
         }
     }
 
-    private fun defaultCategoryIcon(type: String, isChild: Boolean): String {
-        return when {
-            type == "INCOME" -> "payments"
-            isChild -> "sell"
-            else -> "category"
-        }
+    private fun defaultCategoryIcon(
+        type: String,
+        categoryName: String,
+        semanticLabel: String?,
+        isChild: Boolean
+    ): String {
+        return CategorySemanticPolicy.chooseIcon(
+            type = type,
+            categoryName = categoryName,
+            semanticLabel = semanticLabel,
+            isChild = isChild,
+            proposedIcon = null
+        )
     }
 
     private fun defaultCategoryColor(type: String): Long {
@@ -733,7 +804,10 @@ object BackupImportPolicy {
         "交易时间",
         "交易日期",
         "发生时间",
-        "发生日期"
+        "发生日期",
+        "时间戳",
+        "时间戳毫秒",
+        "timestampms"
     )
     private val TYPE_HEADER_ALIASES = setOf("类型", "type", "收支类型", "收入支出")
     private val CATEGORY_HEADER_ALIASES = setOf(
@@ -769,6 +843,16 @@ object BackupImportPolicy {
         "钱包"
     )
     private val LEDGER_HEADER_ALIASES = setOf("账本", "ledger", "book", "账簿", "账本名称")
+    private val SYNC_ID_HEADER_ALIASES = setOf("uuid", "syncid", "同步id", "记录id", "id", "流水号")
+    private val TIMESTAMP_HEADER_ALIASES = setOf(
+        "时间戳",
+        "时间戳毫秒",
+        "timestamp",
+        "timestampms",
+        "createdat",
+        "创建时间",
+        "创建时间戳"
+    )
 
     private val EXPENSE_TYPE_ALIASES = setOf("支出", "expense", "out", "pay", "消费", "付款", "扣款", "转出")
     private val INCOME_TYPE_ALIASES = setOf("收入", "income", "in", "到账", "入账", "收款", "转入", "退款")

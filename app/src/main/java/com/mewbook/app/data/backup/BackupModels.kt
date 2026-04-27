@@ -46,7 +46,8 @@ data class BackupCategory(
     val type: String,
     val isDefault: Boolean,
     val sortOrder: Int,
-    val parentId: Long? = null
+    val parentId: Long? = null,
+    val semanticLabel: String? = null
 )
 
 @Serializable
@@ -156,7 +157,24 @@ data class BackupRecordImportPreview(
     val recordsToImport: Int,
     val categoriesToCreate: Int,
     val accountsToCreate: Int,
-    val ledgersToCreate: Int
+    val ledgersToCreate: Int,
+    val categoryMappings: List<BackupCategoryImportMapping> = emptyList()
 ) {
     val hasExistingData: Boolean = current.hasExistingData
 }
+
+enum class BackupCategoryImportAction {
+    REUSE_EXISTING,
+    CREATE_NEW
+}
+
+data class BackupCategoryImportMapping(
+    val sourceName: String,
+    val sourceParentName: String?,
+    val targetName: String,
+    val targetParentName: String?,
+    val type: String,
+    val action: BackupCategoryImportAction,
+    val icon: String,
+    val reason: String
+)

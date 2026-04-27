@@ -61,6 +61,7 @@ import com.mewbook.app.ui.screens.home.HomeScreen
 import com.mewbook.app.ui.screens.ledger.LedgerManagementScreen
 import com.mewbook.app.ui.screens.recurring.RecurringTemplatesScreen
 import com.mewbook.app.ui.screens.settings.SettingsScreen
+import com.mewbook.app.ui.screens.smartimport.SmartImportScreen
 import com.mewbook.app.ui.screens.statistics.CategoryExpenseDetailScreen
 import com.mewbook.app.ui.screens.statistics.StatisticsScreen
 import com.mewbook.app.ui.update.AppUpdateUiState
@@ -332,6 +333,16 @@ fun MewBookNavHost(
             }
             composable(Screen.Export.route) {
                 ExportScreen(
+                    onNavigateToSmartImport = {
+                        navController.navigate(Screen.SmartImport.route)
+                    },
+                    onNavigateBack = {
+                        navController.popBackStack()
+                    }
+                )
+            }
+            composable(Screen.SmartImport.route) {
+                SmartImportScreen(
                     onNavigateBack = {
                         navController.popBackStack()
                     }

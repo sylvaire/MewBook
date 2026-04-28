@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.Category
 import androidx.compose.material.icons.filled.CloudSync
 import androidx.compose.material.icons.filled.DeleteForever
@@ -19,7 +20,6 @@ import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.CalendarMonth
-import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.AlertDialog
@@ -184,7 +184,7 @@ fun SettingsScreen(
             )
 
             SettingsItem(
-                icon = Icons.Filled.MenuBook,
+                icon = Icons.AutoMirrored.Filled.MenuBook,
                 title = "账本管理",
                 subtitle = "长按删除，自定义排序",
                 onClick = onNavigateToLedgerManagement

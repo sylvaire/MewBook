@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -300,7 +301,7 @@ fun LedgerManagementScreen(
     uiState.pendingDelete?.let { ledger ->
         AlertDialog(
             onDismissRequest = { viewModel.dismissDeleteDialog() },
-            title = { Text("删除分支") },
+            title = { Text("删除账本") },
             text = { Text("确定删除「${ledger.name}」吗？长按删除后无法恢复。") },
             confirmButton = {
                 TextButton(onClick = { viewModel.deleteLedger() }) {
@@ -318,7 +319,7 @@ fun LedgerManagementScreen(
     Scaffold(
         topBar = {
             MewCompactTopAppBar(
-                title = "分支管理",
+                title = "账本管理",
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
@@ -331,7 +332,7 @@ fun LedgerManagementScreen(
                 onClick = { viewModel.showAddDialog() },
                 containerColor = MaterialTheme.colorScheme.primary
             ) {
-                Icon(Icons.Filled.Add, contentDescription = "添加分支")
+                Icon(Icons.Filled.Add, contentDescription = "添加账本")
             }
         }
     ) { paddingValues ->
@@ -342,7 +343,7 @@ fun LedgerManagementScreen(
                 .padding(horizontal = 16.dp)
         ) {
             Text(
-                text = "点击分支进入编辑，长按删除，使用右侧箭头自定义排序",
+                text = "点击账本进入编辑，长按删除，使用右侧箭头自定义排序",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(vertical = 12.dp)
@@ -350,6 +351,7 @@ fun LedgerManagementScreen(
 
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(bottom = 88.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 itemsIndexed(displayLedgers, key = { _, ledger -> ledger.id }) { index, ledger ->
@@ -382,7 +384,7 @@ private fun LedgerSettingsDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("编辑分支") },
+        title = { Text("编辑账本") },
         text = {
             Column(
                 modifier = Modifier
@@ -395,7 +397,7 @@ private fun LedgerSettingsDialog(
                     fontWeight = FontWeight.SemiBold
                 )
                 Text(
-                    text = if (ledger.isDefault) "当前默认分支" else ledger.type.displayName(),
+                    text = if (ledger.isDefault) "当前默认账本" else ledger.type.displayName(),
                     style = MaterialTheme.typography.bodySmall,
                     color = if (ledger.isDefault) {
                         MaterialTheme.colorScheme.primary
@@ -411,7 +413,7 @@ private fun LedgerSettingsDialog(
                     enabled = !ledger.isDefault && !isSaving,
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text(if (ledger.isDefault) "当前默认分支" else "设为默认分支")
+                    Text(if (ledger.isDefault) "当前默认账本" else "设为默认账本")
                 }
 
                 Spacer(modifier = Modifier.height(20.dp))
@@ -421,7 +423,7 @@ private fun LedgerSettingsDialog(
                     style = MaterialTheme.typography.titleSmall
                 )
                 Text(
-                    text = "仅在当前分支内生效",
+                    text = "仅在当前账本内生效",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -444,7 +446,7 @@ private fun LedgerSettingsDialog(
 
                     accounts.isEmpty() -> {
                         Text(
-                            text = "这个分支还没有账户，添加账户后可在这里设置默认账户。",
+                            text = "这个账本还没有账户，添加账户后可在这里设置默认账户。",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -577,7 +579,7 @@ private fun LedgerItem(
                     fontWeight = FontWeight.SemiBold
                 )
                 Text(
-                    text = if (ledger.isDefault) "默认分支" else ledger.type.displayName(),
+                    text = if (ledger.isDefault) "默认账本" else ledger.type.displayName(),
                     style = MaterialTheme.typography.labelSmall,
                     color = if (ledger.isDefault) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -592,7 +594,7 @@ private fun LedgerItem(
                     if (ledger.isDefault) {
                         Icon(
                             imageVector = Icons.Filled.CheckCircle,
-                            contentDescription = "默认分支",
+                            contentDescription = "默认账本",
                             tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(18.dp)
                         )
@@ -661,13 +663,13 @@ private fun AddLedgerDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("添加分支") },
+        title = { Text("添加账本") },
         text = {
             Column {
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
-                    label = { Text("分支名称") },
+                    label = { Text("账本名称") },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text)
@@ -725,9 +727,9 @@ private fun LedgerType.displayName(): String {
 
 private fun LedgerType.defaultName(): String {
     return when (this) {
-        LedgerType.PERSONAL -> "个人分支"
-        LedgerType.FAMILY -> "家庭分支"
-        LedgerType.AA -> "AA分支"
+        LedgerType.PERSONAL -> "个人账本"
+        LedgerType.FAMILY -> "家庭账本"
+        LedgerType.AA -> "AA账本"
     }
 }
 

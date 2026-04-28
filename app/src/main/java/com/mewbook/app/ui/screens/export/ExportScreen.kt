@@ -451,7 +451,7 @@ fun ExportScreen(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Text(
-                text = "• 导入其他记账 App：读取常见 CSV 导出列并先预览，再按去重策略合并到当前账本\n• 本地备份/还原：完整应用数据（记录、分类、账户、预算、周期模板、分支、DAV配置、主题）\n• 分享导出 CSV：便于表格查看和迁移到其他工具\n• 分享导出 JSON：统一版本化备份快照，适合跨设备恢复",
+                text = "• 导入其他记账 App：读取常见 CSV 导出列并先预览，再按去重策略合并到当前账本\n• 本地备份/还原：完整应用数据（记录、分类、账户、预算、周期模板、账本、DAV配置、主题）\n• 分享导出 CSV：便于表格查看和迁移到其他工具\n• 分享导出 JSON：统一版本化备份快照，适合跨设备恢复",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

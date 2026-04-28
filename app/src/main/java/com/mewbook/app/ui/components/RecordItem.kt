@@ -93,7 +93,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.foundation.isSystemInDarkTheme
+import com.mewbook.app.ui.theme.LocalIsDarkTheme
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -125,7 +125,7 @@ fun RecordItem(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val isDarkTheme = isSystemInDarkTheme()
+    val isDarkTheme = LocalIsDarkTheme.current
     val cardShadowColor = MaterialTheme.colorScheme.primary.copy(
         alpha = if (isDarkTheme) 0.08f else 0.15f
     )

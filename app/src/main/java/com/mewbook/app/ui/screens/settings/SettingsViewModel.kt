@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.mewbook.app.data.preferences.HomePreferencesRepository
 import com.mewbook.app.data.preferences.AppThemeMode
 import com.mewbook.app.data.preferences.ThemePreferencesRepository
+import com.mewbook.app.data.repository.BackupRepository
 import com.mewbook.app.domain.model.BudgetPeriodType
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
@@ -16,7 +17,8 @@ import javax.inject.Inject
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     private val themePreferencesRepository: ThemePreferencesRepository,
-    private val homePreferencesRepository: HomePreferencesRepository
+    private val homePreferencesRepository: HomePreferencesRepository,
+    private val backupRepository: BackupRepository
 ) : ViewModel() {
 
     val themeMode: StateFlow<AppThemeMode> = themePreferencesRepository.themeMode.stateIn(
@@ -52,6 +54,12 @@ class SettingsViewModel @Inject constructor(
     fun setSelectedHomePeriod(periodType: BudgetPeriodType) {
         viewModelScope.launch {
             homePreferencesRepository.setSelectedHomePeriod(periodType)
+        }
+    }
+
+    fun clearAllData() {
+        viewModelScope.launch {
+            backupRepository.clearAllData()
         }
     }
 }

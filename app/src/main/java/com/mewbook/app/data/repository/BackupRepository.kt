@@ -171,6 +171,18 @@ class BackupRepository @Inject constructor(
         )
     }
 
+    suspend fun clearAllData() = withContext(Dispatchers.IO) {
+        database.withTransaction {
+            recordDao.deleteAllRecords()
+            budgetDao.deleteAllBudgets()
+            recurringTemplateDao.deleteAllTemplates()
+            accountDao.deleteAllAccounts()
+            categoryDao.deleteAllCategories()
+            ledgerDao.deleteAllLedgers()
+            davConfigDao.deleteDavConfig()
+        }
+    }
+
     private suspend fun restoreEnvelope(envelope: BackupEnvelope) {
         database.withTransaction {
             recordDao.deleteAllRecords()

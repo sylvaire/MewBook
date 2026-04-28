@@ -4,11 +4,13 @@ import android.app.Activity
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
@@ -22,6 +24,8 @@ import androidx.core.view.WindowCompat
 // Warm Claymorphism Theme
 // 温暖橙色系 + 黏土风圆润设计
 // ============================================
+
+val LocalIsDarkTheme = staticCompositionLocalOf { false }
 
 private val WarmLightColorScheme = lightColorScheme(
     primary = Primary,
@@ -122,7 +126,11 @@ fun MewBookTheme(
     MaterialTheme(
         colorScheme = colorScheme,
         typography = Typography,
-        content = content
+        content = {
+            CompositionLocalProvider(LocalIsDarkTheme provides darkTheme) {
+                content()
+            }
+        }
     )
 }
 

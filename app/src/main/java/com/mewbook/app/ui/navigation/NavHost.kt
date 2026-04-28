@@ -35,7 +35,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.foundation.isSystemInDarkTheme
+import com.mewbook.app.ui.theme.LocalIsDarkTheme
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
@@ -90,7 +90,7 @@ fun MewBookNavHost(
     updateUiState: AppUpdateUiState,
     onCheckForUpdates: () -> Unit
 ) {
-    val isDarkTheme = isSystemInDarkTheme()
+    val isDarkTheme = LocalIsDarkTheme.current
     val navController = rememberNavController()
     val topLevelRoutes = remember {
         setOf(

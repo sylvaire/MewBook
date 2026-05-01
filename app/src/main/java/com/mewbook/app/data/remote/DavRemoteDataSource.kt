@@ -27,6 +27,12 @@ interface DavRemoteDataSource {
         content: String
     ): Result<Boolean>
 
+    suspend fun deleteFile(
+        serverUrl: String,
+        username: String,
+        password: String
+    ): Result<Boolean>
+
     suspend fun mkcol(
         serverUrl: String,
         username: String,
@@ -34,6 +40,8 @@ interface DavRemoteDataSource {
     ): Result<Boolean>
 
     fun generateBackupFileName(): String
+
+    fun generateAutoBackupFileName(): String
 
     fun buildDirectoryUrl(serverUrl: String, remotePath: String): String
 

@@ -2,6 +2,7 @@ package com.mewbook.app.data.repository
 
 import android.content.Context
 import android.net.Uri
+import android.util.Log
 import com.mewbook.app.BuildConfig
 import com.mewbook.app.data.backup.BackupAccount
 import com.mewbook.app.data.backup.BackupConflictSummary
@@ -116,6 +117,7 @@ class BackupRepository @Inject constructor(
 
     suspend fun importRecordsFromUri(uri: Uri): Result<Boolean> = withContext(Dispatchers.IO) {
         runCatching {
+            createSafetyBackup()
             val currentEnvelope = buildCurrentEnvelope()
             val incomingEnvelope = BackupMigration.parseToCurrentEnvelope(readText(uri))
             val mergedEnvelope = BackupImportPolicy.mergeRecordImport(currentEnvelope, incomingEnvelope)
@@ -126,6 +128,7 @@ class BackupRepository @Inject constructor(
 
     suspend fun importRecordsFromEnvelope(incomingEnvelope: BackupEnvelope): Result<Boolean> = withContext(Dispatchers.IO) {
         runCatching {
+            createSafetyBackup()
             val currentEnvelope = buildCurrentEnvelope()
             val mergedEnvelope = BackupImportPolicy.mergeRecordImport(currentEnvelope, incomingEnvelope)
             restoreEnvelope(mergedEnvelope)
@@ -135,9 +138,41 @@ class BackupRepository @Inject constructor(
 
     override suspend fun importFromJsonString(jsonString: String): Result<Boolean> = withContext(Dispatchers.IO) {
         runCatching {
+            createSafetyBackup()
             val envelope = BackupMigration.parseToCurrentEnvelope(jsonString)
             restoreEnvelope(envelope)
             true
+        }
+    }
+
+    private suspend fun createSafetyBackup() {
+        runCatching {
+            val backupDir = java.io.File(context.filesDir, "safety_backups")
+            if (!backupDir.exists()) {
+                backupDir.mkdirs()
+            }
+
+            val timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"))
+            val backupFile = java.io.File(backupDir, "safety_backup_$timestamp.json")
+            val jsonString = BackupMigration.encodeEnvelope(buildCurrentEnvelope())
+            backupFile.writeText(jsonString, Charsets.UTF_8)
+
+            cleanupOldSafetyBackups(backupDir)
+            Log.i("BackupRepository", "安全备份已创建：${backupFile.name}")
+        }.onFailure {
+            Log.e("BackupRepository", "安全备份创建失败", it)
+        }
+    }
+
+    private fun cleanupOldSafetyBackups(backupDir: java.io.File) {
+        val maxBackups = 3
+        val backupFiles = backupDir.listFiles()
+            ?.filter { it.name.startsWith("safety_backup_") && it.name.endsWith(".json") }
+            ?.sortedByDescending { it.name }
+            ?: return
+
+        if (backupFiles.size > maxBackups) {
+            backupFiles.drop(maxBackups).forEach { it.delete() }
         }
     }
 
@@ -165,7 +200,7 @@ class BackupRepository @Inject constructor(
                 budgets = budgetDao.getAllBudgetsOnce().map { it.toBackup() },
                 templates = recurringTemplateDao.getAllTemplatesOnce().map { it.toBackup() },
                 ledgers = ledgerDao.getAllLedgersOnce().map { it.toBackup() },
-                davConfig = davConfigDao.getDavConfigOnce()?.toBackup(),
+                davConfig = davConfigDao.getDavConfigOnce()?.toBackup()?.copy(password = ""),
                 themeMode = themePreferencesRepository.getThemeModeOnce().storageValue
             )
         )

@@ -57,9 +57,13 @@ import com.mewbook.app.domain.model.BudgetPeriodType
 import com.mewbook.app.ui.components.MewCompactTopAppBar
 import com.mewbook.app.ui.components.BudgetPeriodNavigator
 import com.mewbook.app.ui.components.BudgetPeriodTypeSelector
+import com.mewbook.app.ui.components.SettingsSectionHeader
+import com.mewbook.app.ui.components.SettingsSummaryCard
 import com.mewbook.app.ui.theme.BudgetDanger
 import com.mewbook.app.ui.theme.BudgetSafe
 import com.mewbook.app.ui.theme.BudgetWarning
+import com.mewbook.app.ui.theme.ClayDesign
+import com.mewbook.app.ui.theme.clayCardShadow
 import com.mewbook.app.util.formatCurrency
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -88,9 +92,25 @@ fun BudgetScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(paddingValues)
-                    .padding(16.dp),
+                    .padding(horizontal = 16.dp),
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(top = 16.dp, bottom = 96.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
+                item {
+                    SettingsSummaryCard(
+                        icon = Icons.Filled.Add,
+                        title = "预算总览",
+                        subtitle = "${uiState.periodLabel} · 已花 ${formatCurrency(uiState.totalSpent)}，按周期管理总预算和分类预算。"
+                    )
+                }
+
+                item {
+                    SettingsSectionHeader(
+                        title = "周期",
+                        description = "切换日、周、月预算周期并查看历史区间。"
+                    )
+                }
+
                 item {
                     BudgetPeriodTypeSelector(
                         selectedPeriodType = uiState.selectedPeriodType,
@@ -123,14 +143,17 @@ fun BudgetScreen(
 
                 // 分类预算列表
                 item {
-                    Text(
-                        text = "分类预算",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
+                    SettingsSectionHeader(
+                        title = "分类预算",
+                        description = "为具体支出分类设置独立额度。"
                     )
                 }
 
-                items(uiState.categoryBudgets) { budgetWithSpending ->
+                items(
+                    items = uiState.categoryBudgets,
+                    key = { it.budget.categoryId ?: it.budget.id },
+                    contentType = { "categoryBudget" }
+                ) { budgetWithSpending ->
                     CategoryBudgetItem(
                         budgetWithSpending = budgetWithSpending,
                         categoryName = uiState.categories[budgetWithSpending.budget.categoryId]?.name ?: "未知",
@@ -189,9 +212,13 @@ fun TotalBudgetCard(
     )
 
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clayCardShadow(),
+        shape = RoundedCornerShape(ClayDesign.CardRadius),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.primaryContainer
+            containerColor = MaterialTheme.colorScheme.surface
         )
     ) {
         Column(
@@ -206,7 +233,8 @@ fun TotalBudgetCard(
             ) {
                 Text(
                     text = title,
-                    style = MaterialTheme.typography.titleMedium
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface
                 )
                 TextButton(onClick = onAddClick) {
                     Icon(
@@ -276,7 +304,14 @@ fun CategoryBudgetItem(
     )
 
     Card(
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier
+            .fillMaxWidth()
+            .clayCardShadow(),
+        shape = RoundedCornerShape(ClayDesign.CardRadius),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        )
     ) {
         Column(
             modifier = Modifier

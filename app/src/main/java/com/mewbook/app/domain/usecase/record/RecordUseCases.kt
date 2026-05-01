@@ -33,6 +33,10 @@ class GetRecordsUseCase @Inject constructor(
     fun getAll(): Flow<List<Record>> {
         return recordRepository.getAllRecords()
     }
+
+    fun getDatesWithRecords(ledgerId: Long, startDate: LocalDate, endDate: LocalDate): Flow<Set<LocalDate>> {
+        return recordRepository.getDatesWithRecords(ledgerId, startDate, endDate)
+    }
 }
 
 class AddRecordUseCase @Inject constructor(

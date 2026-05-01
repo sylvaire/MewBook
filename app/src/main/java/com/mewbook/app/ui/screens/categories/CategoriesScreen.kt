@@ -54,7 +54,6 @@ import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -70,12 +69,17 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mewbook.app.ui.components.MewCompactTopAppBar
 import com.mewbook.app.domain.model.Category
 import com.mewbook.app.domain.model.RecordType
 import com.mewbook.app.domain.policy.CategorySelectionPolicy
 import com.mewbook.app.ui.components.CategoryIconBadge
 import com.mewbook.app.ui.components.getIconForCategory
+import com.mewbook.app.ui.components.SettingsSectionHeader
+import com.mewbook.app.ui.components.SettingsSummaryCard
+import com.mewbook.app.ui.theme.ClayDesign
+import com.mewbook.app.ui.theme.clayCardShadow
 import kotlin.math.roundToInt
 
 // 可选的图标列表
@@ -110,7 +114,7 @@ fun CategoriesScreen(
     onNavigateBack: () -> Unit,
     viewModel: CategoriesViewModel = hiltViewModel()
 ) {
-    val uiState by viewModel.uiState.collectAsState()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var selectedTabIndex by remember { mutableIntStateOf(0) }
 
     val expenseCategories = CategorySelectionPolicy.visibleTopLevelCategories(
@@ -194,11 +198,23 @@ fun CategoriesScreen(
                 contentPadding = PaddingValues(
                     start = 12.dp,
                     end = 12.dp,
-                    top = 10.dp,
+                    top = 16.dp,
                     bottom = 96.dp
                 ),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+                item {
+                    SettingsSummaryCard(
+                        icon = Icons.Filled.Edit,
+                        title = if (selectedTabIndex == 0) "支出分类" else "收入分类",
+                        subtitle = "当前显示 ${displayedCategories.size} 个分类。点击分类编辑，右侧箭头调整排序。"
+                    )
+                }
+
+                item {
+                    SettingsSectionHeader(title = "分类列表")
+                }
+
                 items(displayedCategories, key = { it.id }) { category ->
                     CategoryRowItem(
                         category = category,
@@ -322,9 +338,12 @@ private fun CategoryItemCard(
     onClick: () -> Unit
 ) {
     Card(
+        onClick = onClick,
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick),
+            .clayCardShadow(),
+        shape = RoundedCornerShape(ClayDesign.CardRadius),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
         )

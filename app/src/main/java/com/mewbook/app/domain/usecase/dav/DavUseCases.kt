@@ -1,5 +1,6 @@
 package com.mewbook.app.domain.usecase.dav
 
+import com.mewbook.app.domain.model.DavBackupFile
 import com.mewbook.app.domain.model.DavConfig
 import com.mewbook.app.domain.repository.DavRepository
 import kotlinx.coroutines.flow.Flow
@@ -36,8 +37,12 @@ class TestConnectionUseCase @Inject constructor(
 class ExportDataUseCase @Inject constructor(
     private val davRepository: DavRepository
 ) {
-    suspend operator fun invoke(config: DavConfig): Result<Boolean> {
-        return davRepository.exportData(config)
+    suspend operator fun invoke(config: DavConfig, fileName: String? = null): Result<Boolean> {
+        return davRepository.exportData(config, fileName)
+    }
+
+    suspend fun autoBackup(config: DavConfig): Result<Boolean> {
+        return davRepository.exportAutoBackupData(config)
     }
 }
 
@@ -47,6 +52,13 @@ class PreviewImportDataUseCase @Inject constructor(
     suspend operator fun invoke(config: DavConfig): Result<com.mewbook.app.data.backup.BackupRestorePreview> {
         return davRepository.previewImportData(config)
     }
+
+    suspend operator fun invoke(
+        config: DavConfig,
+        backupFile: DavBackupFile
+    ): Result<com.mewbook.app.data.backup.BackupRestorePreview> {
+        return davRepository.previewImportData(config, backupFile)
+    }
 }
 
 class ImportDataUseCase @Inject constructor(
@@ -54,5 +66,17 @@ class ImportDataUseCase @Inject constructor(
 ) {
     suspend operator fun invoke(config: DavConfig): Result<Boolean> {
         return davRepository.importData(config)
+    }
+
+    suspend operator fun invoke(config: DavConfig, backupFile: DavBackupFile): Result<Boolean> {
+        return davRepository.importData(config, backupFile)
+    }
+}
+
+class ListBackupFilesUseCase @Inject constructor(
+    private val davRepository: DavRepository
+) {
+    suspend operator fun invoke(config: DavConfig): Result<List<DavBackupFile>> {
+        return davRepository.listBackupFiles(config)
     }
 }

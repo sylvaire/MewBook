@@ -27,8 +27,8 @@ object RecurringTemplateUsageGuide {
             detail = "需要入账时点“生成本期”创建记录；本期不需要记账时点“跳过”推进到下一次。"
         ),
         RecurringTemplateUsageStep(
-            title = "4. 当前是手动闭环",
-            detail = "P0 阶段先以手动处理为主，提醒开关当前用于标记模板，后续再扩展系统通知。"
+            title = "4. 完成闭环",
+            detail = "生成本期或跳过都会推进到下一次到期；到结束日期后模板自动停用，不再参与生成或跳过。"
         )
     )
 

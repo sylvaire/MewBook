@@ -58,4 +58,7 @@ interface RecordDao {
 
     @Query("SELECT * FROM records")
     suspend fun getAllRecordsOnce(): List<RecordEntity>
+
+    @Query("SELECT DISTINCT date FROM records WHERE ledgerId = :ledgerId AND date >= :startDate AND date <= :endDate")
+    fun getDatesWithRecords(ledgerId: Long, startDate: Long, endDate: Long): Flow<List<Long>>
 }

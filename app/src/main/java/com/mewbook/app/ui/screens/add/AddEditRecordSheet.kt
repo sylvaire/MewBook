@@ -322,8 +322,13 @@ private fun AddRecordScreenSystemBarsEffect(
     val view = LocalView.current
     val activity = view.context as? Activity ?: return
     val window = activity.window
+    val isDarkTheme = MaterialTheme.colorScheme.background.luminance() < 0.5f
     val navBarAppearanceColor = if (showKeyboard) keyboardSurfaceColor else MaterialTheme.colorScheme.surface
-    val statusBarAppearanceColor = MaterialTheme.colorScheme.primaryContainer
+    val statusBarAppearanceColor = if (isDarkTheme) {
+        MaterialTheme.colorScheme.primaryContainer
+    } else {
+        MaterialTheme.colorScheme.primary
+    }
 
     DisposableEffect(showKeyboard, keyboardSurfaceColor, window, view) {
         val previousNavigationBarColor = window.navigationBarColor

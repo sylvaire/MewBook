@@ -56,6 +56,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mewbook.app.data.backup.BackupCategoryImportAction
 import com.mewbook.app.data.backup.BackupRecordImportPreview
 import com.mewbook.app.ui.components.MewCompactTopAppBar
+import com.mewbook.app.ui.components.SettingsPageScaffold
+import com.mewbook.app.ui.components.SettingsSectionHeader
+import com.mewbook.app.ui.components.SettingsSummaryCard
+import com.mewbook.app.ui.components.SettingsSurfaceCard
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -143,22 +147,22 @@ fun SmartImportScreen(
             )
         }
     ) { paddingValues ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .verticalScroll(rememberScrollState())
-                .padding(16.dp)
-                .padding(bottom = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
+        SettingsPageScaffold(paddingValues = paddingValues) {
             IntroCard()
+            SettingsSectionHeader(
+                title = "接口配置",
+                description = "配置会保存在本机；API Key 可用时走加密存储。"
+            )
             ApiConfigCard(
                 uiState = uiState,
                 onBaseUrlChange = viewModel::updateBaseUrl,
                 onModelChange = viewModel::updateModel,
                 onApiKeyChange = viewModel::updateApiKey,
                 onSave = viewModel::saveConfig
+            )
+            SettingsSectionHeader(
+                title = "导入内容",
+                description = "粘贴文本或选择文件，转换完成后仍需确认预览。"
             )
             InputCard(
                 uiState = uiState,
@@ -168,11 +172,8 @@ fun SmartImportScreen(
             )
 
             uiState.error?.let { error ->
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.errorContainer
-                    )
+                SettingsSurfaceCard(
+                    containerColor = MaterialTheme.colorScheme.errorContainer
                 ) {
                     Text(
                         text = "操作失败：$error",
@@ -187,25 +188,11 @@ fun SmartImportScreen(
 
 @Composable
 private fun IntroCard() {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Icon(Icons.Filled.AutoAwesome, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                Text("把杂乱账单变成可预览导入", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-            }
-            Text(
-                text = "粘贴账单文本，或选择 TXT/CSV/JSON 文件直接上传转换。AI 只负责转换结构，最终仍会经过本地分类映射、重复检测和确认导入。",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-    }
+    SettingsSummaryCard(
+        icon = Icons.Filled.AutoAwesome,
+        title = "把杂乱账单变成可预览导入",
+        subtitle = "粘贴账单文本，或选择 TXT/CSV/JSON 文件直接上传转换。AI 只负责转换结构，最终仍会经过本地分类映射、重复检测和确认导入。"
+    )
 }
 
 @Composable
@@ -216,7 +203,7 @@ private fun ApiConfigCard(
     onApiKeyChange: (String) -> Unit,
     onSave: () -> Unit
 ) {
-    Card(modifier = Modifier.fillMaxWidth()) {
+    SettingsSurfaceCard {
         Column(
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -282,7 +269,7 @@ private fun InputCard(
     onChooseFile: () -> Unit,
     onConvert: () -> Unit
 ) {
-    Card(modifier = Modifier.fillMaxWidth()) {
+    SettingsSurfaceCard {
         Column(
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)

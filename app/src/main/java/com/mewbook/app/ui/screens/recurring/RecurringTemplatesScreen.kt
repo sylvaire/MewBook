@@ -59,7 +59,6 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -81,6 +80,9 @@ import com.mewbook.app.domain.model.RecurringTemplateScheduleType
 import com.mewbook.app.domain.policy.CategorySelectionPolicy
 import com.mewbook.app.domain.policy.RecurringTemplateSchedulePolicy
 import com.mewbook.app.ui.components.MewCompactTopAppBar
+import com.mewbook.app.ui.components.SettingsSectionHeader
+import com.mewbook.app.ui.components.SettingsSummaryCard
+import com.mewbook.app.ui.components.SettingsSurfaceCard
 import com.mewbook.app.ui.theme.ExpenseRed
 import com.mewbook.app.ui.theme.IncomeGreen
 import com.mewbook.app.util.formatCurrency
@@ -156,6 +158,12 @@ fun RecurringTemplatesScreen(
                 item {
                     RecurringTemplateGuideCard()
                 }
+                item {
+                    SettingsSectionHeader(
+                        title = "模板列表",
+                        description = "启用中的模板可以生成本期记录或跳过本期。"
+                    )
+                }
 
                 if (uiState.templates.isEmpty()) {
                     item {
@@ -218,14 +226,12 @@ fun RecurringTemplatesScreen(
 private fun RecurringTemplateGuideCard() {
     var isExpanded by rememberSaveable { mutableStateOf(RecurringTemplateUsageGuide.defaultExpanded) }
 
-    Card(
+    SettingsSurfaceCard(
         modifier = Modifier
             .fillMaxWidth()
             .animateContentSize()
             .clickable { isExpanded = !isExpanded },
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.tertiaryContainer
-        )
+        containerColor = MaterialTheme.colorScheme.tertiaryContainer
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
@@ -304,42 +310,21 @@ private fun TemplatesSummaryCard(
     }
     val nextDue = templates.filter { it.isEnabled }.minByOrNull { it.nextDueDate }
 
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Text(
-                text = "即将到期",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
-            )
-            Text(
-                text = "启用中 ${enabledCount} 个，30 天内到期 ${dueSoonCount} 个",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Text(
-                text = nextDue?.let {
-                    "最近到期：${it.name} · ${it.nextDueDate.format(RecurringDateFormatter)}"
-                } ?: "还没有可用的周期模板，先创建一个吧。",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-    }
+    SettingsSummaryCard(
+        icon = Icons.Filled.CalendarMonth,
+        title = "周期模板",
+        subtitle = "启用中 ${enabledCount} 个，30 天内到期 ${dueSoonCount} 个。${
+            nextDue?.let { "最近到期：${it.name} · ${it.nextDueDate.format(RecurringDateFormatter)}" }
+                ?: "还没有可用的周期模板，先创建一个吧。"
+        }"
+    )
 }
 
 @Composable
 private fun EmptyTemplatesCard(
     onCreateClick: () -> Unit
 ) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant
-        )
-    ) {
+    SettingsSurfaceCard(containerColor = MaterialTheme.colorScheme.surfaceVariant) {
         Column(
             modifier = Modifier.padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -376,8 +361,11 @@ private fun RecurringTemplateCard(
 ) {
     val accentColor = if (template.type == RecordType.EXPENSE) ExpenseRed else IncomeGreen
     val statusText = remember(template) { templateStatusText(template) }
+    val canProcessOccurrence = remember(template) {
+        RecurringTemplateSchedulePolicy.canProcessCurrentOccurrence(template)
+    }
 
-    Card(modifier = Modifier.fillMaxWidth()) {
+    SettingsSurfaceCard {
         Column(
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -425,7 +413,7 @@ private fun RecurringTemplateCard(
                     Icon(Icons.Filled.Edit, contentDescription = null)
                     Text("编辑")
                 }
-                TextButton(onClick = onGenerate, enabled = !isBusy) {
+                TextButton(onClick = onGenerate, enabled = !isBusy && canProcessOccurrence) {
                     if (isBusy) {
                         CircularProgressIndicator(
                             modifier = Modifier.height(14.dp),
@@ -436,7 +424,7 @@ private fun RecurringTemplateCard(
                     }
                     Text("生成本期")
                 }
-                TextButton(onClick = onSkip, enabled = !isBusy) {
+                TextButton(onClick = onSkip, enabled = !isBusy && canProcessOccurrence) {
                     Icon(Icons.Filled.SkipNext, contentDescription = null)
                     Text("跳过")
                 }
@@ -965,6 +953,9 @@ private fun DateField(
 private fun templateStatusText(template: RecurringTemplate): String {
     if (!template.isEnabled) {
         return "已停用"
+    }
+    if (!RecurringTemplateSchedulePolicy.canProcessCurrentOccurrence(template)) {
+        return "已到结束日期"
     }
     val diffDays = template.nextDueDate.toEpochDay() - LocalDate.now().toEpochDay()
     return when {

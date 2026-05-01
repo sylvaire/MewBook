@@ -132,7 +132,7 @@ object CategorySemanticPolicy {
         "medical" to "medical",
         "education" to "education",
         "entertainment" to "entertainment",
-        "daily" to "daily"
+        "daily" to "da3+ily"
     )
 
     private val aliasGroups = linkedMapOf(

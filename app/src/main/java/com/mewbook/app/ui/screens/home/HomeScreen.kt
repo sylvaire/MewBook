@@ -9,7 +9,9 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.combinedClickable
 import com.mewbook.app.ui.theme.LocalIsDarkTheme
 import androidx.compose.foundation.layout.Arrangement
@@ -27,6 +29,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
@@ -36,15 +39,21 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.TrendingDown
 import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.automirrored.rounded.ManageSearch
+import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ChevronLeft
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Savings
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.Role
@@ -90,9 +99,11 @@ import com.mewbook.app.ui.theme.BudgetWarning
 import com.mewbook.app.ui.theme.ClayDesign
 import com.mewbook.app.ui.theme.ExpenseRed
 import com.mewbook.app.ui.theme.IncomeGreen
+import com.mewbook.app.ui.theme.clayCardShadow
 import com.mewbook.app.util.formatCurrency
 import java.time.Instant
 import java.time.LocalDate
+import java.time.YearMonth
 import java.time.ZoneOffset
 
 // ============================================
@@ -112,6 +123,7 @@ fun HomeScreen(
     var showDeleteConfirmDialog by remember { mutableStateOf(false) }
     var showDatePickerDialog by remember { mutableStateOf(false) }
     var showQuickFabMenu by remember { mutableStateOf(false) }
+    var scrollToDate by remember { mutableStateOf<LocalDate?>(null) }
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     LaunchedEffect(uiState.showAddEditSheet) {
@@ -305,6 +317,7 @@ fun HomeScreen(
                                 } else {
                                     null
                                 },
+                                scrollToDate = scrollToDate,
                                 onRecordClick = { record -> viewModel.showRecordDetail(record) }
                             )
                         }
@@ -391,51 +404,165 @@ fun HomeScreen(
         if (showDatePickerDialog) {
             HomeDatePickerDialog(
                 initialDate = uiState.anchorDate,
+                datesWithRecords = uiState.datesWithRecords,
                 onDismiss = { showDatePickerDialog = false },
                 onDateSelected = { selectedDate ->
                     viewModel.selectAnchorDate(selectedDate)
+                    scrollToDate = selectedDate
                     showDatePickerDialog = false
-                }
+                },
+                onMonthChange = viewModel::setCalendarMonth
             )
         }
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun HomeDatePickerDialog(
     initialDate: LocalDate,
+    datesWithRecords: Set<LocalDate>,
     onDismiss: () -> Unit,
-    onDateSelected: (LocalDate) -> Unit
+    onDateSelected: (LocalDate) -> Unit,
+    onMonthChange: (YearMonth) -> Unit
 ) {
     val today = remember { LocalDate.now() }
-    val initialDateMillis = initialDate.toDatePickerMillis()
-    val datePickerState = rememberDatePickerState(
-        initialSelectedDateMillis = initialDateMillis,
-        initialDisplayedMonthMillis = initialDateMillis,
-        yearRange = 1900..today.year,
-        selectableDates = object : SelectableDates {
-            override fun isSelectableDate(utcTimeMillis: Long): Boolean {
-                return utcTimeMillis.toDatePickerLocalDate() <= today
-            }
+    var selectedDate by remember { mutableStateOf(initialDate) }
+    var currentMonth by remember { mutableStateOf(YearMonth.from(initialDate)) }
 
-            override fun isSelectableYear(year: Int): Boolean {
-                return year <= today.year
-            }
-        }
-    )
+    LaunchedEffect(Unit) {
+        onMonthChange(currentMonth)
+    }
 
-    DatePickerDialog(
+    AlertDialog(
         onDismissRequest = onDismiss,
-        confirmButton = {
-            TextButton(
-                enabled = datePickerState.selectedDateMillis != null,
-                onClick = {
-                    datePickerState.selectedDateMillis
-                        ?.toDatePickerLocalDate()
-                        ?.let(onDateSelected)
-                }
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+                // Month header with navigation
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(onClick = {
+                        currentMonth = currentMonth.minusMonths(1)
+                        onMonthChange(currentMonth)
+                    }) {
+                        Icon(Icons.Filled.ChevronLeft, contentDescription = "上月")
+                    }
+                    Text(
+                        text = "${currentMonth.year}年${currentMonth.monthValue}月",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    IconButton(onClick = {
+                        val next = currentMonth.plusMonths(1)
+                        if (YearMonth.from(today) >= next) {
+                            currentMonth = next
+                            onMonthChange(currentMonth)
+                        }
+                    }, enabled = YearMonth.from(today) >= currentMonth.plusMonths(1)) {
+                        Icon(Icons.Filled.ChevronRight, contentDescription = "下月")
+                    }
+                }
+
+                // Day-of-week headers
+                Row(modifier = Modifier.fillMaxWidth()) {
+                    listOf("日", "一", "二", "三", "四", "五", "六").forEach { day ->
+                        Text(
+                            text = day,
+                            modifier = Modifier.weight(1f),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+
+                // Calendar grid
+                val firstDayOfMonth = currentMonth.atDay(1)
+                val daysInMonth = currentMonth.lengthOfMonth()
+                val startOffset = (firstDayOfMonth.dayOfWeek.value % 7)
+
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    var dayCounter = 1
+                    for (week in 0 until 6) {
+                        if (dayCounter > daysInMonth) break
+                        Row(modifier = Modifier.fillMaxWidth()) {
+                            for (dayOfWeek in 0 until 7) {
+                                if (week == 0 && dayOfWeek < startOffset || dayCounter > daysInMonth) {
+                                    Spacer(modifier = Modifier.weight(1f))
+                                } else {
+                                    val day = dayCounter
+                                    val date = currentMonth.atDay(day)
+                                    val isToday = date == today
+                                    val isSelected = date == selectedDate
+                                    val isFuture = date > today
+                                    val hasRecords = date in datesWithRecords
+
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .aspectRatio(1f)
+                                            .clip(CircleShape)
+                                            .then(
+                                                if (isSelected) {
+                            Modifier.background(MaterialTheme.colorScheme.primary, CircleShape)
+                                                } else if (isToday) {
+                                                    Modifier.border(
+                                                        1.5.dp,
+                                                        MaterialTheme.colorScheme.primary,
+                                                        CircleShape
+                                                    )
+                                                } else {
+                                                    Modifier
+                                                }
+                                            )
+                                            .clickable(enabled = !isFuture) {
+                                                selectedDate = date
+                                            },
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Column(
+                                            horizontalAlignment = Alignment.CenterHorizontally,
+                                            verticalArrangement = Arrangement.Center
+                                        ) {
+                                            Text(
+                                                text = "$day",
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                color = when {
+                                                    isSelected -> MaterialTheme.colorScheme.onPrimary
+                                                    isFuture -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
+                                                    isToday -> MaterialTheme.colorScheme.primary
+                                                    else -> MaterialTheme.colorScheme.onSurface
+                                                }
+                                            )
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(4.dp)
+                                                    .clip(CircleShape)
+                                                    .background(
+                                                        when {
+                                                            isSelected -> MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.7f)
+                                                            hasRecords -> MaterialTheme.colorScheme.primary
+                                                            else -> Color.Transparent
+                                                        }
+                                                    )
+                                            )
+                                        }
+                                    }
+                                    dayCounter++
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onDateSelected(selectedDate) }) {
                 Text("确定")
             }
         },
@@ -444,20 +571,7 @@ private fun HomeDatePickerDialog(
                 Text("取消")
             }
         }
-    ) {
-        DatePicker(
-            state = datePickerState,
-            modifier = Modifier.verticalScroll(rememberScrollState())
-        )
-    }
-}
-
-private fun LocalDate.toDatePickerMillis(): Long {
-    return atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
-}
-
-private fun Long.toDatePickerLocalDate(): LocalDate {
-    return Instant.ofEpochMilli(this).atZone(ZoneOffset.UTC).toLocalDate()
+    )
 }
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -709,9 +823,23 @@ private fun HomeRecordList(
     categories: Map<Long, Category>,
     modifier: Modifier = Modifier,
     headerContent: (@Composable () -> Unit)? = null,
+    scrollToDate: LocalDate? = null,
     onRecordClick: (com.mewbook.app.domain.model.Record) -> Unit
 ) {
+    val listState = rememberLazyListState()
+
+    LaunchedEffect(scrollToDate, records) {
+        if (scrollToDate != null) {
+            val index = records.indexOfFirst { it.date == scrollToDate }
+            if (index >= 0) {
+                val offset = if (headerContent != null) 1 else 0
+                listState.animateScrollToItem(index + offset)
+            }
+        }
+    }
+
     LazyColumn(
+        state = listState,
         modifier = modifier.fillMaxWidth(),
         contentPadding = PaddingValues(
             top = 8.dp,
@@ -754,24 +882,13 @@ fun SummaryCard(
     budgetRemaining: Double = 0.0
 ) {
     val isDarkTheme = LocalIsDarkTheme.current
-    val cardShadowPrimary = MaterialTheme.colorScheme.primary.copy(alpha = if (isDarkTheme) 0.08f else 0.15f)
-    val cardShadowSecondary = MaterialTheme.colorScheme.primary.copy(alpha = if (isDarkTheme) 0.04f else 0.10f)
     val progressShadow = MaterialTheme.colorScheme.onSurface.copy(alpha = if (isDarkTheme) 0.18f else 0.10f)
 
     // Claymorphism 卡片 - 多层阴影
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .shadow(
-                elevation = ClayDesign.CardShadowElevation1,
-                shape = RoundedCornerShape(ClayDesign.CardRadius),
-                spotColor = cardShadowPrimary
-            )
-            .shadow(
-                elevation = ClayDesign.CardShadowElevation2,
-                shape = RoundedCornerShape(ClayDesign.CardRadius),
-                spotColor = cardShadowSecondary
-            ),
+            .clayCardShadow(),
         shape = RoundedCornerShape(ClayDesign.CardRadius),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
@@ -792,10 +909,13 @@ fun SummaryCard(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = "🍊 ",
-                            style = MaterialTheme.typography.bodyMedium
+                        Icon(
+                            imageVector = Icons.Filled.Savings,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(18.dp)
                         )
+                        Spacer(modifier = Modifier.width(6.dp))
                         Text(
                             text = "预算剩余",
                             style = MaterialTheme.typography.bodyMedium,
@@ -857,100 +977,76 @@ fun SummaryCard(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceEvenly
             ) {
-                // 收入
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier
-                        .weight(1f)
-                        .background(
-                            IncomeGreen.copy(alpha = 0.08f),
-                            RoundedCornerShape(ClayDesign.ButtonRadius)
-                        )
-                        .padding(vertical = 12.dp, horizontal = 8.dp)
-                ) {
-                    Text(
-                        text = "📈",
-                        style = MaterialTheme.typography.titleMedium
-                    )
-                    Text(
-                        text = "收入",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "+${formatCurrency(totalIncome)}",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = IncomeGreen
-                    )
-                }
+                SummaryMetric(
+                    label = "收入",
+                    value = "+${formatCurrency(totalIncome)}",
+                    icon = Icons.AutoMirrored.Filled.TrendingUp,
+                    tint = IncomeGreen,
+                    modifier = Modifier.weight(1f)
+                )
 
                 Spacer(modifier = Modifier.width(8.dp))
 
-                // 支出
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier
-                        .weight(1f)
-                        .background(
-                            ExpenseRed.copy(alpha = 0.08f),
-                            RoundedCornerShape(ClayDesign.ButtonRadius)
-                        )
-                        .padding(vertical = 12.dp, horizontal = 8.dp)
-                ) {
-                    Text(
-                        text = "📉",
-                        style = MaterialTheme.typography.titleMedium
-                    )
-                    Text(
-                        text = "支出",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "-${formatCurrency(totalExpense)}",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = ExpenseRed
-                    )
-                }
+                SummaryMetric(
+                    label = "支出",
+                    value = "-${formatCurrency(totalExpense)}",
+                    icon = Icons.AutoMirrored.Filled.TrendingDown,
+                    tint = ExpenseRed,
+                    modifier = Modifier.weight(1f)
+                )
 
                 Spacer(modifier = Modifier.width(8.dp))
 
                 // 结余
                 val balance = totalIncome - totalExpense
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier
-                        .weight(1f)
-                        .background(
-                            if (balance >= 0) IncomeGreen.copy(alpha = 0.08f)
-                            else ExpenseRed.copy(alpha = 0.08f),
-                            RoundedCornerShape(ClayDesign.ButtonRadius)
-                        )
-                        .padding(vertical = 12.dp, horizontal = 8.dp)
-                ) {
-                    Text(
-                        text = if (balance >= 0) "💰" else "😿",
-                        style = MaterialTheme.typography.titleMedium
-                    )
-                    Text(
-                        text = "结余",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = formatCurrency(balance),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = if (balance >= 0) IncomeGreen else ExpenseRed
-                    )
-                }
+                SummaryMetric(
+                    label = "结余",
+                    value = formatCurrency(balance),
+                    icon = Icons.Filled.AccountBalanceWallet,
+                    tint = if (balance >= 0) IncomeGreen else ExpenseRed,
+                    modifier = Modifier.weight(1f)
+                )
             }
         }
+    }
+}
+
+@Composable
+private fun SummaryMetric(
+    label: String,
+    value: String,
+    icon: ImageVector,
+    tint: Color,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = modifier
+            .background(
+                tint.copy(alpha = 0.14f),
+                RoundedCornerShape(ClayDesign.ButtonRadius)
+            )
+            .padding(vertical = 12.dp, horizontal = 8.dp)
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = tint,
+            modifier = Modifier.size(20.dp)
+        )
+        Spacer(modifier = Modifier.height(6.dp))
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = value,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = tint
+        )
     }
 }
 

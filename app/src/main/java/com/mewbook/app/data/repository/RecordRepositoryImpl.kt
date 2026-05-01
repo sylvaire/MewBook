@@ -94,6 +94,14 @@ class RecordRepositoryImpl @Inject constructor(
         recordDao.deleteAllRecords()
     }
 
+    override fun getDatesWithRecords(ledgerId: Long, startDate: LocalDate, endDate: LocalDate): Flow<Set<LocalDate>> {
+        return recordDao.getDatesWithRecords(
+            ledgerId,
+            startDate.toEpochDay(),
+            endDate.toEpochDay()
+        ).map { days -> days.map { LocalDate.ofEpochDay(it) }.toSet() }
+    }
+
     private fun RecordEntity.toDomain(): Record {
         return Record(
             id = id,

@@ -22,6 +22,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -35,6 +37,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -56,8 +59,10 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mewbook.app.domain.model.Category
 import com.mewbook.app.ui.components.MewCompactTopAppBar
+import com.mewbook.app.ui.theme.ClayDesign
 import com.mewbook.app.ui.theme.ExpenseRed
 import com.mewbook.app.ui.theme.IncomeGreen
+import com.mewbook.app.ui.theme.clayCardShadow
 import com.mewbook.app.util.formatCurrency
 import java.time.LocalDate
 
@@ -161,7 +166,10 @@ private fun StatisticsPeriodControls(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+            .padding(horizontal = 16.dp, vertical = 12.dp)
+            .clayCardShadow(),
+        shape = RoundedCornerShape(ClayDesign.CardRadius),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
         )
@@ -235,9 +243,12 @@ fun SummarySection(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp),
+            .padding(horizontal = 16.dp)
+            .clayCardShadow(),
+        shape = RoundedCornerShape(ClayDesign.CardRadius),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant
+            containerColor = MaterialTheme.colorScheme.surface
         )
     ) {
         Row(
@@ -302,7 +313,11 @@ fun CategoryBreakdown(
     onCategoryClick: ((Long) -> Unit)? = null
 ) {
     val total = amountByCategory.values.sum()
-    val topCategories = amountByCategory.entries.sortedByDescending { it.value }.take(5)
+    val allCategories = amountByCategory.entries.sortedByDescending { it.value }
+    val topCategories = allCategories.take(5)
+    val hasMore = allCategories.size > 5
+    var expanded by remember { mutableStateOf(false) }
+    val displayedCategories = if (expanded) allCategories else topCategories
 
     Column(modifier = Modifier.padding(16.dp)) {
         Row(
@@ -316,7 +331,7 @@ fun CategoryBreakdown(
                 fontWeight = FontWeight.Bold
             )
             Text(
-                text = "Top ${topCategories.size}",
+                text = "共 ${allCategories.size} 项",
                 style = MaterialTheme.typography.labelSmall,
                 color = accentColor,
                 fontWeight = FontWeight.SemiBold
@@ -326,7 +341,11 @@ fun CategoryBreakdown(
         Spacer(modifier = Modifier.height(12.dp))
 
         Card(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .clayCardShadow(),
+            shape = RoundedCornerShape(ClayDesign.CardRadius),
+            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
             colors = CardDefaults.cardColors(
                 containerColor = MaterialTheme.colorScheme.surface
             )
@@ -335,7 +354,7 @@ fun CategoryBreakdown(
                 modifier = Modifier.padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-                topCategories.forEach { (categoryId, amount) ->
+                displayedCategories.forEach { (categoryId, amount) ->
                     val category = categories[categoryId]
                     val categoryColor = Color(category?.color ?: 0xFF808080)
                     val percentage = if (total > 0) (amount / total * 100).toFloat() else 0f
@@ -405,6 +424,30 @@ fun CategoryBreakdown(
                         )
                     }
                 }
+
+                if (hasMore) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { expanded = !expanded }
+                            .padding(top = 4.dp),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = if (expanded) "收起" else "展开全部",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = accentColor,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Icon(
+                            imageVector = if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                            contentDescription = if (expanded) "收起" else "展开全部",
+                            tint = accentColor,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
             }
         }
     }
@@ -428,7 +471,11 @@ fun IncomeExpenseTrend(
         Spacer(modifier = Modifier.height(12.dp))
 
         Card(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .clayCardShadow(),
+            shape = RoundedCornerShape(ClayDesign.CardRadius),
+            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
             colors = CardDefaults.cardColors(
                 containerColor = MaterialTheme.colorScheme.surface
             )
@@ -702,7 +749,7 @@ private fun TrendSeriesPill(
     Card(
         modifier = modifier,
         colors = CardDefaults.cardColors(
-            containerColor = color.copy(alpha = 0.08f)
+            containerColor = color.copy(alpha = 0.14f)
         ),
         shape = RoundedCornerShape(18.dp)
     ) {

@@ -68,7 +68,12 @@ import com.mewbook.app.domain.repository.AccountRepository
 import com.mewbook.app.domain.repository.LedgerRepository
 import com.mewbook.app.ui.components.AccountTypeIconBadge
 import com.mewbook.app.ui.components.MewCompactTopAppBar
+import com.mewbook.app.ui.components.SettingsSectionHeader
+import com.mewbook.app.ui.components.SettingsSummaryCard
+import com.mewbook.app.ui.components.SettingsSurfaceCard
 import com.mewbook.app.ui.components.toDisplayName
+import com.mewbook.app.ui.theme.ClayDesign
+import com.mewbook.app.ui.theme.clayCardShadow
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -342,11 +347,17 @@ fun LedgerManagementScreen(
                 .padding(paddingValues)
                 .padding(horizontal = 16.dp)
         ) {
-            Text(
-                text = "点击账本进入编辑，长按删除，使用右侧箭头自定义排序",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(vertical = 12.dp)
+            SettingsSummaryCard(
+                icon = Icons.Filled.Groups,
+                title = "账本管理",
+                subtitle = "共 ${displayLedgers.size} 个账本。点击进入默认账本/账户设置，长按删除非默认账本。",
+                modifier = Modifier.padding(top = 16.dp)
+            )
+
+            SettingsSectionHeader(
+                title = "账本列表",
+                description = "使用右侧箭头调整显示顺序。",
+                modifier = Modifier.padding(top = 16.dp, bottom = 8.dp)
             )
 
             LazyColumn(
@@ -553,16 +564,13 @@ private fun LedgerItem(
     onMoveUp: () -> Unit,
     onMoveDown: () -> Unit
 ) {
-    Card(
+    SettingsSurfaceCard(
         modifier = Modifier
             .fillMaxWidth()
             .combinedClickable(
                 onClick = onClick,
                 onLongClick = onLongPress
-            ),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        )
+            )
     ) {
         Row(
             modifier = Modifier

@@ -22,4 +22,5 @@ interface RecordRepository {
     suspend fun getAllRecordsOnce(): List<Record>
     suspend fun insertRecords(records: List<Record>)
     suspend fun deleteAllRecords()
+    fun getDatesWithRecords(ledgerId: Long, startDate: LocalDate, endDate: LocalDate): Flow<Set<LocalDate>>
 }

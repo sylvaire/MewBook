@@ -38,6 +38,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.LocalDateTime
+import java.time.YearMonth
 import java.util.UUID
 import javax.inject.Inject
 import com.mewbook.app.util.PeriodDateRange
@@ -103,6 +104,8 @@ data class HomeUiState(
     val budgetProgress: Float = 0f,
     val selectedPeriodType: BudgetPeriodType = BudgetPeriodType.MONTH,
     val anchorDate: LocalDate = LocalDate.now(),
+    val calendarMonth: YearMonth = YearMonth.now(),
+    val datesWithRecords: Set<LocalDate> = emptySet(),
     val periodLabel: String = "",
     val canGoNext: Boolean = false,
     val isLoading: Boolean = true,
@@ -160,6 +163,8 @@ class HomeViewModel @Inject constructor(
     private val _totalBudget = MutableStateFlow(0.0)
     private val _budgetRemaining = MutableStateFlow(0.0)
     private val _showHomeOverviewCards = MutableStateFlow(true)
+    private val _calendarMonth = MutableStateFlow(YearMonth.now())
+    private val _datesWithRecords = MutableStateFlow<Set<LocalDate>>(emptySet())
     private val periodState = combine(_selectedPeriodType, _anchorDate) { selectedPeriodType, anchorDate ->
         HomePeriodState(selectedPeriodType = selectedPeriodType, anchorDate = anchorDate)
     }
@@ -219,7 +224,13 @@ class HomeViewModel @Inject constructor(
         )
     }
 
-    val uiState: StateFlow<HomeUiState> = combine(periodState, summaryState, contextState, interactionState) { period, summary, context, interaction ->
+    val uiState: StateFlow<HomeUiState> = combine(
+        combine(periodState, summaryState, contextState, interactionState) { period, summary, context, interaction ->
+            period to Triple(summary, context, interaction)
+        },
+        _datesWithRecords
+    ) { (period, triple), datesWithRecords ->
+        val (summary, context, interaction) = triple
         val overlay = interaction.overlay
         val search = interaction.search
         val activeLedgerId = context.activeLedger?.id ?: 1L
@@ -279,7 +290,9 @@ class HomeViewModel @Inject constructor(
                 records = context.allRecords,
                 ledgerId = activeLedgerId,
                 type = overlay.newRecordType ?: RecordType.EXPENSE
-            )
+            ),
+            calendarMonth = _calendarMonth.value,
+            datesWithRecords = datesWithRecords
         )
     }.stateIn(
         viewModelScope,
@@ -292,6 +305,7 @@ class HomeViewModel @Inject constructor(
         restoreSelectedPeriodType()
         restoreHomeOverviewVisibility()
         observePeriodData()
+        observeCalendarMonthData()
     }
 
     private fun initializeData() {
@@ -371,6 +385,24 @@ class HomeViewModel @Inject constructor(
 
     fun selectAnchorDate(date: LocalDate) {
         _anchorDate.update { date }
+    }
+
+    fun setCalendarMonth(month: YearMonth) {
+        _calendarMonth.update { month }
+    }
+
+    private fun observeCalendarMonthData() {
+        viewModelScope.launch {
+            combine(_calendarMonth, ledgerRepository.getDefaultLedgerFlow()) { month, ledger ->
+                month to (ledger?.id ?: 1L)
+            }.collectLatest { (month, ledgerId) ->
+                val start = month.atDay(1)
+                val end = month.atEndOfMonth()
+                getRecordsUseCase.getDatesWithRecords(ledgerId, start, end).collect { dates ->
+                    _datesWithRecords.update { dates }
+                }
+            }
+        }
     }
 
     fun showAddSheet(initialType: RecordType? = null) {

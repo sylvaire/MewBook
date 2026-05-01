@@ -4,11 +4,13 @@ import android.app.Activity
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Shapes
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
@@ -126,6 +128,7 @@ fun MewBookTheme(
     MaterialTheme(
         colorScheme = colorScheme,
         typography = Typography,
+        shapes = MewBookShapes,
         content = {
             CompositionLocalProvider(LocalIsDarkTheme provides darkTheme) {
                 content()
@@ -153,12 +156,20 @@ object ClayDesign {
     val ButtonShadowElevation = 6.dp
 
     // 阴影颜色
-    val CardShadowColor = Color(0xFFF97316).copy(alpha = 0.12f)
-    val CardShadowColor2 = Color(0xFFF97316).copy(alpha = 0.08f)
-    val ButtonShadowColor = Color(0xFFF97316).copy(alpha = 0.25f)
+    val CardShadowColor = Primary.copy(alpha = 0.12f)
+    val CardShadowColor2 = Primary.copy(alpha = 0.08f)
+    val ButtonShadowColor = Primary.copy(alpha = 0.25f)
 
     // 间距
     val CardPadding = 16.dp
     val CardSpacing = 12.dp
     val SectionSpacing = 24.dp
 }
+
+val MewBookShapes = Shapes(
+    extraSmall = RoundedCornerShape(8.dp),
+    small = RoundedCornerShape(ClayDesign.InputRadius),
+    medium = RoundedCornerShape(ClayDesign.ButtonRadius),
+    large = RoundedCornerShape(ClayDesign.CardRadius),
+    extraLarge = RoundedCornerShape(28.dp)
+)

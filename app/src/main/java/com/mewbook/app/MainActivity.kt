@@ -16,6 +16,7 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -31,6 +32,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
 import com.mewbook.app.ui.navigation.MewBookNavHost
+import com.mewbook.app.domain.policy.DavAutoBackupCoordinator
 import com.mewbook.app.ui.theme.MewBookTheme
 import com.mewbook.app.data.preferences.AppThemeMode
 import com.mewbook.app.ui.theme.ThemeViewModel
@@ -38,12 +40,16 @@ import com.mewbook.app.ui.update.AppUpdateUiState
 import com.mewbook.app.ui.update.AppUpdateViewModel
 import dagger.hilt.android.AndroidEntryPoint
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
 import java.io.File
+import javax.inject.Inject
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     private val themeViewModel: ThemeViewModel by viewModels()
     private val appUpdateViewModel: AppUpdateViewModel by viewModels()
+    @Inject lateinit var davAutoBackupCoordinator: DavAutoBackupCoordinator
     private lateinit var installApkLauncher: ActivityResultLauncher<Intent>
     private var pendingInstallAfterPermissionPath: String? = null
 
@@ -87,6 +93,8 @@ class MainActivity : ComponentActivity() {
                             currentVersionName = BuildConfig.VERSION_NAME,
                             onDismissUpdate = appUpdateViewModel::dismissUpdateDialog,
                             onDownloadUpdate = appUpdateViewModel::downloadAvailableUpdate,
+                            onSnoozeVersion = appUpdateViewModel::snoozeCurrentVersion,
+                            onDisableUpdate = appUpdateViewModel::disableUpdateChecking,
                             onDismissInstall = appUpdateViewModel::dismissInstallDialog,
                             onInstall = ::tryInstallDownloadedApk,
                             onDismissPermission = appUpdateViewModel::dismissInstallPermissionDialog,
@@ -96,6 +104,13 @@ class MainActivity : ComponentActivity() {
                     }
                 }
             }
+        }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        lifecycleScope.launch {
+            davAutoBackupCoordinator.runIfDue()
         }
     }
 
@@ -165,6 +180,8 @@ private fun AppUpdateDialogs(
     currentVersionName: String,
     onDismissUpdate: () -> Unit,
     onDownloadUpdate: () -> Unit,
+    onSnoozeVersion: () -> Unit,
+    onDisableUpdate: () -> Unit,
     onDismissInstall: () -> Unit,
     onInstall: (String?) -> Unit,
     onDismissPermission: () -> Unit,
@@ -192,8 +209,16 @@ private fun AppUpdateDialogs(
                 }
             },
             dismissButton = {
-                TextButton(onClick = onDismissUpdate) {
-                    Text("稍后")
+                Row {
+                    TextButton(onClick = onSnoozeVersion) {
+                        Text("跳过此版本")
+                    }
+                    TextButton(onClick = onDisableUpdate) {
+                        Text("关闭更新")
+                    }
+                    TextButton(onClick = onDismissUpdate) {
+                        Text("稍后")
+                    }
                 }
             }
         )

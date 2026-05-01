@@ -4,15 +4,12 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.automirrored.filled.MenuBook
+import androidx.compose.material.icons.filled.AccountBalance
 import androidx.compose.material.icons.filled.Category
 import androidx.compose.material.icons.filled.CloudSync
 import androidx.compose.material.icons.filled.DeleteForever
@@ -23,14 +20,11 @@ import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -40,20 +34,22 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.compose.foundation.verticalScroll
 import com.mewbook.app.BuildConfig
 import com.mewbook.app.data.preferences.AppThemeMode
 import com.mewbook.app.domain.model.BudgetPeriodType
 import com.mewbook.app.ui.components.BudgetPeriodTypeSelector
 import com.mewbook.app.ui.components.MewCompactTopAppBar
-import com.mewbook.app.ui.theme.ClayDesign
-import com.mewbook.app.ui.theme.clayCardShadow
+import com.mewbook.app.ui.components.SettingsDangerRowCard
+import com.mewbook.app.ui.components.SettingsPageScaffold
+import com.mewbook.app.ui.components.SettingsRowCard
+import com.mewbook.app.ui.components.SettingsSectionHeader
+import com.mewbook.app.ui.components.SettingsSummaryCard
+import com.mewbook.app.ui.components.SettingsSurfaceCard
+import com.mewbook.app.ui.components.SettingsSwitchRowCard
 import com.mewbook.app.ui.components.displayLabel
 import com.mewbook.app.ui.update.AppUpdateUiState
 
@@ -73,6 +69,7 @@ fun SettingsScreen(
     val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
     val showHomeOverviewCards by viewModel.showHomeOverviewCards.collectAsStateWithLifecycle()
     val selectedHomePeriod by viewModel.selectedHomePeriod.collectAsStateWithLifecycle()
+    val updateEnabled by viewModel.updateEnabled.collectAsStateWithLifecycle()
     var showThemeDialog by remember { mutableStateOf(false) }
     var showClearDataDialog by remember { mutableStateOf(false) }
     var clearDataConfirmText by remember { mutableStateOf("") }
@@ -148,29 +145,35 @@ fun SettingsScreen(
             )
         }
     ) { paddingValues ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .verticalScroll(rememberScrollState())
-                .padding(16.dp)
-                .padding(bottom = 24.dp)
-        ) {
-            Text(
-                text = "通用",
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(vertical = 8.dp)
+        SettingsPageScaffold(paddingValues = paddingValues) {
+            SettingsSummaryCard(
+                icon = Icons.Filled.Info,
+                title = "喵喵记账",
+                subtitle = "版本 ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})"
             )
 
-            SettingsItem(
+            val updateSubtitle = updateStatusSubtitle(updateUiState)
+            if (updateSubtitle != null) {
+                SettingsSummaryCard(
+                    icon = Icons.Filled.Download,
+                    title = "更新状态",
+                    subtitle = updateSubtitle
+                )
+            }
+
+            SettingsSectionHeader(
+                title = "偏好",
+                description = "控制主题、首页信息密度和默认统计周期。"
+            )
+
+            SettingsRowCard(
                 icon = Icons.Filled.Palette,
                 title = "主题",
                 subtitle = themeMode.displayName,
                 onClick = { showThemeDialog = true }
             )
 
-            SettingsSwitchItem(
+            SettingsSwitchRowCard(
                 icon = Icons.Filled.AccountBalanceWallet,
                 title = "首页收支概览",
                 subtitle = "控制首页是否显示收支概览卡片",
@@ -183,100 +186,89 @@ fun SettingsScreen(
                 onSelect = viewModel::setSelectedHomePeriod
             )
 
-            SettingsItem(
-                icon = Icons.AutoMirrored.Filled.MenuBook,
+            SettingsSectionHeader(
+                title = "账务结构",
+                description = "管理账本、分类、预算和固定收支模板。"
+            )
+
+            SettingsRowCard(
+                icon = Icons.Filled.AccountBalance,
                 title = "账本管理",
                 subtitle = "长按删除，自定义排序",
                 onClick = onNavigateToLedgerManagement
             )
 
-            SettingsItem(
+            SettingsRowCard(
                 icon = Icons.Filled.Category,
                 title = "分类管理",
                 subtitle = "管理收支分类",
                 onClick = onNavigateToCategories
             )
 
-            SettingsItem(
+            SettingsRowCard(
                 icon = Icons.Filled.AccountBalanceWallet,
                 title = "预算管理",
                 subtitle = "设置不同周期及类型预算",
                 onClick = onNavigateToBudget
             )
 
-            SettingsItem(
+            SettingsRowCard(
                 icon = Icons.Filled.CalendarMonth,
                 title = "周期模板",
                 subtitle = "工资、房租、订阅等固定记账",
                 onClick = onNavigateToRecurringTemplates
             )
 
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Text(
-                text = "同步",
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(vertical = 8.dp)
+            SettingsSectionHeader(
+                title = "数据与同步",
+                description = "处理云端备份、本地备份、还原和外部导入。"
             )
 
-            SettingsItem(
+            SettingsRowCard(
                 icon = Icons.Filled.CloudSync,
                 title = "DAV同步",
-                subtitle = "云端导入导出与同步预览",
+                subtitle = "自动备份、手动导入导出与同步预览",
                 onClick = onNavigateToDavSettings
             )
 
-            SettingsItem(
+            SettingsRowCard(
                 icon = Icons.Filled.Download,
                 title = "迁移与备份",
                 subtitle = "外部导入、本地备份、还原与格式导出",
                 onClick = onNavigateToExport
             )
 
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Text(
-                text = "数据",
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(vertical = 8.dp)
+            SettingsSectionHeader(
+                title = "应用与安全",
+                description = "更新检查和不可恢复的数据操作集中在这里。"
             )
 
-            SettingsItem(
+            SettingsSwitchRowCard(
+                icon = Icons.Filled.CloudSync,
+                title = "自动检查更新",
+                subtitle = if (updateEnabled) "已开启" else "已关闭",
+                checked = updateEnabled,
+                onCheckedChange = viewModel::setUpdateEnabled
+            )
+
+            SettingsRowCard(
+                icon = Icons.Filled.Download,
+                title = "检查更新",
+                subtitle = if (!updateEnabled) "更新功能已关闭" else updateStatusSubtitle(updateUiState) ?: "点击检查",
+                onClick = onCheckForUpdates
+            )
+
+            SettingsDangerRowCard(
                 icon = Icons.Filled.DeleteForever,
                 title = "清除数据",
                 subtitle = "删除所有记账数据，不可恢复",
                 onClick = { showClearDataDialog = true }
             )
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Text(
-                text = "关于",
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(vertical = 8.dp)
-            )
-
-            SettingsItem(
-                icon = Icons.Filled.Download,
-                title = "检查更新",
-                subtitle = updateStatusSubtitle(updateUiState),
-                onClick = onCheckForUpdates
-            )
-
-            SettingsItem(
-                icon = Icons.Filled.Info,
-                title = "关于喵喵记账",
-                subtitle = "版本 ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
-                onClick = { }
-            )
         }
     }
 }
 
-private fun updateStatusSubtitle(updateUiState: AppUpdateUiState): String {
+private fun updateStatusSubtitle(updateUiState: AppUpdateUiState): String? {
     return when {
         updateUiState.isDownloading -> {
             val percentText = updateUiState.downloadProgressPercent?.let { "$it%" } ?: "进行中"
@@ -285,7 +277,7 @@ private fun updateStatusSubtitle(updateUiState: AppUpdateUiState): String {
 
         updateUiState.isChecking -> "正在检查 GitHub Release..."
         updateUiState.availableRelease != null -> "发现新版本 ${updateUiState.availableRelease.versionName}"
-        else -> "当前版本 ${BuildConfig.VERSION_NAME}"
+        else -> null
     }
 }
 
@@ -294,17 +286,7 @@ private fun HomePeriodPreferenceItem(
     selectedPeriodType: BudgetPeriodType,
     onSelect: (BudgetPeriodType) -> Unit
 ) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp)
-            .clayCardShadow(),
-        shape = RoundedCornerShape(ClayDesign.CardRadius),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        )
-    ) {
+    SettingsSurfaceCard {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -325,7 +307,8 @@ private fun HomePeriodPreferenceItem(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = "首页显示周期",
-                        style = MaterialTheme.typography.bodyLarge
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = androidx.compose.ui.text.font.FontWeight.Medium
                     )
                     Text(
                         text = "当前：${selectedPeriodType.displayLabel()}，控制首页记录和金额概览的统计范围",
@@ -388,115 +371,4 @@ private fun ThemeModeDialog(
             }
         }
     )
-}
-
-@Composable
-fun SettingsItem(
-    icon: ImageVector,
-    title: String,
-    subtitle: String,
-    onClick: () -> Unit
-) {
-    Card(
-        onClick = onClick,
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp)
-            .clayCardShadow(),
-        shape = RoundedCornerShape(ClayDesign.CardRadius),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        )
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary
-            )
-
-            Spacer(modifier = Modifier.width(16.dp))
-
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.bodyLarge
-                )
-                Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-    }
-}
-
-@Composable
-fun SettingsSwitchItem(
-    icon: ImageVector,
-    title: String,
-    subtitle: String,
-    checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit
-) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp)
-            .clayCardShadow(),
-        shape = RoundedCornerShape(ClayDesign.CardRadius),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        )
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary
-            )
-
-            Spacer(modifier = Modifier.width(16.dp))
-
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.bodyLarge
-                )
-                Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-
-            Switch(
-                checked = checked,
-                onCheckedChange = onCheckedChange
-            )
-        }
-    }
 }

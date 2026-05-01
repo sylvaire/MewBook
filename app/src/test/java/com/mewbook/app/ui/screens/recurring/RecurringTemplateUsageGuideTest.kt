@@ -19,6 +19,9 @@ class RecurringTemplateUsageGuideTest {
         assertTrue(RecurringTemplateUsageGuide.steps.any { it.detail.contains("下次到期") })
         assertTrue(RecurringTemplateUsageGuide.steps.any { it.detail.contains("生成本期") })
         assertTrue(RecurringTemplateUsageGuide.steps.any { it.detail.contains("跳过") })
-        assertTrue(RecurringTemplateUsageGuide.steps.any { it.detail.contains("手动") })
+        assertTrue(RecurringTemplateUsageGuide.steps.any { it.title.contains("闭环") })
+        assertTrue(RecurringTemplateUsageGuide.steps.any { it.detail.contains("推进到下一次") })
+        assertTrue(RecurringTemplateUsageGuide.steps.any { it.detail.contains("结束日期") })
+        assertFalse(RecurringTemplateUsageGuide.steps.any { it.detail.contains("P0") })
     }
 }

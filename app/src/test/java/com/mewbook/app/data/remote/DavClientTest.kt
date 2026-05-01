@@ -23,4 +23,20 @@ class DavClientTest {
         assertNotNull(request.header("Authorization"))
         assertNotNull(request.body)
     }
+
+    @Test
+    fun buildDeleteRequest_usesDeleteWithBasicAuth() {
+        val request = davClient.buildDeleteRequest(
+            serverUrl = "https://dav.example.com/MewBook/mewbook_backup_20260401_120000.json",
+            username = "user@example.com",
+            password = "secret"
+        )
+
+        assertEquals("DELETE", request.method)
+        assertEquals(
+            "https://dav.example.com/MewBook/mewbook_backup_20260401_120000.json",
+            request.url.toString()
+        )
+        assertNotNull(request.header("Authorization"))
+    }
 }

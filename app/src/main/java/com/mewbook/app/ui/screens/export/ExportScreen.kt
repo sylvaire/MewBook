@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -26,7 +27,6 @@ import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.TableChart
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -37,7 +37,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -51,6 +50,13 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.activity.result.contract.ActivityResultContracts
 import com.mewbook.app.data.backup.BackupCategoryImportAction
 import com.mewbook.app.ui.components.MewCompactTopAppBar
+import com.mewbook.app.ui.components.SettingsPageScaffold
+import com.mewbook.app.ui.components.SettingsSectionHeader
+import com.mewbook.app.ui.components.SettingsSummaryCard
+import com.mewbook.app.ui.components.SettingsSurfaceCard
+import com.mewbook.app.ui.theme.ClayDesign
+import com.mewbook.app.ui.theme.clayCardShadow
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -59,7 +65,7 @@ fun ExportScreen(
     onNavigateToSmartImport: () -> Unit,
     onNavigateBack: () -> Unit
 ) {
-    val uiState by viewModel.uiState.collectAsState()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val restoreContentContract = remember {
         GetContentWithMimeTypes(arrayOf("application/json", "text/json"))
@@ -249,63 +255,29 @@ fun ExportScreen(
             )
         }
     ) { paddingValues ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .padding(16.dp)
-                .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            Text(
-                text = "迁移、备份与还原",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
-            )
-
-            Text(
-                text = "这里集中管理本地备份、格式导出与数据还原。每次还原前都会先展示数据预览和冲突提示。",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+        SettingsPageScaffold(paddingValues = paddingValues) {
+            SettingsSummaryCard(
+                icon = Icons.Filled.CheckCircle,
+                title = "迁移、备份与还原",
+                subtitle = "本地备份、格式导出和数据还原都在这里处理；还原与导入前会先展示预览。"
             )
 
             uiState.currentSnapshotSummary?.let { summary ->
-                Card(modifier = Modifier.fillMaxWidth()) {
-                    Column(
-                        modifier = Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Text(
-                            text = "当前数据概览",
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                        Text(
-                            text = "记录 ${summary.records}、分类 ${summary.categories}、账户 ${summary.accounts}、预算 ${summary.budgets}、模板 ${summary.templates}、账本 ${summary.ledgers}",
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                        Text(
-                            text = if (summary.hasExistingData) {
-                                "已有数据，执行还原会覆盖当前本地内容。"
-                            } else {
-                                "当前没有本地数据，可以直接开始导入或备份。"
-                            },
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
+                SettingsSummaryCard(
+                    title = "当前数据概览",
+                    subtitle = "记录 ${summary.records}、分类 ${summary.categories}、账户 ${summary.accounts}、预算 ${summary.budgets}、模板 ${summary.templates}、账本 ${summary.ledgers}。${
+                        if (summary.hasExistingData) "还原会覆盖当前本地内容。" else "当前没有本地数据。"
+                    }",
+                    icon = Icons.Filled.CheckCircle
+                )
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Text(
-                text = "导入其他记账 App",
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.SemiBold
+            SettingsSectionHeader(
+                title = "导入其他记账 App",
+                description = "CSV 走本地解析；字段混乱时可以进入智能导入。"
             )
 
-            Card(modifier = Modifier.fillMaxWidth()) {
+            SettingsSurfaceCard {
                 Column(
                     modifier = Modifier.padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -352,15 +324,12 @@ fun ExportScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Text(
-                text = "本地备份",
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.SemiBold
+            SettingsSectionHeader(
+                title = "本地备份",
+                description = "完整保存或恢复应用数据，适合换机前后使用。"
             )
 
-            Card(modifier = Modifier.fillMaxWidth()) {
+            SettingsSurfaceCard {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -404,13 +373,7 @@ fun ExportScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Text(
-                text = "分享导出",
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.SemiBold
-            )
+            SettingsSectionHeader(title = "分享导出")
 
             ExportOptionCard(
                 icon = Icons.Default.TableChart,
@@ -429,11 +392,8 @@ fun ExportScreen(
             )
 
             if (uiState.error != null) {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = androidx.compose.material3.CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.errorContainer
-                    )
+                SettingsSurfaceCard(
+                    containerColor = MaterialTheme.colorScheme.errorContainer
                 ) {
                     Text(
                         text = "操作失败: ${uiState.error}",
@@ -443,18 +403,15 @@ fun ExportScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Text(
-                text = "迁移说明：",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Text(
-                text = "• 导入其他记账 App：读取常见 CSV 导出列并先预览，再按去重策略合并到当前账本\n• 本地备份/还原：完整应用数据（记录、分类、账户、预算、周期模板、账本、DAV配置、主题）\n• 分享导出 CSV：便于表格查看和迁移到其他工具\n• 分享导出 JSON：统一版本化备份快照，适合跨设备恢复",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            SettingsSectionHeader(title = "迁移说明")
+            SettingsSurfaceCard {
+                Text(
+                    text = "导入其他记账 App 会读取常见 CSV 导出列并先预览，再按去重策略合并到当前账本。本地备份/还原会处理完整应用数据。CSV 适合表格查看，JSON 适合跨设备恢复。",
+                    modifier = Modifier.padding(16.dp),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
     }
 }
@@ -496,9 +453,7 @@ fun ExportOptionCard(
     onClick: () -> Unit,
     isLoading: Boolean
 ) {
-    Card(
-        modifier = Modifier.fillMaxWidth()
-    ) {
+    SettingsSurfaceCard {
         Row(
             modifier = Modifier
                 .fillMaxWidth()

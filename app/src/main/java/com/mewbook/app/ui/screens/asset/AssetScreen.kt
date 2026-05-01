@@ -1,6 +1,5 @@
 package com.mewbook.app.ui.screens.asset
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,6 +14,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.Card
@@ -27,7 +27,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -35,12 +34,15 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mewbook.app.domain.model.Account
 import com.mewbook.app.ui.components.AccountTypeIconBadge
 import com.mewbook.app.ui.components.MewCompactTopAppBar
 import com.mewbook.app.ui.components.toDisplayName
+import com.mewbook.app.ui.theme.ClayDesign
 import com.mewbook.app.ui.theme.ExpenseRed
 import com.mewbook.app.ui.theme.IncomeGreen
+import com.mewbook.app.ui.theme.clayCardShadow
 import com.mewbook.app.util.formatCurrency
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -50,7 +52,7 @@ fun AssetScreen(
     onNavigateToAddAccount: () -> Unit = {},
     viewModel: AssetViewModel = hiltViewModel()
 ) {
-    val uiState by viewModel.uiState.collectAsState()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     Scaffold(
         topBar = {
@@ -105,7 +107,11 @@ fun AssetScreen(
                     )
                 }
 
-                items(uiState.accounts) { account ->
+                items(
+                    items = uiState.accounts,
+                    key = { it.id },
+                    contentType = { "account" }
+                ) { account ->
                     AccountItem(
                         account = account,
                         onClick = { onNavigateToAccountEdit(account.id) }
@@ -126,7 +132,7 @@ fun AssetScreen(
                                 )
                                 Spacer(modifier = Modifier.height(8.dp))
                                 Text(
-                                    text = "在设置中添加您的账户",
+                                    text = "点击右下角 + 添加账户",
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -146,9 +152,13 @@ fun NetAssetCard(
     totalLiability: Double
 ) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clayCardShadow(),
+        shape = RoundedCornerShape(ClayDesign.CardRadius),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.primaryContainer
+            containerColor = MaterialTheme.colorScheme.surface
         )
     ) {
         Column(
@@ -160,7 +170,7 @@ fun NetAssetCard(
             Text(
                 text = "净资产",
                 style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onPrimaryContainer
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
@@ -178,7 +188,7 @@ fun NetAssetCard(
                     Text(
                         text = "资产",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
                         text = formatCurrency(totalAsset),
@@ -191,7 +201,7 @@ fun NetAssetCard(
                     Text(
                         text = "负债",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
                         text = formatCurrency(totalLiability),
@@ -211,9 +221,15 @@ fun AccountItem(
     onClick: (Account) -> Unit
 ) {
     Card(
+        onClick = { onClick(account) },
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { onClick(account) }
+            .clayCardShadow(),
+        shape = RoundedCornerShape(ClayDesign.CardRadius),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        )
     ) {
         Row(
             modifier = Modifier

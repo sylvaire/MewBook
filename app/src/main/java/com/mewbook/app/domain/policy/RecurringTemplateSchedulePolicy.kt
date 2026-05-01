@@ -49,4 +49,12 @@ object RecurringTemplateSchedulePolicy {
         val endDate = template.endDate
         return endDate == null || template.nextDueDate <= endDate
     }
+
+    fun canProcessCurrentOccurrence(template: RecurringTemplate): Boolean {
+        if (!template.isEnabled) {
+            return false
+        }
+        val endDate = template.endDate
+        return endDate == null || template.nextDueDate <= endDate
+    }
 }

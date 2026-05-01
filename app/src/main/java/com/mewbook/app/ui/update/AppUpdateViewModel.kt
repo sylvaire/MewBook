@@ -3,6 +3,7 @@ package com.mewbook.app.ui.update
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mewbook.app.BuildConfig
+import com.mewbook.app.data.preferences.AppUpdatePreferencesRepository
 import com.mewbook.app.data.update.AppUpdateRepository
 import com.mewbook.app.domain.model.AppUpdateRelease
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -22,25 +23,36 @@ data class AppUpdateUiState(
     val showUpdateDialog: Boolean = false,
     val showInstallDialog: Boolean = false,
     val showInstallPermissionDialog: Boolean = false,
+    val updateEnabled: Boolean = true,
     val infoMessage: String? = null,
     val errorMessage: String? = null
 )
 
 @HiltViewModel
 class AppUpdateViewModel @Inject constructor(
-    private val appUpdateRepository: AppUpdateRepository
+    private val appUpdateRepository: AppUpdateRepository,
+    private val appUpdatePreferencesRepository: AppUpdatePreferencesRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(AppUpdateUiState())
     val uiState: StateFlow<AppUpdateUiState> = _uiState.asStateFlow()
 
     init {
-        checkForUpdates(silent = true)
+        viewModelScope.launch {
+            val enabled = appUpdatePreferencesRepository.isUpdateEnabledOnce()
+            _uiState.update { it.copy(updateEnabled = enabled) }
+            if (enabled) {
+                checkForUpdates(silent = true)
+            }
+        }
     }
 
     fun checkForUpdates(silent: Boolean) {
         val currentState = _uiState.value
         if (currentState.isChecking || currentState.isDownloading) {
+            return
+        }
+        if (!currentState.updateEnabled) {
             return
         }
         viewModelScope.launch {
@@ -54,14 +66,18 @@ class AppUpdateViewModel @Inject constructor(
             runCatching {
                 appUpdateRepository.checkLatestRelease(BuildConfig.VERSION_NAME)
             }.onSuccess { release ->
-                _uiState.update {
-                    if (release != null) {
+                if (release != null) {
+                    val snoozedVersion = appUpdatePreferencesRepository.getSnoozedVersionOnce()
+                    val isSnoozed = snoozedVersion == release.versionName
+                    _uiState.update {
                         it.copy(
                             isChecking = false,
                             availableRelease = release,
-                            showUpdateDialog = true
+                            showUpdateDialog = !isSnoozed
                         )
-                    } else {
+                    }
+                } else {
+                    _uiState.update {
                         it.copy(
                             isChecking = false,
                             infoMessage = if (silent) null else "当前已是最新版本"
@@ -76,6 +92,43 @@ class AppUpdateViewModel @Inject constructor(
                     )
                 }
             }
+        }
+    }
+
+    fun snoozeCurrentVersion() {
+        val release = _uiState.value.availableRelease ?: return
+        viewModelScope.launch {
+            appUpdatePreferencesRepository.setSnoozedVersion(release.versionName)
+            _uiState.update {
+                it.copy(
+                    showUpdateDialog = false,
+                    availableRelease = null
+                )
+            }
+        }
+    }
+
+    fun disableUpdateChecking() {
+        viewModelScope.launch {
+            appUpdatePreferencesRepository.setUpdateEnabled(false)
+            _uiState.update {
+                it.copy(
+                    updateEnabled = false,
+                    showUpdateDialog = false,
+                    availableRelease = null
+                )
+            }
+        }
+    }
+
+    fun enableUpdateChecking() {
+        viewModelScope.launch {
+            appUpdatePreferencesRepository.setUpdateEnabled(true)
+            appUpdatePreferencesRepository.clearSnoozedVersion()
+            _uiState.update {
+                it.copy(updateEnabled = true)
+            }
+            checkForUpdates(silent = false)
         }
     }
 

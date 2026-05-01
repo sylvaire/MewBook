@@ -16,7 +16,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.DirectionsRun
 import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.automirrored.filled.ReceiptLong
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.AccountBalance
@@ -93,7 +92,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import com.mewbook.app.ui.theme.LocalIsDarkTheme
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -107,6 +105,7 @@ import com.mewbook.app.domain.model.RecordType
 import com.mewbook.app.ui.theme.ClayDesign
 import com.mewbook.app.ui.theme.ExpenseRed
 import com.mewbook.app.ui.theme.IncomeGreen
+import com.mewbook.app.ui.theme.clayCardShadow
 import java.text.NumberFormat
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -125,29 +124,12 @@ fun RecordItem(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val isDarkTheme = LocalIsDarkTheme.current
-    val cardShadowColor = MaterialTheme.colorScheme.primary.copy(
-        alpha = if (isDarkTheme) 0.08f else 0.15f
-    )
-    val cardShadowColorSecondary = MaterialTheme.colorScheme.primary.copy(
-        alpha = if (isDarkTheme) 0.04f else 0.10f
-    )
-
     // Claymorphism 卡片 - 多层柔和阴影
     Card(
         onClick = onClick,
         modifier = modifier
             .fillMaxWidth()
-            .shadow(
-                elevation = ClayDesign.CardShadowElevation1,
-                shape = RoundedCornerShape(ClayDesign.CardRadius),
-                spotColor = cardShadowColor
-            )
-            .shadow(
-                elevation = ClayDesign.CardShadowElevation2,
-                shape = RoundedCornerShape(ClayDesign.CardRadius),
-                spotColor = cardShadowColorSecondary
-            ),
+            .clayCardShadow(),
         shape = RoundedCornerShape(ClayDesign.CardRadius),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface

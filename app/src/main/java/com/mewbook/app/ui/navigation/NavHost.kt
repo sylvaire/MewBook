@@ -80,7 +80,7 @@ data class BottomNavItem(
 
 val bottomNavItems = listOf(
     BottomNavItem(Screen.Home, "记账", Icons.Filled.Home, Icons.Outlined.Home),
-    BottomNavItem(Screen.Statistics, "报表", Icons.Filled.BarChart, Icons.Outlined.BarChart),
+    BottomNavItem(Screen.Statistics, "统计", Icons.Filled.BarChart, Icons.Outlined.BarChart),
     BottomNavItem(Screen.Asset, "资产", Icons.Filled.AccountBalanceWallet, Icons.Outlined.AccountBalanceWallet),
     BottomNavItem(Screen.Settings, "设置", Icons.Filled.Settings, Icons.Outlined.Settings)
 )

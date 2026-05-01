@@ -59,6 +59,9 @@ class RecurringTemplateRepositoryImpl @Inject constructor(
             val template = recurringTemplateDao.getTemplateById(templateId)
                 ?: throw IllegalArgumentException("模板不存在")
             val domainTemplate = template.toDomain()
+            require(RecurringTemplateSchedulePolicy.canProcessCurrentOccurrence(domainTemplate)) {
+                "模板已停用或超过结束日期"
+            }
             val now = LocalDateTime.now()
             val recordDate = domainTemplate.nextDueDate
             val nextDueDate = RecurringTemplateSchedulePolicy.advanceNextDueDate(
@@ -101,6 +104,9 @@ class RecurringTemplateRepositoryImpl @Inject constructor(
             val template = recurringTemplateDao.getTemplateById(templateId)
                 ?: throw IllegalArgumentException("模板不存在")
             val domainTemplate = template.toDomain()
+            require(RecurringTemplateSchedulePolicy.canProcessCurrentOccurrence(domainTemplate)) {
+                "模板已停用或超过结束日期"
+            }
             val now = LocalDateTime.now()
             val nextDueDate = RecurringTemplateSchedulePolicy.advanceNextDueDate(
                 currentDueDate = domainTemplate.nextDueDate,

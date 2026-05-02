@@ -33,6 +33,36 @@ class DavAutoBackupCoordinator @Inject constructor(
 
     private val mutex = Mutex()
 
+    suspend fun retry(now: LocalDateTime = LocalDateTime.now()) {
+        mutex.withLock {
+            val config = getDavConfigUseCase.getOnce()
+            if (config == null || !config.isConfigured()) {
+                return
+            }
+
+            val today = now.toLocalDate()
+            statusRepository.recordAttempt(today, now)
+            val result = exportWithRetry(config)
+            if (result.isFailure) {
+                statusRepository.recordFailure(
+                    "自动备份失败：${result.exceptionOrNull()?.message ?: "未知错误"}"
+                )
+                return
+            }
+
+            val pruneResult = withTimeoutOrNull(pruneTimeoutMs) {
+                davRepository.pruneBackupFiles(config, keepLatestCount = 30)
+            }
+            val message = when {
+                pruneResult == null -> "自动备份成功，但清理旧备份超时"
+                pruneResult.isFailure -> "自动备份成功，但清理旧备份失败：${pruneResult.exceptionOrNull()?.message ?: "未知错误"}"
+                pruneResult.getOrNull()?.failedFiles?.isNotEmpty() == true -> "自动备份成功，但清理旧备份失败：${pruneResult.getOrThrow().failedFiles.size} 个文件"
+                else -> null
+            }
+            statusRepository.recordSuccess(now, message)
+        }
+    }
+
     suspend fun runIfDue(now: LocalDateTime = LocalDateTime.now()) {
         mutex.withLock {
             val today = now.toLocalDate()

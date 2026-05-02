@@ -49,6 +49,7 @@ import com.mewbook.app.ui.components.SettingsSummaryCard
 import com.mewbook.app.ui.components.SettingsSurfaceCard
 import com.mewbook.app.ui.components.SettingsSwitchRowCard
 import androidx.compose.material.icons.filled.CloudSync
+import androidx.compose.material.icons.filled.Refresh
 import java.time.format.DateTimeFormatter
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -233,7 +234,9 @@ fun DavSettingsScreen(
                 Column(modifier = Modifier.padding(16.dp)) {
                     AutoBackupStatusBlock(
                         status = uiState.autoBackupStatus,
-                        enabled = uiState.isEnabled
+                        enabled = uiState.isEnabled,
+                        isRetrying = uiState.isRetrying,
+                        onRetry = viewModel::retryAutoBackup
                     )
                 }
             }
@@ -486,7 +489,9 @@ private fun BackupFilePickerDialog(
 @Composable
 private fun AutoBackupStatusBlock(
     status: DavAutoBackupStatus,
-    enabled: Boolean
+    enabled: Boolean,
+    isRetrying: Boolean = false,
+    onRetry: () -> Unit = {}
 ) {
     val formatter = remember { DateTimeFormatter.ofPattern("yyyy年MM月dd日 HH:mm") }
     val enabledText = if (enabled) {
@@ -523,5 +528,30 @@ private fun AutoBackupStatusBlock(
                 MaterialTheme.colorScheme.onSurfaceVariant
             }
         )
+    }
+    if (status.lastMessageIsError) {
+        Spacer(modifier = Modifier.height(8.dp))
+        TextButton(
+            onClick = onRetry,
+            enabled = !isRetrying,
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 0.dp, vertical = 0.dp)
+        ) {
+            if (isRetrying) {
+                CircularProgressIndicator(
+                    modifier = Modifier.height(14.dp).width(14.dp),
+                    strokeWidth = 2.dp
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Text("重试中…", style = MaterialTheme.typography.bodySmall)
+            } else {
+                Icon(
+                    Icons.Filled.Refresh,
+                    contentDescription = null,
+                    modifier = Modifier.height(14.dp).width(14.dp)
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Text("重新备份", style = MaterialTheme.typography.bodySmall)
+            }
+        }
     }
 }

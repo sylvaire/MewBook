@@ -16,6 +16,7 @@ import com.mewbook.app.domain.usecase.dav.ListBackupFilesUseCase
 import com.mewbook.app.domain.usecase.dav.PreviewImportDataUseCase
 import com.mewbook.app.domain.usecase.dav.SaveDavConfigUseCase
 import com.mewbook.app.domain.usecase.dav.TestConnectionUseCase
+import com.mewbook.app.domain.policy.DavAutoBackupCoordinator
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -45,6 +46,7 @@ data class DavSettingsUiState(
     val selectedImportBackupFile: DavBackupFile? = null,
     val importPreview: BackupRestorePreview? = null,
     val autoBackupStatus: DavAutoBackupStatus = DavAutoBackupStatus(),
+    val isRetrying: Boolean = false,
     val message: String? = null
 )
 
@@ -57,7 +59,8 @@ class DavSettingsViewModel @Inject constructor(
     private val listBackupFilesUseCase: ListBackupFilesUseCase,
     private val previewImportDataUseCase: PreviewImportDataUseCase,
     private val importDataUseCase: ImportDataUseCase,
-    private val davAutoBackupStatusRepository: DavAutoBackupStatusRepository
+    private val davAutoBackupStatusRepository: DavAutoBackupStatusRepository,
+    private val davAutoBackupCoordinator: DavAutoBackupCoordinator
 ) : ViewModel() {
 
     private companion object {
@@ -321,6 +324,14 @@ class DavSettingsViewModel @Inject constructor(
 
     fun dismissBackupFilePicker() {
         _uiState.update { it.copy(showBackupFilePicker = false, isLoadingBackupFiles = false) }
+    }
+
+    fun retryAutoBackup() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isRetrying = true, message = null) }
+            davAutoBackupCoordinator.retry()
+            _uiState.update { it.copy(isRetrying = false) }
+        }
     }
 
     fun clearMessage() {

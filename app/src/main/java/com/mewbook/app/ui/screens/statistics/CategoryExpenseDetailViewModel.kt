@@ -3,6 +3,8 @@ package com.mewbook.app.ui.screens.statistics
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.room.withTransaction
+import com.mewbook.app.data.local.database.MewBookDatabase
 import com.mewbook.app.domain.model.Account
 import com.mewbook.app.domain.model.Category
 import com.mewbook.app.domain.model.Ledger
@@ -64,6 +66,7 @@ class CategoryExpenseDetailViewModel @Inject constructor(
     private val addRecordUseCase: AddRecordUseCase,
     private val updateRecordUseCase: UpdateRecordUseCase,
     private val deleteRecordUseCase: DeleteRecordUseCase,
+    private val database: MewBookDatabase,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
@@ -157,59 +160,61 @@ class CategoryExpenseDetailViewModel @Inject constructor(
         accountId: Long?
     ) {
         viewModelScope.launch {
-            val now = LocalDateTime.now()
-            val editing = _editingRecord.value
-            val activeLedgerId = uiState.value.records.firstOrNull()?.ledgerId ?: 1L
+            database.withTransaction {
+                val now = LocalDateTime.now()
+                val editing = _editingRecord.value
+                val activeLedgerId = uiState.value.records.firstOrNull()?.ledgerId ?: 1L
 
-            if (editing != null) {
-                val oldAccountId = editing.accountId
-                if (oldAccountId != null) {
-                    val oldAccount = accountRepository.getAccountById(oldAccountId)
-                    if (oldAccount != null) {
-                        val oldBalanceChange = if (editing.type == RecordType.INCOME) -editing.amount else editing.amount
-                        accountRepository.updateBalance(oldAccountId, oldAccount.balance + oldBalanceChange)
+                if (editing != null) {
+                    val oldAccountId = editing.accountId
+                    if (oldAccountId != null) {
+                        val oldAccount = accountRepository.getAccountById(oldAccountId)
+                        if (oldAccount != null) {
+                            val oldBalanceChange = if (editing.type == RecordType.INCOME) -editing.amount else editing.amount
+                            accountRepository.updateBalance(oldAccountId, oldAccount.balance + oldBalanceChange)
+                        }
                     }
-                }
 
-                val updatedRecord = editing.copy(
-                    amount = amount,
-                    type = type,
-                    categoryId = categoryId,
-                    note = note,
-                    date = date,
-                    updatedAt = now,
-                    accountId = accountId
-                )
-                updateRecordUseCase(updatedRecord)
+                    val updatedRecord = editing.copy(
+                        amount = amount,
+                        type = type,
+                        categoryId = categoryId,
+                        note = note,
+                        date = date,
+                        updatedAt = now,
+                        accountId = accountId
+                    )
+                    updateRecordUseCase(updatedRecord)
 
-                if (accountId != null) {
-                    val newAccount = accountRepository.getAccountById(accountId)
-                    if (newAccount != null) {
-                        val newBalanceChange = if (type == RecordType.INCOME) amount else -amount
-                        accountRepository.updateBalance(accountId, newAccount.balance + newBalanceChange)
+                    if (accountId != null) {
+                        val newAccount = accountRepository.getAccountById(accountId)
+                        if (newAccount != null) {
+                            val newBalanceChange = if (type == RecordType.INCOME) amount else -amount
+                            accountRepository.updateBalance(accountId, newAccount.balance + newBalanceChange)
+                        }
                     }
-                }
-            } else {
-                val newRecord = Record(
-                    id = 0,
-                    amount = amount,
-                    type = type,
-                    categoryId = categoryId,
-                    note = note,
-                    date = date,
-                    createdAt = now,
-                    updatedAt = now,
-                    syncId = UUID.randomUUID().toString(),
-                    ledgerId = activeLedgerId,
-                    accountId = accountId
-                )
-                addRecordUseCase(newRecord)
+                } else {
+                    val newRecord = Record(
+                        id = 0,
+                        amount = amount,
+                        type = type,
+                        categoryId = categoryId,
+                        note = note,
+                        date = date,
+                        createdAt = now,
+                        updatedAt = now,
+                        syncId = UUID.randomUUID().toString(),
+                        ledgerId = activeLedgerId,
+                        accountId = accountId
+                    )
+                    addRecordUseCase(newRecord)
 
-                if (accountId != null) {
-                    val account = accountRepository.getAccountById(accountId)
-                    if (account != null) {
-                        val balanceChange = if (type == RecordType.INCOME) amount else -amount
-                        accountRepository.updateBalance(accountId, account.balance + balanceChange)
+                    if (accountId != null) {
+                        val account = accountRepository.getAccountById(accountId)
+                        if (account != null) {
+                            val balanceChange = if (type == RecordType.INCOME) amount else -amount
+                            accountRepository.updateBalance(accountId, account.balance + balanceChange)
+                        }
                     }
                 }
             }
@@ -219,18 +224,20 @@ class CategoryExpenseDetailViewModel @Inject constructor(
 
     fun deleteRecord(id: Long) {
         viewModelScope.launch {
-            val record = _editingRecord.value?.takeIf { it.id == id }
-                ?: _browsingRecord.value?.takeIf { it.id == id }
-                ?: uiState.value.records.find { rec -> rec.id == id }
-            if (record?.accountId != null) {
-                val accId = record.accountId
-                val account = accountRepository.getAccountById(accId)
-                if (account != null) {
-                    val balanceChange = if (record.type == RecordType.INCOME) -record.amount else record.amount
-                    accountRepository.updateBalance(accId, account.balance + balanceChange)
+            database.withTransaction {
+                val record = _editingRecord.value?.takeIf { it.id == id }
+                    ?: _browsingRecord.value?.takeIf { it.id == id }
+                    ?: uiState.value.records.find { rec -> rec.id == id }
+                if (record?.accountId != null) {
+                    val accId = record.accountId
+                    val account = accountRepository.getAccountById(accId)
+                    if (account != null) {
+                        val balanceChange = if (record.type == RecordType.INCOME) -record.amount else record.amount
+                        accountRepository.updateBalance(accId, account.balance + balanceChange)
+                    }
                 }
+                deleteRecordUseCase(id)
             }
-            deleteRecordUseCase(id)
             _browsingRecord.update { current -> current?.takeIf { it.id != id } }
         }
     }

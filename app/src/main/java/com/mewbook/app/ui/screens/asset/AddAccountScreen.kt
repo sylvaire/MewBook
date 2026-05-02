@@ -11,11 +11,15 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -34,6 +38,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -50,6 +55,8 @@ import com.mewbook.app.ui.components.AccountTypeIconBadge
 import com.mewbook.app.ui.components.MewCompactTopAppBar
 import com.mewbook.app.ui.components.defaultColorValue
 import com.mewbook.app.ui.components.toDisplayName
+import com.mewbook.app.ui.theme.ClayDesign
+import com.mewbook.app.ui.theme.clayCardShadow
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -207,92 +214,97 @@ fun AddAccountScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .padding(16.dp)
                 .verticalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp, vertical = 16.dp)
         ) {
-            Text(
-                text = "账户类型",
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+            // Type selection card
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clayCardShadow(),
+                shape = RoundedCornerShape(ClayDesign.CardRadius),
+                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surface
+                )
             ) {
-                AccountTypeChip(
-                    type = AccountType.BANK,
-                    isSelected = selectedType == AccountType.BANK,
-                    onClick = { selectedType = AccountType.BANK }
-                )
-                AccountTypeChip(
-                    type = AccountType.ALIPAY,
-                    isSelected = selectedType == AccountType.ALIPAY,
-                    onClick = { selectedType = AccountType.ALIPAY }
-                )
-                AccountTypeChip(
-                    type = AccountType.WECHAT,
-                    isSelected = selectedType == AccountType.WECHAT,
-                    onClick = { selectedType = AccountType.WECHAT }
-                )
-                AccountTypeChip(
-                    type = AccountType.CASH,
-                    isSelected = selectedType == AccountType.CASH,
-                    onClick = { selectedType = AccountType.CASH }
-                )
-                AccountTypeChip(
-                    type = AccountType.CREDIT_CARD,
-                    isSelected = selectedType == AccountType.CREDIT_CARD,
-                    onClick = { selectedType = AccountType.CREDIT_CARD }
-                )
-                AccountTypeChip(
-                    type = AccountType.INVESTMENT,
-                    isSelected = selectedType == AccountType.INVESTMENT,
-                    onClick = { selectedType = AccountType.INVESTMENT }
-                )
-                AccountTypeChip(
-                    type = AccountType.OTHER,
-                    isSelected = selectedType == AccountType.OTHER,
-                    onClick = { selectedType = AccountType.OTHER }
-                )
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 16.dp)
+                ) {
+                    Text(
+                        text = "账户类型",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        AccountType.entries.forEach { type ->
+                            AccountTypeChip(
+                                type = type,
+                                isSelected = selectedType == type,
+                                onClick = { selectedType = type }
+                            )
+                        }
+                    }
+                }
             }
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            // 账户名称 - 可编辑
-            OutlinedTextField(
-                value = if (accountName.isEmpty()) defaultName else accountName,
-                onValueChange = { accountName = it },
-                label = { Text("账户名称") },
-                placeholder = { Text("输入账户名称") },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true
-            )
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            OutlinedTextField(
-                value = balance,
-                onValueChange = { newValue ->
-                    if (newValue.isEmpty() || newValue.matches(Regex("^-?\\d*\\.?\\d{0,2}$"))) {
-                        balance = newValue
-                    }
-                },
-                label = { Text("账户余额") },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                prefix = { Text("¥") },
-                supportingText = {
-                    Text(
-                        text = if (selectedType == AccountType.CREDIT_CARD) "信用卡请输入负数，如 -1000.00" else "输入当前账户余额"
+            // Fields card
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clayCardShadow(),
+                shape = RoundedCornerShape(ClayDesign.CardRadius),
+                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surface
+                )
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    OutlinedTextField(
+                        value = if (accountName.isEmpty()) defaultName else accountName,
+                        onValueChange = { accountName = it },
+                        label = { Text("账户名称") },
+                        placeholder = { Text("输入账户名称") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
+
+                    OutlinedTextField(
+                        value = balance,
+                        onValueChange = { newValue ->
+                            if (newValue.isEmpty() || newValue.matches(Regex("^-?\\d*\\.?\\d{0,2}$"))) {
+                                balance = newValue
+                            }
+                        },
+                        label = { Text("账户余额") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        prefix = { Text("¥") },
+                        supportingText = {
+                            Text(
+                                text = if (selectedType == AccountType.CREDIT_CARD) "信用卡请输入负数，如 -1000.00" else "输入当前账户余额"
+                            )
+                        }
                     )
                 }
-            )
+            }
 
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(24.dp))
 
             Button(
                 onClick = {
@@ -301,7 +313,9 @@ fun AddAccountScreen(
                     viewModel.saveAccount(accountName, selectedType, balanceValue)
                 },
                 modifier = Modifier.fillMaxWidth(),
-                enabled = !uiState.isSaving
+                enabled = !uiState.isSaving,
+                shape = RoundedCornerShape(ClayDesign.ButtonRadius),
+                elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp)
             ) {
                 if (uiState.isSaving) {
                     CircularProgressIndicator(
@@ -309,7 +323,7 @@ fun AddAccountScreen(
                         color = MaterialTheme.colorScheme.onPrimary
                     )
                 } else {
-                    Text("保存")
+                    Text("保存", fontWeight = FontWeight.SemiBold)
                 }
             }
 

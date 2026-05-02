@@ -12,7 +12,8 @@ MewBook 为单模块 Android 应用（`app`），使用 Kotlin、Jetpack Compose
 | JVM 目标 | 17 |
 | Android Gradle Plugin | 8.2.2 |
 | minSdk / targetSdk | 26 / 34 |
-| 应用版本 | versionCode 3, versionName 1.0.2 |
+| 应用版本 | versionCode 7, versionName 1.0.6 |
+| Room 数据库 | `mewbook.db` version 4 |
 
 ## UI
 
@@ -28,13 +29,13 @@ MewBook 为单模块 Android 应用（`app`），使用 Kotlin、Jetpack Compose
 
 ## 数据与存储
 
-- **Room**（`2.6.1`）：本地 SQLite，实体含流水、分类、账本、资产、预算、WebDAV 配置等
-- **DataStore Preferences**：主题等偏好
+- **Room**（`2.6.1`）：本地 SQLite，实体含流水、分类、账本、资产、预算、WebDAV 配置、周期模板等
+- **DataStore Preferences**：主题、首页周期、首页概览卡片等偏好
 - **kotlinx-serialization-json**（`1.6.2`）：JSON 序列化（备份等场景）
 
 ## 网络与安全
 
-- **OkHttp**（`4.12.0`）：WebDAV 同步/探测
+- **OkHttp**（`4.12.0`）：WebDAV 同步/探测、OpenAI 兼容智能导入、GitHub Release 更新检查
 - **androidx.security:security-crypto**：凭据相关安全能力（与配置配合使用）
 
 ## 异步
@@ -44,6 +45,7 @@ MewBook 为单模块 Android 应用（`app`），使用 Kotlin、Jetpack Compose
 ## 构建与签名
 
 - 根 `build.gradle.kts` 仅声明插件版本；`app/build.gradle.kts` 中通过可选的 `keystore.properties` 配置 release 签名。
+- `.github/workflows/release.yml` 监听 `v*.*.*` tag，构建 release APK 并发布 GitHub Release。
 - Release 构建当前 **未启用** `minify`（`isMinifyEnabled = false`）。
 
 ## 非代码资产

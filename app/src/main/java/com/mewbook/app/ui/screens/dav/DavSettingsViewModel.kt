@@ -2,6 +2,7 @@ package com.mewbook.app.ui.screens.dav
 
 import android.util.Log
 import androidx.lifecycle.ViewModel
+import com.mewbook.app.BuildConfig
 import androidx.lifecycle.viewModelScope
 import com.mewbook.app.data.backup.BackupRestorePreview
 import com.mewbook.app.domain.model.DavAutoBackupStatus
@@ -141,7 +142,7 @@ class DavSettingsViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isTesting = true, message = null) }
             val state = _uiState.value
-            Log.d(TAG, "testConnection serverUrl=${state.serverUrl} remotePath=${state.remotePath}")
+            if (BuildConfig.DEBUG) Log.d(TAG, "testConnection serverUrl=${state.serverUrl} remotePath=${state.remotePath}")
             val config = DavConfig(
                 serverUrl = state.serverUrl,
                 username = state.username,
@@ -187,7 +188,7 @@ class DavSettingsViewModel @Inject constructor(
                 )
             }
             val state = _uiState.value
-            Log.d(TAG, "exportData serverUrl=${state.serverUrl} remotePath=${state.remotePath}")
+            if (BuildConfig.DEBUG) Log.d(TAG, "exportData serverUrl=${state.serverUrl} remotePath=${state.remotePath}")
             val config = DavConfig(
                 serverUrl = state.serverUrl,
                 username = state.username,
@@ -222,7 +223,7 @@ class DavSettingsViewModel @Inject constructor(
                 )
             }
             val state = _uiState.value
-            Log.d(TAG, "previewImportData serverUrl=${state.serverUrl} remotePath=${state.remotePath}")
+            if (BuildConfig.DEBUG) Log.d(TAG, "previewImportData serverUrl=${state.serverUrl} remotePath=${state.remotePath}")
             val config = DavConfig(
                 serverUrl = state.serverUrl,
                 username = state.username,
@@ -254,7 +255,7 @@ class DavSettingsViewModel @Inject constructor(
                 )
             }
             val state = _uiState.value
-            Log.d(TAG, "previewImportData selected=${backupFile.fileUrl}")
+            if (BuildConfig.DEBUG) Log.d(TAG, "previewImportData selected=${backupFile.fileUrl}")
             val config = DavConfig(
                 serverUrl = state.serverUrl,
                 username = state.username,
@@ -277,7 +278,7 @@ class DavSettingsViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isImporting = true, message = null) }
             val state = _uiState.value
-            Log.d(TAG, "importData serverUrl=${state.serverUrl} remotePath=${state.remotePath}")
+            if (BuildConfig.DEBUG) Log.d(TAG, "importData serverUrl=${state.serverUrl} remotePath=${state.remotePath}")
             val config = DavConfig(
                 serverUrl = state.serverUrl,
                 username = state.username,

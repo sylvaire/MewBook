@@ -155,8 +155,7 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun openInstallPermissionSettings(apkPath: String?) {
-        pendingInstallAfterPermissionPath = apkPath
+    private fun openInstallPermissionSettings() {
         appUpdateViewModel.dismissInstallPermissionDialog()
         val settingsIntent = Intent(
             Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
@@ -185,7 +184,7 @@ private fun AppUpdateDialogs(
     onDismissInstall: () -> Unit,
     onInstall: (String?) -> Unit,
     onDismissPermission: () -> Unit,
-    onOpenInstallPermissionSettings: (String?) -> Unit,
+    onOpenInstallPermissionSettings: () -> Unit,
     onDismissMessage: () -> Unit
 ) {
     val release = uiState.availableRelease
@@ -267,7 +266,7 @@ private fun AppUpdateDialogs(
             title = { Text("需要安装权限") },
             text = { Text("请允许喵喵记账安装未知应用，授权后会继续打开安装界面。") },
             confirmButton = {
-                TextButton(onClick = { onOpenInstallPermissionSettings(uiState.downloadedApkPath) }) {
+                TextButton(onClick = onOpenInstallPermissionSettings) {
                     Text("去设置")
                 }
             },

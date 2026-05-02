@@ -1,29 +1,28 @@
 # 路线图
 
-## 里程碑：统计页支出构成分类下钻
+## 里程碑：网盘自动备份
 
-### Phase 1 — 数据与导航契约
+### Phase 1 — 自动备份决策与状态
 
-- 明确统计子页所需参数：`categoryId`、`TimeRange`、锚点日期或等价 `startDate`/`endDate`、`ledgerId`（默认账本）。
-- 在 `RecordDao` / `RecordRepository`（或 UseCase）增加按「账本 + 日期区间 + 分类 + 支出类型」的查询（或复用组合过滤），返回 `Flow`/`List` 与现有模型一致。
-- 在 `Screen` / `NavHost` 增加路由，例如 `statistics_category_expense/{categoryId}`，使用 `SavedStateHandle` 或导航参数传递周期（推荐 **Navigation Compose 类型安全参数** 或 **单一字符串编码周期**，避免歧义）。
+- 新增 `DavAutoBackupPolicy`，覆盖是否应执行与远端保留文件筛选。
+- 新增 DataStore 状态仓库，保存最近尝试日期、尝试时间、成功时间和错误/警告信息。
+- 新增单元测试锁定每日一次、配置条件与保留 30 份策略。
 
-### Phase 2 — UI：分类支出明细页
+### Phase 2 — DAV 上传、清理与前台触发
 
-- 新建 `CategoryExpenseDetailScreen` + `CategoryExpenseDetailViewModel`（Hilt）。
-- 顶栏：返回、标题（分类名 + 周期）；主体：`LazyColumn` + 复用 `RecordItem` 或精简行。
-- `StatisticsScreen` 中 `ExpenseBreakdown` 为每行增加 `clickable` / `Modifier.clickable`，调用 `onCategoryClick(categoryId)`，由 `StatisticsScreen` 持有 `NavController` 或回调到 `NavHost` 导航。
+- 扩展 DAV remote/repository，支持 DELETE 与 `pruneBackupFiles(config, keepLatestCount = 30)`。
+- 新增 `DavAutoBackupCoordinator`，由 `MainActivity.onStart` 调用，并用 mutex 防止并发上传。
+- 自动备份复用现有 DAV 导出快照逻辑；上传成功后只清理旧自动备份，不删除手动导出文件。
 
-### Phase 3 — 验证
+### Phase 3 — 设置页展示与验证
 
-- 单元测试：日期区间与分类过滤逻辑（若有独立函数）。
-- 手动：周/月/年 + 切换周期 + 点击不同分类，核对笔数与合计。
+- DAV 设置页新增“打开 App 自动备份”开关，保存配置后生效。
+- DAV 设置页显示最近自动备份尝试、成功、错误或清理警告。
+- DAV 手动导出支持自定义文件名；留空时使用默认文件名。
+- DAV 导入流程改为先列出远端备份，用户手动选择后预览并确认恢复同一文件。
+- 运行单元测试、Debug 构建与 lint。
 
 ## 后续（Backlog，非本里程碑）
 
-- 明细页支持长按跳转编辑流水。
-- 支出构成展示「全部 N 个分类」与折叠。
-
-## 依赖关系
-
-- Phase 2 依赖 Phase 1 的路由与查询就绪。
+- 可选备份频率、保留份数配置。
+- 后台定时备份或网络条件约束。

@@ -59,6 +59,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mewbook.app.domain.model.Account
+import com.mewbook.app.domain.model.AccountType
 import com.mewbook.app.domain.model.Ledger
 import com.mewbook.app.domain.model.LedgerType
 import com.mewbook.app.domain.policy.AccountDefaultsPolicy
@@ -178,7 +179,7 @@ class LedgerManagementViewModel @Inject constructor(
         viewModelScope.launch {
             val existingLedgers = _uiState.value.ledgers
             val nextOrderTime = (existingLedgers.maxOfOrNull { it.createdAt } ?: System.currentTimeMillis()) + 1
-            ledgerRepository.insertLedger(
+            val ledgerId = ledgerRepository.insertLedger(
                 Ledger(
                     name = name,
                     type = type,
@@ -186,6 +187,18 @@ class LedgerManagementViewModel @Inject constructor(
                     color = type.defaultColor(),
                     createdAt = nextOrderTime,
                     isDefault = false
+                )
+            )
+            accountRepository.insertAccount(
+                Account(
+                    name = "现金",
+                    type = AccountType.CASH,
+                    balance = 0.0,
+                    icon = "account_balance_wallet",
+                    color = 0xFF4CAF50,
+                    isDefault = true,
+                    sortOrder = 0,
+                    ledgerId = ledgerId
                 )
             )
             hideAddDialog()

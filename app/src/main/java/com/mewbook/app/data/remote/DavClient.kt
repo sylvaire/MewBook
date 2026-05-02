@@ -2,6 +2,7 @@ package com.mewbook.app.data.remote
 
 import android.util.Log
 import android.util.Xml
+import com.mewbook.app.BuildConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.Credentials
@@ -12,6 +13,8 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import org.xmlpull.v1.XmlPullParser
 import java.io.IOException
 import java.io.StringReader
+import java.net.SocketTimeoutException
+import java.net.UnknownHostException
 import java.net.URI
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
@@ -25,6 +28,24 @@ class DavClient @Inject constructor(
 
     private companion object {
         const val TAG = "DavClient"
+        const val PROPFIND_BODY = "<?xml version=\"1.0\"?><d:propfind xmlns:d=\"DAV:\"><d:prop><d:resourcetype/></d:prop></d:propfind>"
+
+        fun mapHttpError(code: Int): String = when (code) {
+            401, 403 -> "认证失败（$code），请检查用户名和应用密码"
+            404 -> "路径不存在（404），请检查服务器地址和远程路径"
+            405 -> "服务器不支持此操作（405）"
+            409 -> "创建目录失败（409），路径可能已存在但不是目录"
+            502, 503, 504 -> "服务器暂时不可用（$code），请稍后重试"
+            507 -> "服务器存储空间不足（507）"
+            else -> "请求失败（$code）"
+        }
+
+        fun mapConnectionError(e: Exception): String = when (e) {
+            is SocketTimeoutException -> "连接超时，请检查服务器地址或网络"
+            is UnknownHostException -> "无法解析服务器地址，请检查 URL 是否正确"
+            is IOException -> "网络错误：${e.message ?: "未知错误"}"
+            else -> e.message ?: "未知错误"
+        }
     }
 
     override suspend fun testConnection(
@@ -34,22 +55,18 @@ class DavClient @Inject constructor(
     ): Result<Boolean> = withContext(Dispatchers.IO) {
         try {
             val request = buildConnectionProbeRequest(serverUrl, username, password)
-            Log.d(TAG, "${request.method} testConnection url=$serverUrl user=${username.take(2)}***")
+            if (BuildConfig.DEBUG) Log.d(TAG, "${request.method} testConnection url=$serverUrl user=${username.take(2)}***")
 
             okHttpClient.newCall(request).execute().use { response ->
-                Log.d(TAG, "${request.method} response code=${response.code} url=$serverUrl")
+                if (BuildConfig.DEBUG) Log.d(TAG, "${request.method} response code=${response.code} url=$serverUrl")
                 if (response.isSuccessful) {
                     Result.success(true)
-                } else if (response.code == 401 || response.code == 403) {
-                    Result.failure(IOException("Authentication failed: ${response.code}"))
-                } else if (response.code == 404) {
-                    Result.failure(IOException("WebDAV endpoint not found: ${response.code}"))
                 } else {
-                    Result.failure(IOException("Connection failed: ${response.code}"))
+                    Result.failure(IOException(mapHttpError(response.code)))
                 }
             }
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(IOException(mapConnectionError(e)))
         }
     }
 
@@ -62,7 +79,7 @@ class DavClient @Inject constructor(
             .url(serverUrl)
             .method(
                 "PROPFIND",
-                "<?xml version=\"1.0\"?><d:propfind xmlns:d=\"DAV:\"><d:prop><d:resourcetype/></d:prop></d:propfind>"
+                PROPFIND_BODY
                     .toRequestBody("application/xml".toMediaType())
             )
             .header("Authorization", Credentials.basic(username, password))
@@ -77,26 +94,26 @@ class DavClient @Inject constructor(
         depth: String
     ): Result<List<String>> = withContext(Dispatchers.IO) {
         try {
-            Log.d(TAG, "PROPFIND url=$serverUrl depth=$depth")
+            if (BuildConfig.DEBUG) Log.d(TAG, "PROPFIND url=$serverUrl depth=$depth")
             val request = Request.Builder()
                 .url(serverUrl)
-                .method("PROPFIND", "<?xml version=\"1.0\"?><d:propfind xmlns:d=\"DAV:\"><d:prop><d:resourcetype/></d:prop></d:propfind>".toRequestBody("application/xml".toMediaType()))
+                .method("PROPFIND", PROPFIND_BODY.toRequestBody("application/xml".toMediaType()))
                 .header("Authorization", Credentials.basic(username, password))
                 .header("Depth", depth)
                 .build()
 
             okHttpClient.newCall(request).execute().use { response ->
-                Log.d(TAG, "PROPFIND response code=${response.code} url=$serverUrl")
+                if (BuildConfig.DEBUG) Log.d(TAG, "PROPFIND response code=${response.code} url=$serverUrl")
                 if (response.isSuccessful) {
                     val body = response.body?.string() ?: ""
                     val files = parsePropfindResponse(body)
                     Result.success(files)
                 } else {
-                    Result.failure(IOException("PROPFIND failed: ${response.code}"))
+                    Result.failure(IOException(mapHttpError(response.code)))
                 }
             }
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(IOException(mapConnectionError(e)))
         }
     }
 
@@ -106,7 +123,7 @@ class DavClient @Inject constructor(
         password: String
     ): Result<String> = withContext(Dispatchers.IO) {
         try {
-            Log.d(TAG, "GET url=$serverUrl")
+            if (BuildConfig.DEBUG) Log.d(TAG, "GET url=$serverUrl")
             val request = Request.Builder()
                 .url(serverUrl)
                 .get()
@@ -114,16 +131,16 @@ class DavClient @Inject constructor(
                 .build()
 
             okHttpClient.newCall(request).execute().use { response ->
-                Log.d(TAG, "GET response code=${response.code} url=$serverUrl")
+                if (BuildConfig.DEBUG) Log.d(TAG, "GET response code=${response.code} url=$serverUrl")
                 if (response.isSuccessful) {
                     val body = response.body?.string() ?: ""
                     Result.success(body)
                 } else {
-                    Result.failure(IOException("GET failed: ${response.code}"))
+                    Result.failure(IOException(mapHttpError(response.code)))
                 }
             }
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(IOException(mapConnectionError(e)))
         }
     }
 
@@ -134,7 +151,7 @@ class DavClient @Inject constructor(
         content: String
     ): Result<Boolean> = withContext(Dispatchers.IO) {
         try {
-            Log.d(TAG, "PUT url=$serverUrl bytes=${content.toByteArray().size}")
+            if (BuildConfig.DEBUG) Log.d(TAG, "PUT url=$serverUrl bytes=${content.toByteArray().size}")
             val request = Request.Builder()
                 .url(serverUrl)
                 .put(content.toRequestBody("application/json".toMediaType()))
@@ -142,15 +159,15 @@ class DavClient @Inject constructor(
                 .build()
 
             okHttpClient.newCall(request).execute().use { response ->
-                Log.d(TAG, "PUT response code=${response.code} url=$serverUrl")
+                if (BuildConfig.DEBUG) Log.d(TAG, "PUT response code=${response.code} url=$serverUrl")
                 if (response.isSuccessful) {
                     Result.success(true)
                 } else {
-                    Result.failure(IOException("PUT failed: ${response.code}"))
+                    Result.failure(IOException(mapHttpError(response.code)))
                 }
             }
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(IOException(mapConnectionError(e)))
         }
     }
 
@@ -160,19 +177,19 @@ class DavClient @Inject constructor(
         password: String
     ): Result<Boolean> = withContext(Dispatchers.IO) {
         try {
-            Log.d(TAG, "DELETE url=$serverUrl")
+            if (BuildConfig.DEBUG) Log.d(TAG, "DELETE url=$serverUrl")
             val request = buildDeleteRequest(serverUrl, username, password)
 
             okHttpClient.newCall(request).execute().use { response ->
-                Log.d(TAG, "DELETE response code=${response.code} url=$serverUrl")
+                if (BuildConfig.DEBUG) Log.d(TAG, "DELETE response code=${response.code} url=$serverUrl")
                 if (response.isSuccessful || response.code == 404) {
                     Result.success(true)
                 } else {
-                    Result.failure(IOException("DELETE failed: ${response.code}"))
+                    Result.failure(IOException(mapHttpError(response.code)))
                 }
             }
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(IOException(mapConnectionError(e)))
         }
     }
 
@@ -194,7 +211,7 @@ class DavClient @Inject constructor(
         password: String
     ): Result<Boolean> = withContext(Dispatchers.IO) {
         try {
-            Log.d(TAG, "MKCOL url=$serverUrl")
+            if (BuildConfig.DEBUG) Log.d(TAG, "MKCOL url=$serverUrl")
             val request = Request.Builder()
                 .url(serverUrl)
                 .method("MKCOL", null)
@@ -202,15 +219,15 @@ class DavClient @Inject constructor(
                 .build()
 
             okHttpClient.newCall(request).execute().use { response ->
-                Log.d(TAG, "MKCOL response code=${response.code} url=$serverUrl")
+                if (BuildConfig.DEBUG) Log.d(TAG, "MKCOL response code=${response.code} url=$serverUrl")
                 if (response.isSuccessful || response.code == 405) {
                     Result.success(true)
                 } else {
-                    Result.failure(IOException("MKCOL failed: ${response.code}"))
+                    Result.failure(IOException(mapHttpError(response.code)))
                 }
             }
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(IOException(mapConnectionError(e)))
         }
     }
 

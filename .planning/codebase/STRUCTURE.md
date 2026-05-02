@@ -8,6 +8,7 @@ MewBook/
 ├── build.gradle.kts        # 根构建脚本（插件版本）
 ├── settings.gradle.kts
 ├── gradle/
+├── .github/workflows/      # tag 触发的 Android release workflow
 ├── signing/                # 签名相关资源（勿提交密钥材料到公开仓库）
 ├── keystore.properties     # 本地可选，用于 release 签名配置
 └── ...
@@ -17,21 +18,25 @@ MewBook/
 
 | 包/目录 | 职责 |
 |---------|------|
-| `MainActivity.kt` | 单一 Activity，Compose 入口、主题与 Splash |
+| `MainActivity.kt` | 单一 Activity，Compose 入口、主题与应用更新弹窗 |
 | `MewBookApplication.kt` | `@HiltAndroidApp` Application |
 | `di/` | Hilt：`DatabaseModule`、`NetworkModule`、`RepositoryModule` |
 | `data/local/` | Room：`entity/`、`dao/`、`database/`、`Converters` |
 | `data/remote/` | `DavClient`、`DavRemoteDataSource` |
 | `data/repository/` | 各 Repository 实现、备份、导出等 |
 | `data/backup/` | 备份模型、迁移 |
-| `data/preferences/` | DataStore 主题等 |
+| `data/preferences/` | DataStore 主题、首页周期、首页概览偏好、DAV 自动备份状态等 |
+| `data/smartimport/` | OpenAI 兼容智能导入、配置存储、AI 响应解析 |
+| `data/update/` | GitHub Release 更新检查与 APK 下载 |
 | `domain/model/` | 领域模型 |
+| `domain/policy/` | 可单测业务规则，如首页搜索、预算、周期模板、DAV 自动备份、更新选择 |
 | `domain/repository/` | Repository 接口 |
 | `domain/usecase/` | `account/`、`category/`、`dav/`、`ledger/`、`record/` 等 |
 | `ui/navigation/` | `NavHost.kt`、`Screen.kt` |
-| `ui/screens/` | 各功能屏：`home`、`statistics`、`asset`、`budget`、`settings`、`dav`、`export`、`ledger`、`categories`、`add` 等 |
+| `ui/screens/` | 各功能屏：`home`、`statistics`、`asset`、`budget`、`settings`、`dav`、`export`、`smartimport`、`ledger`、`categories`、`recurring`、`add` 等 |
 | `ui/components/` | 复用组件（如 `RecordItem`、`CategoryChip`、TopBar） |
 | `ui/theme/` | `Theme`、`Color`、`Type`、`ThemeViewModel` |
+| `ui/update/` | 应用更新 UI 状态与 ViewModel |
 | `util/` | 扩展工具 |
 
 ## 资源
@@ -40,9 +45,9 @@ MewBook/
 
 ## 测试
 
-- `app/src/test/java/...`：单元测试（DAV、备份迁移、表达式辅助等）。
+- `app/src/test/java/...`：单元测试（DAV、备份迁移、智能导入、领域 policy、表达式辅助、统计汇总等）。
 - `app/src/androidTest/`：当前为空（依赖已声明）。
 
 ## 规划产物
 
-- `.planning/codebase/`：本套 GSD codebase 文档。
+- `.planning/codebase/`：本套 GSD codebase 文档（该目录被 `.gitignore` 忽略，主要服务本地 agent 交接）。

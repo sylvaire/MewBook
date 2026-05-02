@@ -12,6 +12,9 @@ data class DavConfig(
     val lastSyncTime: LocalDateTime? = null
 ) {
     fun isConfigured(): Boolean = serverUrl.isNotBlank() && username.isNotBlank() && password.isNotBlank()
+
+    fun isInsecure(): Boolean = serverUrl.startsWith("http://", ignoreCase = true) &&
+        !serverUrl.startsWith("http://localhost")
 }
 
 data class DavBackupPruneResult(

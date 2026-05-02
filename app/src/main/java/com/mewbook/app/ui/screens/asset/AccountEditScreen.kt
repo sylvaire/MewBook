@@ -10,12 +10,18 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -46,6 +52,8 @@ import com.mewbook.app.domain.repository.AccountRepository
 import com.mewbook.app.ui.components.AccountTypeIconBadge
 import com.mewbook.app.ui.components.MewCompactTopAppBar
 import com.mewbook.app.ui.components.toDisplayName
+import com.mewbook.app.ui.theme.ClayDesign
+import com.mewbook.app.ui.theme.clayCardShadow
 import com.mewbook.app.ui.theme.ExpenseRed
 import com.mewbook.app.ui.theme.IncomeGreen
 import com.mewbook.app.util.formatCurrency
@@ -80,21 +88,11 @@ class AccountEditViewModel @Inject constructor(
         }
     }
 
-    fun updateBalance(balance: Double) {
+    fun saveChanges(name: String, balance: Double) {
         viewModelScope.launch {
             val account = _uiState.value.account ?: return@launch
             _uiState.update { it.copy(isSaving = true) }
-            accountRepository.updateBalance(account.id, balance)
-            val updated = accountRepository.getAccountById(account.id)
-            _uiState.update { it.copy(account = updated, isSaving = false) }
-        }
-    }
-
-    fun updateName(name: String) {
-        viewModelScope.launch {
-            val account = _uiState.value.account ?: return@launch
-            _uiState.update { it.copy(isSaving = true) }
-            val updated = account.copy(name = name)
+            val updated = account.copy(name = name, balance = balance)
             accountRepository.updateAccount(updated)
             _uiState.update { it.copy(account = updated, isSaving = false) }
         }
@@ -201,89 +199,118 @@ fun AccountEditScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(paddingValues)
-                    .padding(16.dp)
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 16.dp, vertical = 16.dp)
             ) {
                 uiState.account?.let { account ->
-                    // Account icon and type
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        AccountTypeIconBadge(
-                            type = account.type,
-                            accentColor = Color(account.color),
-                            containerSize = 52.dp,
-                            iconSize = 28.dp,
-                            emphasized = true
+                    // Hero card: account icon, type, balance
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clayCardShadow(),
+                        shape = RoundedCornerShape(ClayDesign.CardRadius),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surface
                         )
-                        Spacer(modifier = Modifier.width(16.dp))
-                        Column {
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(20.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            AccountTypeIconBadge(
+                                type = account.type,
+                                accentColor = Color(account.color),
+                                containerSize = 56.dp,
+                                iconSize = 30.dp,
+                                emphasized = true
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
                             Text(
                                 text = account.type.toDisplayName(),
                                 style = MaterialTheme.typography.titleMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            val currentBalance = balanceText.toDoubleOrNull() ?: account.balance
+                            Text(
+                                text = formatCurrency(currentBalance),
+                                style = MaterialTheme.typography.headlineSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = if (currentBalance >= 0) IncomeGreen else ExpenseRed
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // Edit fields card
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clayCardShadow(),
+                        shape = RoundedCornerShape(ClayDesign.CardRadius),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surface
+                        )
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 16.dp),
+                            verticalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            OutlinedTextField(
+                                value = nameText,
+                                onValueChange = { nameText = it },
+                                label = { Text("账户名称") },
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true
+                            )
+
+                            OutlinedTextField(
+                                value = balanceText,
+                                onValueChange = { newValue ->
+                                    if (newValue.isEmpty() || newValue.matches(Regex("^-?\\d*\\.?\\d{0,2}$"))) {
+                                        balanceText = newValue
+                                    }
+                                },
+                                label = { Text("账户余额") },
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true,
+                                prefix = { Text("¥") },
+                                supportingText = {
+                                    Text(
+                                        text = if (account.type.name == "CREDIT_CARD") "信用卡请输入负数，如 -1000.00" else "输入当前账户余额"
+                                    )
+                                }
                             )
                         }
                     }
 
                     Spacer(modifier = Modifier.height(24.dp))
 
-                    // Account name
-                    OutlinedTextField(
-                        value = nameText,
-                        onValueChange = { nameText = it },
-                        label = { Text("账户名称") },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true
-                    )
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    // Balance
-                    OutlinedTextField(
-                        value = balanceText,
-                        onValueChange = { newValue ->
-                            if (newValue.isEmpty() || newValue.matches(Regex("^-?\\d*\\.?\\d{0,2}$"))) {
-                                balanceText = newValue
-                            }
-                        },
-                        label = { Text("账户余额") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        prefix = { Text("¥") },
-                        supportingText = {
-                            Text(
-                                text = if (account.type.name == "CREDIT_CARD") "信用卡请输入负数，如 -1000.00" else "输入当前账户余额"
-                            )
-                        }
-                    )
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    // Current balance display
-                    val currentBalance = balanceText.toDoubleOrNull() ?: 0.0
-                    Text(
-                        text = "当前余额: ${formatCurrency(currentBalance)}",
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Medium,
-                        color = if (currentBalance >= 0) IncomeGreen else ExpenseRed
-                    )
-
-                    Spacer(modifier = Modifier.height(32.dp))
+                    val hasChanges = remember(nameText, balanceText, account) {
+                        val nameChanged = nameText.isNotBlank() && nameText != account.name
+                        val balanceChanged = balanceText.toDoubleOrNull()?.let { it != account.balance } ?: false
+                        nameChanged || balanceChanged
+                    }
 
                     Button(
                         onClick = {
-                            if (nameText.isNotBlank()) {
-                                viewModel.updateName(nameText)
-                            }
-                            balanceText.toDoubleOrNull()?.let { balance ->
-                                viewModel.updateBalance(balance)
-                            }
+                            val balance = balanceText.toDoubleOrNull() ?: account.balance
+                            viewModel.saveChanges(nameText.ifBlank { account.name }, balance)
                             onNavigateBack()
                         },
                         modifier = Modifier.fillMaxWidth(),
-                        enabled = !uiState.isSaving && (nameText.isNotBlank() || balanceText.isNotBlank())
+                        enabled = !uiState.isSaving && hasChanges,
+                        shape = RoundedCornerShape(ClayDesign.ButtonRadius),
+                        elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp)
                     ) {
                         if (uiState.isSaving) {
                             CircularProgressIndicator(
@@ -291,7 +318,7 @@ fun AccountEditScreen(
                                 color = MaterialTheme.colorScheme.onPrimary
                             )
                         } else {
-                            Text("保存")
+                            Text("保存", fontWeight = FontWeight.SemiBold)
                         }
                     }
                 }

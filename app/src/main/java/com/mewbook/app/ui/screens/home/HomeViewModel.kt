@@ -2,6 +2,8 @@ package com.mewbook.app.ui.screens.home
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.room.withTransaction
+import com.mewbook.app.data.local.database.MewBookDatabase
 import com.mewbook.app.data.preferences.HomePreferencesRepository
 import com.mewbook.app.domain.model.Account
 import com.mewbook.app.domain.model.Budget
@@ -21,6 +23,7 @@ import com.mewbook.app.domain.repository.LedgerRepository
 import com.mewbook.app.domain.repository.RecurringTemplateRepository
 import com.mewbook.app.domain.usecase.category.GetCategoriesUseCase
 import com.mewbook.app.domain.usecase.category.InitializeDefaultCategoriesUseCase
+import com.mewbook.app.domain.usecase.account.EnsureDefaultAccountForLedgerUseCase
 import com.mewbook.app.domain.usecase.ledger.InitializeDefaultLedgerUseCase
 import com.mewbook.app.domain.usecase.record.AddRecordUseCase
 import com.mewbook.app.domain.usecase.record.DeleteRecordUseCase
@@ -138,11 +141,13 @@ class HomeViewModel @Inject constructor(
     private val getCategoriesUseCase: GetCategoriesUseCase,
     private val initializeDefaultCategoriesUseCase: InitializeDefaultCategoriesUseCase,
     private val initializeDefaultLedgerUseCase: InitializeDefaultLedgerUseCase,
+    private val ensureDefaultAccountForLedgerUseCase: EnsureDefaultAccountForLedgerUseCase,
     private val ledgerRepository: LedgerRepository,
     private val accountRepository: AccountRepository,
     private val budgetRepository: BudgetRepository,
     private val recurringTemplateRepository: RecurringTemplateRepository,
-    private val homePreferencesRepository: HomePreferencesRepository
+    private val homePreferencesRepository: HomePreferencesRepository,
+    private val database: MewBookDatabase
 ) : ViewModel() {
 
     private val _selectedPeriodType = MutableStateFlow(BudgetPeriodType.MONTH)
@@ -311,6 +316,8 @@ class HomeViewModel @Inject constructor(
     private fun initializeData() {
         viewModelScope.launch {
             initializeDefaultLedgerUseCase()
+            val ledgerId = ledgerRepository.getDefaultLedger()?.id ?: 1L
+            ensureDefaultAccountForLedgerUseCase(ledgerId)
             initializeDefaultCategoriesUseCase()
             recurringTemplateRepository.autoCloseDueTemplates()
         }
@@ -481,62 +488,61 @@ class HomeViewModel @Inject constructor(
         accountId: Long?
     ) {
         viewModelScope.launch {
-            val now = LocalDateTime.now()
-            val editing = _editingRecord.value
-            val activeLedgerId = uiState.value.activeLedger?.id ?: 1L
+            database.withTransaction {
+                val now = LocalDateTime.now()
+                val editing = _editingRecord.value
+                val activeLedgerId = uiState.value.activeLedger?.id ?: 1L
 
-            if (editing != null) {
-                // 如果有账户，先还原旧记录的账户余额
-                val oldAccountId = editing.accountId
-                if (oldAccountId != null) {
-                    val oldAccount = accountRepository.getAccountById(oldAccountId)
-                    if (oldAccount != null) {
-                        val oldBalanceChange = if (editing.type == RecordType.INCOME) -editing.amount else editing.amount
-                        accountRepository.updateBalance(oldAccountId, oldAccount.balance + oldBalanceChange)
+                if (editing != null) {
+                    val oldAccountId = editing.accountId
+                    if (oldAccountId != null) {
+                        val oldAccount = accountRepository.getAccountById(oldAccountId)
+                        if (oldAccount != null) {
+                            val oldBalanceChange = if (editing.type == RecordType.INCOME) -editing.amount else editing.amount
+                            accountRepository.updateBalance(oldAccountId, oldAccount.balance + oldBalanceChange)
+                        }
                     }
-                }
 
-                val updatedRecord = editing.copy(
-                    amount = amount,
-                    type = type,
-                    categoryId = categoryId,
-                    note = note,
-                    date = date,
-                    updatedAt = now,
-                    accountId = accountId
-                )
-                updateRecordUseCase(updatedRecord)
+                    val updatedRecord = editing.copy(
+                        amount = amount,
+                        type = type,
+                        categoryId = categoryId,
+                        note = note,
+                        date = date,
+                        updatedAt = now,
+                        accountId = accountId
+                    )
+                    updateRecordUseCase(updatedRecord)
 
-                // 如果有新账户，同步新账户余额
-                if (accountId != null) {
-                    val newAccount = accountRepository.getAccountById(accountId)
-                    if (newAccount != null) {
-                        val newBalanceChange = if (type == RecordType.INCOME) amount else -amount
-                        accountRepository.updateBalance(accountId, newAccount.balance + newBalanceChange)
+                    if (accountId != null) {
+                        val newAccount = accountRepository.getAccountById(accountId)
+                        if (newAccount != null) {
+                            val newBalanceChange = if (type == RecordType.INCOME) amount else -amount
+                            accountRepository.updateBalance(accountId, newAccount.balance + newBalanceChange)
+                        }
                     }
-                }
-            } else {
-                val newRecord = Record(
-                    id = 0,
-                    amount = amount,
-                    type = type,
-                    categoryId = categoryId,
-                    note = note,
-                    date = date,
-                    createdAt = now,
-                    updatedAt = now,
-                    syncId = UUID.randomUUID().toString(),
-                    ledgerId = activeLedgerId,
-                    accountId = accountId
-                )
-                addRecordUseCase(newRecord)
+                } else {
+                    val newRecord = Record(
+                        id = 0,
+                        amount = amount,
+                        type = type,
+                        categoryId = categoryId,
+                        note = note,
+                        date = date,
+                        createdAt = now,
+                        updatedAt = now,
+                        syncId = UUID.randomUUID().toString(),
+                        ledgerId = activeLedgerId,
+                        accountId = accountId
+                    )
+                    addRecordUseCase(newRecord)
 
-                // 新增记录，同步账户余额
-                if (accountId != null) {
-                    val account = accountRepository.getAccountById(accountId)
-                    if (account != null) {
-                        val balanceChange = if (type == RecordType.INCOME) amount else -amount
-                        accountRepository.updateBalance(accountId, account.balance + balanceChange)
+                    if (accountId != null) {
+                        val account = accountRepository.getAccountById(accountId)
+                        if (account != null) {
+                            val balanceChange = if (type == RecordType.INCOME) amount else -amount
+                            accountRepository.updateBalance(accountId, account.balance + balanceChange)
+                        }
                     }
                 }
             }
@@ -547,19 +553,20 @@ class HomeViewModel @Inject constructor(
 
     fun deleteRecord(id: Long) {
         viewModelScope.launch {
-            // 删除记录前，先还原账户余额
-            val record = _editingRecord.value?.takeIf { it.id == id }
-                ?: _browsingRecord.value?.takeIf { it.id == id }
-                ?: uiState.value.records.find { rec -> rec.id == id }
-            if (record?.accountId != null) {
-                val accId = record.accountId
-                val account = accountRepository.getAccountById(accId)
-                if (account != null) {
-                    val balanceChange = if (record.type == RecordType.INCOME) -record.amount else record.amount
-                    accountRepository.updateBalance(accId, account.balance + balanceChange)
+            database.withTransaction {
+                val record = _editingRecord.value?.takeIf { it.id == id }
+                    ?: _browsingRecord.value?.takeIf { it.id == id }
+                    ?: uiState.value.records.find { rec -> rec.id == id }
+                if (record?.accountId != null) {
+                    val accId = record.accountId
+                    val account = accountRepository.getAccountById(accId)
+                    if (account != null) {
+                        val balanceChange = if (record.type == RecordType.INCOME) -record.amount else record.amount
+                        accountRepository.updateBalance(accId, account.balance + balanceChange)
+                    }
                 }
+                deleteRecordUseCase(id)
             }
-            deleteRecordUseCase(id)
             _browsingRecord.update { current -> current?.takeIf { it.id != id } }
         }
     }

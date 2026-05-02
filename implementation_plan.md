@@ -1,4 +1,6 @@
-# Implementation Plan
+# Archived Implementation Plan
+
+> 状态：历史参考。此计划记录的是早期“分类图标错乱、分类网格、虚拟产品分类”工作，不是当前活跃任务。当前项目状态见 `.planning/PROJECT.md` 与 `.planning/STATE.md`。
 
 [Overview]
 修复MewBook记账应用中分类记录界面的图标错乱问题，并将分类布局重新设计为更合理、统一、整齐的网格布局。同时添加虚拟产品相关的一级分类和二级分类。

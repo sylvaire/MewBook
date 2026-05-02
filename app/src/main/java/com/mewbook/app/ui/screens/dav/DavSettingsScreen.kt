@@ -186,6 +186,19 @@ fun DavSettingsScreen(
                 onClick = { showConfigDialog = true }
             )
 
+            if (uiState.serverUrl.startsWith("http://") &&
+                !uiState.serverUrl.startsWith("http://localhost")
+            ) {
+                SettingsSurfaceCard(containerColor = MaterialTheme.colorScheme.errorContainer) {
+                    Text(
+                        text = "使用 HTTP 连接，密码将以明文传输。建议改用 HTTPS。",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onErrorContainer,
+                        modifier = Modifier.padding(16.dp)
+                    )
+                }
+            }
+
             SettingsSectionHeader(
                 title = "同步操作",
                 description = "自动备份状态和手动导入导出集中在这里。"
@@ -475,7 +488,7 @@ private fun AutoBackupStatusBlock(
     status: DavAutoBackupStatus,
     enabled: Boolean
 ) {
-    val formatter = DateTimeFormatter.ofPattern("yyyy年MM月dd日 HH:mm")
+    val formatter = remember { DateTimeFormatter.ofPattern("yyyy年MM月dd日 HH:mm") }
     val enabledText = if (enabled) {
         "自动备份：已开启（每日首次打开 App）"
     } else {

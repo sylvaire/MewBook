@@ -219,6 +219,7 @@ class BackupRepository @Inject constructor(
     }
 
     private suspend fun restoreEnvelope(envelope: BackupEnvelope) {
+        val existingDavConfig = davConfigDao.getDavConfigOnce()
         database.withTransaction {
             recordDao.deleteAllRecords()
             budgetDao.deleteAllBudgets()
@@ -246,7 +247,14 @@ class BackupRepository @Inject constructor(
             if (envelope.payload.records.isNotEmpty()) {
                 recordDao.insertRecords(envelope.payload.records.map { it.toEntity() })
             }
-            envelope.payload.davConfig?.let { davConfigDao.insertDavConfig(it.toEntity()) }
+            envelope.payload.davConfig?.let { incoming ->
+                val merged = if (incoming.password.isBlank() && existingDavConfig != null) {
+                    incoming.copy(password = existingDavConfig.password)
+                } else {
+                    incoming
+                }
+                davConfigDao.insertDavConfig(merged.toEntity())
+            }
             themePreferencesRepository.setThemeMode(
                 com.mewbook.app.data.preferences.AppThemeMode.fromStorageValue(envelope.payload.themeMode)
             )

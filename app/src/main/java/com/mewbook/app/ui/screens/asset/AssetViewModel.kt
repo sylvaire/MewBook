@@ -6,7 +6,7 @@ import com.mewbook.app.domain.model.Account
 import com.mewbook.app.domain.model.AccountType
 import com.mewbook.app.domain.repository.AccountRepository
 import com.mewbook.app.domain.repository.LedgerRepository
-import com.mewbook.app.domain.usecase.account.InitializeDefaultAccountsUseCase
+import com.mewbook.app.domain.usecase.account.EnsureDefaultAccountForLedgerUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -27,7 +27,7 @@ data class AssetUiState(
 class AssetViewModel @Inject constructor(
     private val accountRepository: AccountRepository,
     private val ledgerRepository: LedgerRepository,
-    private val initializeDefaultAccountsUseCase: InitializeDefaultAccountsUseCase
+    private val ensureDefaultAccountForLedgerUseCase: EnsureDefaultAccountForLedgerUseCase
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(AssetUiState())
@@ -39,7 +39,8 @@ class AssetViewModel @Inject constructor(
 
     private fun initializeData() {
         viewModelScope.launch {
-            initializeDefaultAccountsUseCase()
+            val ledgerId = ledgerRepository.getDefaultLedger()?.id ?: 1L
+            ensureDefaultAccountForLedgerUseCase(ledgerId)
             loadAccounts()
         }
     }

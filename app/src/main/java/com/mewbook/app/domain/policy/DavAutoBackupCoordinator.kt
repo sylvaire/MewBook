@@ -82,8 +82,8 @@ class DavAutoBackupCoordinator @Inject constructor(
             return result
         }
 
-        val error_msg = result.exceptionOrNull()?.message ?: "未知错误"
-        Log.w(TAG, "自动备份失败（第${retryCount + 1}次），${RETRY_DELAY_MS}ms 后重试：$error_msg")
+        val errorMsg = result.exceptionOrNull()?.message ?: "未知错误"
+        Log.w(TAG, "自动备份失败（第${retryCount + 1}次），${RETRY_DELAY_MS}ms 后重试：$errorMsg")
         delay(RETRY_DELAY_MS)
         return exportWithRetry(config, retryCount + 1)
     }

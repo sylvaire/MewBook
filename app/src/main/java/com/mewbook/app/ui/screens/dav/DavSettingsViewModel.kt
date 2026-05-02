@@ -115,6 +115,10 @@ class DavSettingsViewModel @Inject constructor(
 
     fun updateIsEnabled(enabled: Boolean) {
         _uiState.update { it.copy(isEnabled = enabled, message = null) }
+        viewModelScope.launch {
+            val existing = getDavConfigUseCase.getOnce() ?: return@launch
+            saveDavConfigUseCase(existing.copy(isEnabled = enabled))
+        }
     }
 
     private fun observeAutoBackupStatus() {

@@ -263,7 +263,8 @@ fun SettingsScreen(
             SettingsRowCard(
                 icon = Icons.Filled.Download,
                 title = "检查更新",
-                subtitle = if (!updateEnabled) "更新功能已关闭" else updateStatusSubtitle(updateUiState) ?: "点击检查",
+                subtitle = updateStatusSubtitle(updateUiState)
+                    ?: if (updateEnabled) "点击检查" else "自动检查已关闭，可手动检查",
                 onClick = onCheckForUpdates
             )
 

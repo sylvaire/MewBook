@@ -213,7 +213,7 @@ private fun AppUpdateDialogs(
                         Text("跳过此版本")
                     }
                     TextButton(onClick = onDisableUpdate) {
-                        Text("关闭更新")
+                        Text("关闭自动检查")
                     }
                     TextButton(onClick = onDismissUpdate) {
                         Text("稍后")

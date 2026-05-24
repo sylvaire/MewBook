@@ -6,6 +6,7 @@ import com.mewbook.app.BuildConfig
 import com.mewbook.app.data.preferences.AppUpdatePreferencesRepository
 import com.mewbook.app.data.update.AppUpdateRepository
 import com.mewbook.app.domain.model.AppUpdateRelease
+import com.mewbook.app.domain.policy.AppUpdateCheckPolicy
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -49,10 +50,13 @@ class AppUpdateViewModel @Inject constructor(
 
     fun checkForUpdates(silent: Boolean) {
         val currentState = _uiState.value
-        if (currentState.isChecking || currentState.isDownloading) {
-            return
-        }
-        if (!currentState.updateEnabled) {
+        if (!AppUpdateCheckPolicy.canStartCheck(
+                isChecking = currentState.isChecking,
+                isDownloading = currentState.isDownloading,
+                updateEnabled = currentState.updateEnabled,
+                silent = silent
+            )
+        ) {
             return
         }
         viewModelScope.launch {

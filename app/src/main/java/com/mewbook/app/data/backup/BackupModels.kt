@@ -46,7 +46,6 @@ data class BackupCategory(
     val type: String,
     val isDefault: Boolean,
     val sortOrder: Int,
-    val parentId: Long? = null,
     val semanticLabel: String? = null
 )
 
@@ -170,9 +169,7 @@ enum class BackupCategoryImportAction {
 
 data class BackupCategoryImportMapping(
     val sourceName: String,
-    val sourceParentName: String?,
     val targetName: String,
-    val targetParentName: String?,
     val type: String,
     val action: BackupCategoryImportAction,
     val icon: String,

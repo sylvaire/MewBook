@@ -72,6 +72,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SelectableDates
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -91,6 +92,7 @@ import com.mewbook.app.domain.model.Record
 import com.mewbook.app.domain.model.Category
 import com.mewbook.app.domain.policy.HomeScreenLayoutPolicy
 import com.mewbook.app.ui.components.BudgetPeriodNavigator
+import com.mewbook.app.ui.components.MewSnackbarHost
 import com.mewbook.app.ui.components.RecordItem
 import com.mewbook.app.ui.components.MewCompactTopAppBar
 import com.mewbook.app.ui.screens.add.AddEditRecordSheet
@@ -125,6 +127,7 @@ fun HomeScreen(
     var showQuickFabMenu by remember { mutableStateOf(false) }
     var scrollToDate by remember { mutableStateOf<LocalDate?>(null) }
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(uiState.showAddEditSheet) {
         onAddSheetVisibilityChanged(uiState.showAddEditSheet)
@@ -133,6 +136,13 @@ fun HomeScreen(
     LaunchedEffect(searchResetToken) {
         if (searchResetToken > 0) {
             viewModel.exitSearchMode()
+        }
+    }
+
+    uiState.message?.let { message ->
+        LaunchedEffect(message) {
+            snackbarHostState.showSnackbar(message)
+            viewModel.clearMessage()
         }
     }
 
@@ -156,6 +166,7 @@ fun HomeScreen(
 
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
+            snackbarHost = { MewSnackbarHost(snackbarHostState) },
             topBar = {
                 // 温暖渐变顶部导航栏
                 MewCompactTopAppBar(
@@ -375,7 +386,7 @@ fun HomeScreen(
                     pendingDeleteRecordId = 0L
                 },
                 title = { Text("确认删除") },
-                text = { Text("删除后无法恢复，确定要删除这条记录吗？") },
+                text = { Text("删除后可在 30 天内从回收站找回，确定要删除这条记录吗？") },
                 confirmButton = {
                     TextButton(
                         onClick = {

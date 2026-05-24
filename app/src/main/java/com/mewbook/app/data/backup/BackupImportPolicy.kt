@@ -2,6 +2,7 @@ package com.mewbook.app.data.backup
 
 import com.mewbook.app.domain.policy.CategorySemanticCandidate
 import com.mewbook.app.domain.policy.CategorySemanticPolicy
+import com.mewbook.app.domain.policy.MoneyAmountPolicy
 import java.math.BigDecimal
 import java.time.Instant
 import java.time.LocalDate
@@ -47,7 +48,7 @@ object BackupImportPolicy {
         var nextCategoryId = 1L
         var nextAccountId = 1L
         val ledgerIdByName = linkedMapOf<String, Long>()
-        val categoryIdByKey = linkedMapOf<CategoryPathKey, Long>()
+        val categoryIdByKey = linkedMapOf<CategoryKey, Long>()
         val accountIdByKey = linkedMapOf<AccountKey, Long>()
 
         fun ensureLedger(name: String?): Long {
@@ -68,15 +69,10 @@ object BackupImportPolicy {
             }
         }
 
-        fun ensureCategory(type: String, parentName: String?, name: String): Long {
-            val parentId = parentName
-                ?.trim()
-                ?.takeIf { it.isNotEmpty() }
-                ?.let { ensureCategory(type, null, it) }
+        fun ensureCategory(type: String, name: String): Long {
             val semanticLabel = CategorySemanticPolicy.semanticLabelFor(name, null)
-            val key = CategoryPathKey(
+            val key = CategoryKey(
                 type = type,
-                parentId = parentId,
                 normalizedName = normalizeName(name)
             )
             return categoryIdByKey.getOrPut(key) {
@@ -84,12 +80,11 @@ object BackupImportPolicy {
                 categories += BackupCategory(
                     id = id,
                     name = name.trim(),
-                    icon = defaultCategoryIcon(type, name, semanticLabel, parentId != null),
+                    icon = defaultCategoryIcon(type, name, semanticLabel),
                     color = defaultCategoryColor(type),
                     type = type,
                     isDefault = false,
-                    sortOrder = categories.count { it.type == type && it.parentId == parentId },
-                    parentId = parentId,
+                    sortOrder = categories.count { it.type == type },
                     semanticLabel = semanticLabel
                 )
                 id
@@ -127,8 +122,8 @@ object BackupImportPolicy {
             val rawDate = row.valueAt(dateIndex)
             val rawTimestamp = row.valueAt(timestampIndex)
             val rawCategory = row.valueAt(categoryIndex)
-            val categoryPath = resolveCategoryPath(rawCategory, row.valueAt(subCategoryIndex))
-            if ((rawDate.isBlank() && rawTimestamp.isBlank()) || categoryPath.name.isBlank()) {
+            val categoryName = resolveCategoryName(rawCategory, row.valueAt(subCategoryIndex))
+            if ((rawDate.isBlank() && rawTimestamp.isBlank()) || categoryName.isBlank()) {
                 return@forEachIndexed
             }
 
@@ -143,12 +138,11 @@ object BackupImportPolicy {
                 rawValue = row.valueAt(typeIndex),
                 amount = parsedAmount.signedAmount,
                 typeHint = parsedAmount.typeHint,
-                categoryName = categoryPath.name
+                categoryName = categoryName
             )
             val categoryId = ensureCategory(
                 type = type,
-                parentName = categoryPath.parentName,
-                name = categoryPath.name
+                name = categoryName
             )
             val accountId = ensureAccount(ledgerId, row.valueAt(accountIndex))
             val parsedDate = parseDateOrTimestamp(rawDate, rawTimestamp)
@@ -240,42 +234,33 @@ object BackupImportPolicy {
 
         var categoriesToCreate = 0
         val categoryMappings = mutableListOf<BackupCategoryImportMapping>()
-        val incomingCategoryById = incoming.payload.categories.associateBy { it.id }
         incoming.payload.categories
-            .sortedWith(compareBy<BackupCategory> { it.parentId != null }.thenBy { it.sortOrder }.thenBy { it.id })
+            .sortedWith(compareBy<BackupCategory> { it.sortOrder }.thenBy { it.id })
             .forEach { incomingCategory ->
-                val targetParentId = incomingCategory.parentId?.let(categoryIdMap::get)
-                val sourceParentName = incomingCategory.parentId?.let(incomingCategoryById::get)?.name
                 val semanticMatch = CategorySemanticPolicy.resolveExistingCategory(
                     candidates = mergedCategories.map {
                         CategorySemanticCandidate(
                             id = it.id,
                             name = it.name,
                             type = it.type,
-                            parentId = it.parentId,
                             semanticLabel = it.semanticLabel
                         )
                     },
                     incomingName = incomingCategory.name,
                     incomingType = incomingCategory.type,
-                    incomingSemanticLabel = incomingCategory.semanticLabel,
-                    targetParentId = targetParentId
+                    incomingSemanticLabel = incomingCategory.semanticLabel
                 )
                 val targetCategory = semanticMatch
                     ?.let { match -> mergedCategories.firstOrNull { it.id == match.categoryId } }
                     ?: incomingCategory.copy(
                         id = nextCategoryId++,
-                        parentId = targetParentId,
                         icon = CategorySemanticPolicy.chooseIcon(
                             type = incomingCategory.type,
                             categoryName = incomingCategory.name,
                             semanticLabel = incomingCategory.semanticLabel,
-                            isChild = targetParentId != null,
                             proposedIcon = incomingCategory.icon
                         ),
-                        sortOrder = mergedCategories.count {
-                            it.type == incomingCategory.type && it.parentId == targetParentId
-                        }
+                        sortOrder = mergedCategories.count { it.type == incomingCategory.type }
                     ).also { created ->
                         mergedCategories += created
                         categoriesToCreate += 1
@@ -283,11 +268,7 @@ object BackupImportPolicy {
                 categoryIdMap[incomingCategory.id] = targetCategory.id
                 categoryMappings += BackupCategoryImportMapping(
                     sourceName = incomingCategory.name,
-                    sourceParentName = sourceParentName,
                     targetName = targetCategory.name,
-                    targetParentName = targetCategory.parentId?.let { parentId ->
-                        mergedCategories.firstOrNull { it.id == parentId }?.name
-                    },
                     type = incomingCategory.type,
                     action = if (semanticMatch != null) {
                         BackupCategoryImportAction.REUSE_EXISTING
@@ -353,7 +334,7 @@ object BackupImportPolicy {
                     -mappedRecord.amount
                 }
                 mergedAccounts[accountIndex] = existingAccount.copy(
-                    balance = existingAccount.balance + balanceChange
+                    balance = MoneyAmountPolicy.normalizeCurrency(existingAccount.balance + balanceChange)
                 )
             }
         }
@@ -655,33 +636,30 @@ object BackupImportPolicy {
         }
     }
 
-    private fun resolveCategoryPath(rawCategory: String, rawSubCategory: String): CategoryPath {
+    private fun resolveCategoryName(rawCategory: String, rawSubCategory: String): String {
         val subCategory = rawSubCategory.trim()
         if (subCategory.isNotBlank()) {
-            return CategoryPath(
-                parentName = rawCategory.trim().ifBlank { null },
-                name = subCategory
-            )
+            return subCategory
         }
 
         val category = rawCategory.trim()
         if (category.isBlank()) {
-            return CategoryPath(parentName = null, name = "")
+            return ""
         }
 
         val separator = CATEGORY_PATH_SEPARATORS.firstOrNull { category.contains(it) }
         if (separator == null) {
-            return CategoryPath(parentName = null, name = category)
+            return category
         }
 
         val segments = category.split(separator)
             .map(String::trim)
             .filter(String::isNotBlank)
         if (segments.size < 2) {
-            return CategoryPath(parentName = null, name = category)
+            return category
         }
 
-        return CategoryPath(parentName = segments.first(), name = segments.last())
+        return segments.last()
     }
 
     private fun parseNumericDate(rawValue: String): LocalDate? {
@@ -706,14 +684,12 @@ object BackupImportPolicy {
     private fun defaultCategoryIcon(
         type: String,
         categoryName: String,
-        semanticLabel: String?,
-        isChild: Boolean
+        semanticLabel: String?
     ): String {
         return CategorySemanticPolicy.chooseIcon(
             type = type,
             categoryName = categoryName,
             semanticLabel = semanticLabel,
-            isChild = isChild,
             proposedIcon = null
         )
     }
@@ -735,9 +711,8 @@ object BackupImportPolicy {
         }
     }
 
-    private data class CategoryPathKey(
+    private data class CategoryKey(
         val type: String,
-        val parentId: Long?,
         val normalizedName: String
     )
 
@@ -755,11 +730,6 @@ object BackupImportPolicy {
     private data class ParsedAmount(
         val signedAmount: BigDecimal,
         val typeHint: String?
-    )
-
-    private data class CategoryPath(
-        val parentName: String?,
-        val name: String
     )
 
     private data class RecordImportPlan(

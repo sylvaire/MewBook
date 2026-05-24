@@ -133,7 +133,7 @@ class RecurringTemplatesViewModel @Inject constructor(
     fun openCreateTemplate() {
         val state = uiState.value
         val ledgerId = state.activeLedger?.id ?: 1L
-        val defaultCategoryId = CategorySelectionPolicy.resolvePreferredTopLevelCategoryId(
+        val defaultCategoryId = CategorySelectionPolicy.resolvePreferredCategoryId(
             categories = state.categories,
             type = RecordType.EXPENSE
         )
@@ -155,7 +155,7 @@ class RecurringTemplatesViewModel @Inject constructor(
     }
 
     fun openEditTemplate(template: RecurringTemplate) {
-        val availableCategoryId = CategorySelectionPolicy.resolvePreferredTopLevelCategoryId(
+        val availableCategoryId = CategorySelectionPolicy.resolvePreferredCategoryId(
             categories = uiState.value.categories,
             type = template.type,
             preferredCategoryId = template.categoryId
@@ -199,7 +199,7 @@ class RecurringTemplatesViewModel @Inject constructor(
         val amount = editor.amount.toDoubleOrNull()
         val interval = editor.intervalCount.toIntOrNull()?.coerceAtLeast(1)
         val availableCategoryIds = CategorySelectionPolicy
-            .visibleTopLevelCategories(
+            .visibleCategories(
                 categories = uiState.value.categories,
                 type = editor.type
             )

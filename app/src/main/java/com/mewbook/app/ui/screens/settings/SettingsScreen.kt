@@ -19,6 +19,7 @@ import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Restore
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -62,6 +63,7 @@ fun SettingsScreen(
     onNavigateToRecurringTemplates: () -> Unit,
     onNavigateToExport: () -> Unit,
     onNavigateToLedgerManagement: () -> Unit,
+    onNavigateToRecycleBin: () -> Unit,
     updateUiState: AppUpdateUiState,
     onCheckForUpdates: () -> Unit,
     viewModel: SettingsViewModel = hiltViewModel()
@@ -236,6 +238,13 @@ fun SettingsScreen(
                 title = "迁移与备份",
                 subtitle = "外部导入、本地备份、还原与格式导出",
                 onClick = onNavigateToExport
+            )
+
+            SettingsRowCard(
+                icon = Icons.Filled.Restore,
+                title = "回收站",
+                subtitle = "找回 30 天内删除的记录",
+                onClick = onNavigateToRecycleBin
             )
 
             SettingsSectionHeader(

@@ -106,11 +106,11 @@ fun CategoriesScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var selectedTabIndex by remember { mutableIntStateOf(0) }
 
-    val expenseCategories = CategorySelectionPolicy.visibleTopLevelCategories(
+    val expenseCategories = CategorySelectionPolicy.visibleCategories(
         categories = uiState.categories,
         type = RecordType.EXPENSE
     )
-    val incomeCategories = CategorySelectionPolicy.visibleTopLevelCategories(
+    val incomeCategories = CategorySelectionPolicy.visibleCategories(
         categories = uiState.categories,
         type = RecordType.INCOME
     )

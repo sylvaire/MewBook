@@ -6,7 +6,6 @@ data class CategorySemanticCandidate(
     val id: Long,
     val name: String,
     val type: String,
-    val parentId: Long?,
     val semanticLabel: String?
 )
 
@@ -21,31 +20,20 @@ object CategorySemanticPolicy {
         candidates: List<CategorySemanticCandidate>,
         incomingName: String,
         incomingType: String,
-        incomingSemanticLabel: String?,
-        targetParentId: Long?
+        incomingSemanticLabel: String?
     ): CategorySemanticMatch? {
         val sameType = candidates.filter { it.type == incomingType }
         val normalizedIncomingName = normalize(incomingName)
 
         sameType.uniqueMatch {
-            it.parentId == targetParentId && normalize(it.name) == normalizedIncomingName
+            normalize(it.name) == normalizedIncomingName
         }?.let { return CategorySemanticMatch(it.id, "同名分类") }
-
-        if (targetParentId == null) {
-            sameType.uniqueMatch { normalize(it.name) == normalizedIncomingName }
-                ?.let { return CategorySemanticMatch(it.id, "同名分类") }
-        }
 
         val incomingSemanticKey = semanticLabelFor(incomingName, incomingSemanticLabel) ?: return null
 
         sameType.uniqueMatch {
-            it.parentId == targetParentId && semanticLabelFor(it.name, it.semanticLabel) == incomingSemanticKey
+            semanticLabelFor(it.name, it.semanticLabel) == incomingSemanticKey
         }?.let { return CategorySemanticMatch(it.id, "同义分类") }
-
-        if (targetParentId == null) {
-            sameType.uniqueMatch { semanticLabelFor(it.name, it.semanticLabel) == incomingSemanticKey }
-                ?.let { return CategorySemanticMatch(it.id, "同义分类") }
-        }
 
         return null
     }
@@ -54,7 +42,6 @@ object CategorySemanticPolicy {
         type: String,
         categoryName: String,
         semanticLabel: String?,
-        isChild: Boolean,
         proposedIcon: String?
     ): String {
         val cleanedProposedIcon = proposedIcon?.trim().orEmpty()
@@ -67,7 +54,6 @@ object CategorySemanticPolicy {
 
         return when {
             type == "INCOME" -> "payments"
-            isChild -> "sell"
             else -> "category"
         }
     }
@@ -143,8 +129,8 @@ object CategorySemanticPolicy {
         "refund" to setOf("退款", "退费", "报销款", "报销", "refund"),
         "investment" to setOf("投资", "投资收益", "基金收益", "基金", "理财", "理财收益", "分红", "利息", "利息收入", "investment"),
         "daily" to setOf("日用", "日用品", "日常用品", "生活用品", "清洁用品", "daily"),
-        "transport" to setOf("交通", "公交", "地铁", "火车", "飞机", "油费", "停车", "transport"),
-        "food" to setOf("餐饮", "吃饭", "饮食", "美食", "外卖", "午餐", "晚餐", "food", "meal"),
+        "transport" to setOf("交通", "transport"),
+        "food" to setOf("餐饮", "吃饭", "饮食", "美食", "food", "meal"),
         "shopping" to setOf("购物", "网购", "买东西", "商超", "shopping"),
         "medical" to setOf("医疗", "药品", "看病", "医院", "medical"),
         "education" to setOf("教育", "学习", "培训", "课程", "education"),

@@ -12,6 +12,7 @@ import com.mewbook.app.data.repository.DavRepositoryImpl
 import com.mewbook.app.data.repository.LedgerRepositoryImpl
 import com.mewbook.app.data.repository.RecurringTemplateRepositoryImpl
 import com.mewbook.app.data.repository.RecordRepositoryImpl
+import com.mewbook.app.data.repository.RecordTrashRepositoryImpl
 import com.mewbook.app.domain.repository.AccountRepository
 import com.mewbook.app.domain.repository.BudgetRepository
 import com.mewbook.app.domain.repository.CategoryRepository
@@ -20,6 +21,7 @@ import com.mewbook.app.domain.repository.DavRepository
 import com.mewbook.app.domain.repository.LedgerRepository
 import com.mewbook.app.domain.repository.RecurringTemplateRepository
 import com.mewbook.app.domain.repository.RecordRepository
+import com.mewbook.app.domain.repository.RecordTrashRepository
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -35,6 +37,12 @@ abstract class RepositoryModule {
     abstract fun bindRecordRepository(
         recordRepositoryImpl: RecordRepositoryImpl
     ): RecordRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindRecordTrashRepository(
+        recordTrashRepositoryImpl: RecordTrashRepositoryImpl
+    ): RecordTrashRepository
 
     @Binds
     @Singleton

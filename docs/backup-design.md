@@ -1,6 +1,6 @@
 # MewBook 备份系统设计文档
 
-> 最后更新：2026-05-02 | Schema 版本：4
+> 最后更新：2026-05-24 | Schema 版本：4
 
 ## 1. 概述
 
@@ -10,6 +10,7 @@ MewBook 备份系统负责数据的导出、导入、迁移和远程同步。核
 - **事务安全**：全量恢复在单个 Room 事务中执行（delete all → insert all），保证原子性
 - **安全回滚**：每次破坏性导入前自动创建本地安全备份，最多保留 3 份
 - **密码保护**：导出时清除 DAV 密码，恢复时保留已有密码
+- **回收站本地化**：删除记录只保存在本地 `deleted_records` 30 天，不进入普通备份导出；完整恢复和清除数据会清空回收站
 
 ## 2. 架构
 
@@ -81,7 +82,7 @@ data class BackupPayload(
 | 实体 | 关键字段 | 说明 |
 |------|----------|------|
 | `BackupRecord` | `id`, `amount`(正数), `type`(EXPENSE/INCOME), `categoryId`, `date`(epoch day), `ledgerId`, `accountId?` | 流水记录，`accountId` 可选 |
-| `BackupCategory` | `id`, `name`, `icon`, `color`, `type`, `parentId?`, `semanticLabel?` | 分类，支持父子层级 |
+| `BackupCategory` | `id`, `name`, `icon`, `color`, `type`, `isDefault`, `sortOrder`, `semanticLabel?` | 单层分类，`semanticLabel` 主要用于导入匹配 |
 | `BackupAccount` | `id`, `name`, `type`, `balance`, `icon`, `color`, `isDefault`, `ledgerId` | 账户，绑定到账本 |
 | `BackupBudget` | `id`, `categoryId?`, `periodType`, `periodKey`, `amount`, `ledgerId` | 预算 |
 | `BackupRecurringTemplate` | `id`, `name`, `amount`, `type`, `categoryId`, `scheduleType`, `startDate`, `nextDueDate` | 周期模板 |
@@ -107,7 +108,7 @@ data class BackupPayload(
 | Legacy V1 | `version: "1.0"`（字符串），记录含 `categoryName`/`subCategoryName` | `versionElement?.content == "1.0"` |
 | Legacy V2 | `version: 2`（整数），DAV 导出格式 | `versionElement?.intOrNull == 2` |
 | V3-V4 | `schemaVersion` 字段存在 | `root["schemaVersion"]` |
-| **当前 = 4** | 完整信封，含所有 payload 段 | — |
+| **当前 = 4** | 完整信封，含所有 payload 段；当前分类为单层模型 | — |
 
 ### 4.2 迁移策略
 
@@ -115,10 +116,10 @@ data class BackupPayload(
 
 1. 去除 BOM/空白，非 `{` 开头 → 委托 `BackupImportPolicy.parseExternalCsv()`（CSV 路径）
 2. 解析 JSON，读取 `schemaVersion`：
-   - 存在且 ≤ 4 → 直接反序列化 + `normalizeBudget` + 默认账本填充
+   - 存在且 ≤ 4 → 直接反序列化 + `normalizeBudget` + 默认账本填充；旧备份中多余的 `parentId` 通过 `ignoreUnknownKeys` 忽略
    - 不存在 → 检查 legacy `version` 字段：
-     - `"1.0"` → `migrateLegacyExportV1`：动态构建分类树，自增 ID，所有记录绑定 `ledgerId = 1`
-     - `2` → `migrateLegacyDavV2`：逐字段映射，从记录中推断账本
+     - `"1.0"` → `migrateLegacyExportV1`：优先使用 `subCategoryName` 作为单层分类名，自增 ID，所有记录绑定 `ledgerId = 1`
+     - `2` → `migrateLegacyDavV2`：逐字段映射为单层分类，并从记录中推断账本
 
 ### 4.3 预算规范化
 
@@ -207,7 +208,7 @@ BackupMigration.parseToCurrentEnvelope(jsonString)
   │
   ▼
 restoreEnvelope(envelope)  ← Room.withTransaction {
-  │  1. deleteAllRecords / deleteAllBudgets / deleteAllTemplates
+  │  1. deleteAllRecords / deleteAllBudgets / deleteAllTemplates / deleteAllDeletedRecords
   │  2. deleteAllAccounts / deleteAllCategories / deleteAllLedgers / deleteDavConfig
   │  3. insertLedgers → insertCategories → insertAccounts
   │  4. insertBudgets → insertTemplates → insertRecords
@@ -232,11 +233,9 @@ buildRecordImportPlan(current, incoming)
   │     ledgerIdMap[incomingId] → targetId
   │
   ├─ 2. 分类映射（CategorySemanticPolicy.resolveExistingCategory）
-  │     四级瀑布：
-  │     ① 同类型 + 同父级 + 精确名称匹配
-  │     ② 同类型 + 精确名称匹配（忽略父级）
-  │     ③ 同类型 + 同父级 + 语义标签匹配
-  │     ④ 同类型 + 语义标签匹配（忽略父级）
+  │     单层语义匹配：
+  │     ① 同类型 + 精确名称匹配
+  │     ② 同类型 + 语义标签匹配
   │     → REUSE_EXISTING 或 CREATE_NEW
   │
   ├─ 3. 账户映射：按 (targetLedgerId, normalizedName) 匹配
@@ -276,6 +275,12 @@ restoreEnvelope(mergedEnvelope)  ← 同全量恢复
 - DAV 设置页对 HTTP URL 显示安全警告
 - `DavClient` 所有 `Log.d()` 调用用 `BuildConfig.DEBUG` 守卫
 
+### 7.4 回收站边界
+
+- 普通备份只导出活跃 `records`，不导出 `deleted_records`。
+- 全量恢复和“清除所有数据”会在同一事务中清空 `deleted_records`。
+- 永久删除和 30 天过期清理不影响账户余额，因为移入回收站时已经完成余额回滚。
+
 ## 8. 文件命名规范
 
 | 场景 | 文件名格式 | 示例 |
@@ -292,6 +297,7 @@ restoreEnvelope(mergedEnvelope)  ← 同全量恢复
 | 全量恢复用 Room 事务 | 保证 delete + insert 原子性，避免部分恢复 |
 | 记录导入用指纹去重 | `ledgerId|type|categoryId|accountId|date|note|amount` 组合唯一标识一条记录 |
 | 分类匹配用语义标签 | 中英文分类名差异大，精确匹配命中率低 |
+| 回收站不进入普通备份 | 回收站承诺是本地 30 天找回，不应被 DAV/JSON 导出长期保留 |
 | 导出清空 DAV 密码 | 防止密码泄露到备份文件 |
 | 安全备份不阻塞导入 | 用户体验优先，备份失败不应阻止正常操作 |
 | 自动备份每日一次 | 平衡频率与资源消耗，避免频繁网络请求 |

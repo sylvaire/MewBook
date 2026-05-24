@@ -17,6 +17,11 @@ data class Record(
     val accountId: Long? = null
 )
 
+data class DeletedRecord(
+    val record: Record,
+    val deletedAt: LocalDateTime
+)
+
 enum class RecordType {
     INCOME,
     EXPENSE

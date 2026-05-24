@@ -59,6 +59,7 @@ import com.mewbook.app.ui.screens.dav.DavSettingsScreen
 import com.mewbook.app.ui.screens.export.ExportScreen
 import com.mewbook.app.ui.screens.home.HomeScreen
 import com.mewbook.app.ui.screens.ledger.LedgerManagementScreen
+import com.mewbook.app.ui.screens.recyclebin.RecycleBinScreen
 import com.mewbook.app.ui.screens.recurring.RecurringTemplatesScreen
 import com.mewbook.app.ui.screens.settings.SettingsScreen
 import com.mewbook.app.ui.screens.smartimport.SmartImportScreen
@@ -306,8 +307,18 @@ fun MewBookNavHost(
                     onNavigateToLedgerManagement = {
                         navController.navigate(Screen.LedgerManagement.route)
                     },
+                    onNavigateToRecycleBin = {
+                        navController.navigate(Screen.RecycleBin.route)
+                    },
                     updateUiState = updateUiState,
                     onCheckForUpdates = onCheckForUpdates
+                )
+            }
+            composable(Screen.RecycleBin.route) {
+                RecycleBinScreen(
+                    onNavigateBack = {
+                        navController.popBackStack()
+                    }
                 )
             }
             composable(Screen.LedgerManagement.route) {

@@ -451,7 +451,7 @@ private fun RecurringTemplateEditorSheet(
     BackHandler(onBack = onDismiss)
 
     val availableCategories = remember(editorState.type, categories) {
-        CategorySelectionPolicy.visibleTopLevelCategories(
+        CategorySelectionPolicy.visibleCategories(
             categories = categories,
             type = editorState.type
         )
@@ -553,7 +553,7 @@ private fun RecurringTemplateEditorSheet(
                     SegmentedButton(
                         selected = editorState.type == RecordType.EXPENSE,
                         onClick = {
-                            val defaultCategoryId = CategorySelectionPolicy.resolvePreferredTopLevelCategoryId(
+                            val defaultCategoryId = CategorySelectionPolicy.resolvePreferredCategoryId(
                                 categories = categories,
                                 type = RecordType.EXPENSE
                             )
@@ -571,7 +571,7 @@ private fun RecurringTemplateEditorSheet(
                     SegmentedButton(
                         selected = editorState.type == RecordType.INCOME,
                         onClick = {
-                            val defaultCategoryId = CategorySelectionPolicy.resolvePreferredTopLevelCategoryId(
+                            val defaultCategoryId = CategorySelectionPolicy.resolvePreferredCategoryId(
                                 categories = categories,
                                 type = RecordType.INCOME
                             )

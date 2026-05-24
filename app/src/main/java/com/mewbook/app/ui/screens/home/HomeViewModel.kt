@@ -28,6 +28,7 @@ import com.mewbook.app.domain.usecase.ledger.InitializeDefaultLedgerUseCase
 import com.mewbook.app.domain.usecase.record.AddRecordUseCase
 import com.mewbook.app.domain.usecase.record.DeleteRecordUseCase
 import com.mewbook.app.domain.usecase.record.GetRecordsUseCase
+import com.mewbook.app.domain.usecase.record.PurgeExpiredDeletedRecordsUseCase
 import com.mewbook.app.domain.usecase.record.UpdateRecordUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -124,7 +125,8 @@ data class HomeUiState(
     val recentNotesByCategory: Map<Long, List<String>> = emptyMap(),
     val defaultAccountId: Long? = null,
     val showHomeOverviewCards: Boolean = true,
-    val quickCategories: List<Category> = emptyList()
+    val quickCategories: List<Category> = emptyList(),
+    val message: String? = null
 )
 
 enum class HomeAddEntryMode {
@@ -138,6 +140,7 @@ class HomeViewModel @Inject constructor(
     private val addRecordUseCase: AddRecordUseCase,
     private val updateRecordUseCase: UpdateRecordUseCase,
     private val deleteRecordUseCase: DeleteRecordUseCase,
+    private val purgeExpiredDeletedRecordsUseCase: PurgeExpiredDeletedRecordsUseCase,
     private val getCategoriesUseCase: GetCategoriesUseCase,
     private val initializeDefaultCategoriesUseCase: InitializeDefaultCategoriesUseCase,
     private val initializeDefaultLedgerUseCase: InitializeDefaultLedgerUseCase,
@@ -168,6 +171,7 @@ class HomeViewModel @Inject constructor(
     private val _totalBudget = MutableStateFlow(0.0)
     private val _budgetRemaining = MutableStateFlow(0.0)
     private val _showHomeOverviewCards = MutableStateFlow(true)
+    private val _message = MutableStateFlow<String?>(null)
     private val _calendarMonth = MutableStateFlow(YearMonth.now())
     private val _datesWithRecords = MutableStateFlow<Set<LocalDate>>(emptySet())
     private val periodState = combine(_selectedPeriodType, _anchorDate) { selectedPeriodType, anchorDate ->
@@ -233,8 +237,9 @@ class HomeViewModel @Inject constructor(
         combine(periodState, summaryState, contextState, interactionState) { period, summary, context, interaction ->
             period to Triple(summary, context, interaction)
         },
-        _datesWithRecords
-    ) { (period, triple), datesWithRecords ->
+        _datesWithRecords,
+        _message
+    ) { (period, triple), datesWithRecords, message ->
         val (summary, context, interaction) = triple
         val overlay = interaction.overlay
         val search = interaction.search
@@ -297,7 +302,8 @@ class HomeViewModel @Inject constructor(
                 type = overlay.newRecordType ?: RecordType.EXPENSE
             ),
             calendarMonth = _calendarMonth.value,
-            datesWithRecords = datesWithRecords
+            datesWithRecords = datesWithRecords,
+            message = message
         )
     }.stateIn(
         viewModelScope,
@@ -320,6 +326,7 @@ class HomeViewModel @Inject constructor(
             ensureDefaultAccountForLedgerUseCase(ledgerId)
             initializeDefaultCategoriesUseCase()
             recurringTemplateRepository.autoCloseDueTemplates()
+            purgeExpiredDeletedRecordsUseCase()
         }
     }
 
@@ -553,22 +560,20 @@ class HomeViewModel @Inject constructor(
 
     fun deleteRecord(id: Long) {
         viewModelScope.launch {
-            database.withTransaction {
-                val record = _editingRecord.value?.takeIf { it.id == id }
-                    ?: _browsingRecord.value?.takeIf { it.id == id }
-                    ?: uiState.value.records.find { rec -> rec.id == id }
-                if (record?.accountId != null) {
-                    val accId = record.accountId
-                    val account = accountRepository.getAccountById(accId)
-                    if (account != null) {
-                        val balanceChange = if (record.type == RecordType.INCOME) -record.amount else record.amount
-                        accountRepository.updateBalance(accId, account.balance + balanceChange)
-                    }
-                }
-                deleteRecordUseCase(id)
-            }
+            val movedToTrash = deleteRecordUseCase(id)
             _browsingRecord.update { current -> current?.takeIf { it.id != id } }
+            _message.update {
+                if (movedToTrash) {
+                    "已移入回收站，可在 30 天内找回"
+                } else {
+                    "记录不存在或已删除"
+                }
+            }
         }
+    }
+
+    fun clearMessage() {
+        _message.update { null }
     }
 
     private fun resolveDisplayedBudgetAmount(budgets: List<Budget>): Double {

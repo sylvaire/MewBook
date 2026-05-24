@@ -9,6 +9,7 @@ import com.mewbook.app.data.local.database.MewBookDatabase
 import com.mewbook.app.domain.model.RecordType
 import com.mewbook.app.domain.model.RecurringTemplate
 import com.mewbook.app.domain.model.RecurringTemplateScheduleType
+import com.mewbook.app.domain.policy.MoneyAmountPolicy
 import com.mewbook.app.domain.policy.RecurringTemplateAutoClosePolicy
 import com.mewbook.app.domain.policy.RecurringTemplateSchedulePolicy
 import com.mewbook.app.domain.repository.RecurringTemplateRepository
@@ -209,11 +210,11 @@ class RecurringTemplateRepositoryImpl @Inject constructor(
     ) {
         val resolvedAccountId = accountId ?: return
         val currentBalance = accountBalances[resolvedAccountId] ?: return
-        val nextBalance = if (type == RecordType.INCOME) {
+        val nextBalance = MoneyAmountPolicy.normalizeCurrency(if (type == RecordType.INCOME) {
             currentBalance + amount
         } else {
             currentBalance - amount
-        }
+        })
         accountBalances[resolvedAccountId] = nextBalance
         accountDao.updateBalance(resolvedAccountId, nextBalance)
     }

@@ -67,8 +67,7 @@ class CategoryRepositoryImpl @Inject constructor(
             color = color,
             type = RecordType.valueOf(type),
             isDefault = isDefault,
-            sortOrder = sortOrder,
-            parentId = parentId
+            sortOrder = sortOrder
         )
     }
 
@@ -80,8 +79,7 @@ class CategoryRepositoryImpl @Inject constructor(
             color = color,
             type = type.name,
             isDefault = isDefault,
-            sortOrder = sortOrder,
-            parentId = parentId
+            sortOrder = sortOrder
         )
     }
 }

@@ -159,9 +159,7 @@ fun AddEditRecordSheet(
             type = selectedType,
             selectedCategoryId = selectedCategoryId
         ).sortedWith(
-            compareBy<Category> { it.parentId != null }
-                .thenBy { parentSortOrder(it, categoriesById) }
-                .thenBy { it.sortOrder }
+            compareBy<Category> { it.sortOrder }
                 .thenBy { it.id }
         )
     }
@@ -776,11 +774,4 @@ private fun NoteEditorDialog(
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } }
     )
-}
-
-private fun parentSortOrder(
-    category: Category,
-    categoriesById: Map<Long, Category>
-): Int {
-    return category.parentId?.let { categoriesById[it]?.sortOrder } ?: category.sortOrder
 }

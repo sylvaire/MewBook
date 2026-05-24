@@ -14,6 +14,7 @@ sealed class Screen(val route: String) {
     data object Export : Screen("export")
     data object SmartImport : Screen("smart_import")
     data object RecurringTemplates : Screen("recurring_templates")
+    data object RecycleBin : Screen("recycle_bin")
     data object AccountEdit : Screen("account_edit/{accountId}") {
         fun createRoute(accountId: Long) = "account_edit/$accountId"
     }

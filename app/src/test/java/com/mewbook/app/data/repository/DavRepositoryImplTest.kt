@@ -60,7 +60,7 @@ class DavRepositoryImplTest {
 
         assertTrue(result.isSuccess)
         assertEquals(
-            "https://dav.example.com/mewbook/April_report_final.json",
+            "https://dav.example.com/mewbook/manual_April_report_final.json",
             remote.lastPutFileUrl
         )
     }
@@ -185,7 +185,7 @@ class DavRepositoryImplTest {
                 listOf(
                     "/dav/MewBook/mewbook_backup_20260418_110000.json",
                     "https://dav.example.com/dav/MewBook/mewbook_auto_backup_20260418_130000.json",
-                    "/dav/MewBook/custom_april_export.json",
+                    "/dav/MewBook/manual_custom_april_export.json",
                     "/dav/MewBook/readme.txt",
                     "/dav/MewBook/mewbook_backup_20260418_120000.csv"
                 )
@@ -216,7 +216,7 @@ class DavRepositoryImplTest {
             result.getOrThrow().map { it.displayName }
         )
         assertEquals(
-            "https://dav.example.com/dav/MewBook/custom_april_export.json",
+            "https://dav.example.com/dav/MewBook/manual_custom_april_export.json",
             result.getOrThrow()[2].fileUrl
         )
     }

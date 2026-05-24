@@ -23,7 +23,3 @@ fun formatCurrency(amount: Double): String {
 fun Long.toLocalDate(): LocalDate {
     return LocalDate.ofEpochDay(this)
 }
-
-fun LocalDate.toEpochDay(): Long {
-    return this.toEpochDay()
-}

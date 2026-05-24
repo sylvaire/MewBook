@@ -17,8 +17,6 @@ interface RecordRepository {
     suspend fun getRecordById(id: Long): Record?
     suspend fun insertRecord(record: Record): Long
     suspend fun updateRecord(record: Record)
-    suspend fun deleteRecord(record: Record)
-    suspend fun deleteRecordById(id: Long)
     suspend fun getAllRecordsOnce(): List<Record>
     suspend fun insertRecords(records: List<Record>)
     suspend fun deleteAllRecords()

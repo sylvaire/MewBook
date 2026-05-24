@@ -105,4 +105,27 @@ class SmartImportPolicyTest {
         assertEquals(LocalDate.of(2026, 4, 25).toEpochDay(), record.date)
         assertEquals(now.atZone(ZoneId.systemDefault()).toEpochSecond(), record.createdAt)
     }
+
+    @Test
+    fun parseAiResponseToEnvelope_flattensAiSubCategoryToFinalCategory() {
+        val envelope = SmartImportPolicy.parseAiResponseToEnvelope(
+            """
+                [
+                  {
+                    "date": "2026-04-25",
+                    "type": "EXPENSE",
+                    "amount": 18.5,
+                    "category": "餐饮",
+                    "categorySemantic": "food",
+                    "subCategory": "早餐",
+                    "subCategorySemantic": "breakfast",
+                    "account": "支付宝"
+                  }
+                ]
+            """.trimIndent()
+        )
+
+        assertEquals(listOf("早餐"), envelope.payload.categories.map { it.name })
+        assertEquals(envelope.payload.categories.single().id, envelope.payload.records.single().categoryId)
+    }
 }

@@ -36,20 +36,18 @@ class ExportRepository @Inject constructor(
             FileWriter(file).use { writer ->
                 // CSV header with BOM for Excel UTF-8 compatibility
                 writer.append("\uFEFF")
-                writer.append("日期,类型,分类,子分类,金额,备注\n")
+                writer.append("日期,类型,分类,金额,备注\n")
 
                 // Data rows
                 records.forEach { record ->
                     val category = categoriesMap[record.categoryId]
-                    val parentCategory = category?.parentId?.let { categoriesMap[it] }
                     val date = record.date.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"))
                     val type = if (record.type.name == "EXPENSE") "支出" else "收入"
-                    val categoryName = parentCategory?.name ?: category?.name ?: "未知"
-                    val subCategoryName = if (parentCategory != null) category.name else ""
+                    val categoryName = category?.name ?: "未知"
                     val amount = String.format("%.2f", record.amount)
                     val note = record.note?.replace(",", "，")?.replace("\n", " ") ?: ""
 
-                    writer.append("$date,$type,$categoryName,$subCategoryName,$amount,$note\n")
+                    writer.append("$date,$type,$categoryName,$amount,$note\n")
                 }
             }
 

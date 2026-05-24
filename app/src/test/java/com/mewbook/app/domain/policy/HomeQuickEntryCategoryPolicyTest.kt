@@ -14,7 +14,7 @@ class HomeQuickEntryCategoryPolicyTest {
     fun suggest_prioritizesRecentCategoriesWithinLedgerAndType() {
         val breakfast = Category(
             id = 1L,
-            name = "早餐",
+            name = "餐饮",
             icon = "restaurant",
             color = 0xFFFF6B6BL,
             type = RecordType.EXPENSE,
@@ -23,7 +23,7 @@ class HomeQuickEntryCategoryPolicyTest {
         )
         val lunch = Category(
             id = 2L,
-            name = "午餐",
+            name = "交通",
             icon = "restaurant",
             color = 0xFFFF6B6BL,
             type = RecordType.EXPENSE,
@@ -60,7 +60,7 @@ class HomeQuickEntryCategoryPolicyTest {
     }
 
     @Test
-    fun suggest_fallsBackToTopLevelCategoriesWhenNoHistory() {
+    fun suggest_fallsBackToRecordEntryExpenseCategoriesWhenNoHistory() {
         val dining = Category(
             id = 1L,
             name = "餐饮",
@@ -86,8 +86,7 @@ class HomeQuickEntryCategoryPolicyTest {
             color = 0xFFFF9F43,
             type = RecordType.EXPENSE,
             isDefault = true,
-            sortOrder = 0,
-            parentId = dining.id
+            sortOrder = 2
         )
         val salary = Category(
             id = 4L,
@@ -111,7 +110,7 @@ class HomeQuickEntryCategoryPolicyTest {
     }
 
     @Test
-    fun suggest_excludesLegacySubwayFromFallbackAndRecentSuggestions() {
+    fun suggest_excludesHiddenDefaultExpenseCategoriesFromRecentAndFallbackSuggestions() {
         val subway = Category(
             id = 1L,
             name = "地铁",
@@ -153,6 +152,42 @@ class HomeQuickEntryCategoryPolicyTest {
 
         assertEquals(listOf(transport), recentSuggestions)
         assertEquals(listOf(transport), fallbackSuggestions)
+    }
+
+    @Test
+    fun suggest_excludesLegacyExpenseSubcategoriesEvenWhenImportedAsCustomCategories() {
+        val subway = Category(
+            id = 1L,
+            name = "地铁",
+            icon = "train",
+            color = 0xFF78909C,
+            type = RecordType.EXPENSE,
+            isDefault = false,
+            sortOrder = 0
+        )
+        val transport = Category(
+            id = 2L,
+            name = "交通",
+            icon = "directions_bus",
+            color = 0xFF4ECDC4,
+            type = RecordType.EXPENSE,
+            isDefault = true,
+            sortOrder = 1
+        )
+        val now = LocalDateTime.of(2026, 4, 21, 10, 0)
+
+        val suggestions = HomeQuickEntryCategoryPolicy.suggest(
+            categories = listOf(subway, transport),
+            records = listOf(
+                record(categoryId = subway.id, ledgerId = 1L, type = RecordType.EXPENSE, updatedAt = now),
+                record(categoryId = transport.id, ledgerId = 1L, type = RecordType.EXPENSE, updatedAt = now.minusHours(1))
+            ),
+            ledgerId = 1L,
+            type = RecordType.EXPENSE,
+            limit = 4
+        )
+
+        assertEquals(listOf(transport), suggestions)
     }
 
     private fun record(

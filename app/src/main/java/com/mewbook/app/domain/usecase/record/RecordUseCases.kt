@@ -2,6 +2,7 @@ package com.mewbook.app.domain.usecase.record
 
 import com.mewbook.app.domain.model.Record
 import com.mewbook.app.domain.repository.RecordRepository
+import com.mewbook.app.domain.repository.RecordTrashRepository
 import kotlinx.coroutines.flow.Flow
 import java.time.LocalDate
 import javax.inject.Inject
@@ -56,9 +57,47 @@ class UpdateRecordUseCase @Inject constructor(
 }
 
 class DeleteRecordUseCase @Inject constructor(
-    private val recordRepository: RecordRepository
+    private val recordTrashRepository: RecordTrashRepository
+) {
+    suspend operator fun invoke(id: Long): Boolean {
+        return recordTrashRepository.moveRecordToTrash(id)
+    }
+}
+
+class MoveRecordToTrashUseCase @Inject constructor(
+    private val recordTrashRepository: RecordTrashRepository
+) {
+    suspend operator fun invoke(id: Long): Boolean {
+        return recordTrashRepository.moveRecordToTrash(id)
+    }
+}
+
+class GetDeletedRecordsUseCase @Inject constructor(
+    private val recordTrashRepository: RecordTrashRepository
+) {
+    operator fun invoke() = recordTrashRepository.getDeletedRecords()
+}
+
+class RestoreDeletedRecordUseCase @Inject constructor(
+    private val recordTrashRepository: RecordTrashRepository
+) {
+    suspend operator fun invoke(id: Long): Boolean {
+        return recordTrashRepository.restoreDeletedRecord(id)
+    }
+}
+
+class DeleteDeletedRecordForeverUseCase @Inject constructor(
+    private val recordTrashRepository: RecordTrashRepository
 ) {
     suspend operator fun invoke(id: Long) {
-        recordRepository.deleteRecordById(id)
+        recordTrashRepository.deleteDeletedRecordForever(id)
+    }
+}
+
+class PurgeExpiredDeletedRecordsUseCase @Inject constructor(
+    private val recordTrashRepository: RecordTrashRepository
+) {
+    suspend operator fun invoke(): Int {
+        return recordTrashRepository.purgeExpiredDeletedRecords()
     }
 }

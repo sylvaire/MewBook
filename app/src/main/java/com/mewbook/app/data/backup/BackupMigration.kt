@@ -115,17 +115,12 @@ object BackupMigration {
 
     private fun migrateLegacyExportV1(legacy: LegacyExportV1): BackupEnvelope {
         val categories = mutableListOf<BackupCategory>()
-        val categoryIds = mutableMapOf<Triple<String, String?, String>, Long>()
+        val categoryIds = mutableMapOf<Pair<String, String>, Long>()
         var nextCategoryId = 1L
 
-        fun ensureCategory(type: String, parentName: String?, name: String): Long {
-            val key = Triple(type, parentName, name)
+        fun ensureCategory(type: String, name: String): Long {
+            val key = type to name
             return categoryIds.getOrPut(key) {
-                val parentId = if (parentName == null) {
-                    null
-                } else {
-                    ensureCategory(type, null, parentName)
-                }
                 val id = nextCategoryId++
                 categories += BackupCategory(
                     id = id,
@@ -134,8 +129,7 @@ object BackupMigration {
                     color = 0xFF9E9E9E,
                     type = type,
                     isDefault = false,
-                    sortOrder = categories.count { it.type == type && it.parentId == parentId },
-                    parentId = parentId
+                    sortOrder = categories.count { it.type == type }
                 )
                 id
             }
@@ -144,11 +138,10 @@ object BackupMigration {
         val fallbackTimestamp = parseExportTime(legacy.exportTime)
         val records = legacy.records.mapIndexed { index, record ->
             val type = record.type
-            val categoryId = if (record.subCategoryName.isNullOrBlank()) {
-                ensureCategory(type, null, record.categoryName.ifBlank { "未分类" })
-            } else {
-                ensureCategory(type, record.categoryName.ifBlank { "未分类" }, record.subCategoryName)
+            val categoryName = record.subCategoryName.ifBlank {
+                record.categoryName.ifBlank { "未分类" }
             }
+            val categoryId = ensureCategory(type, categoryName)
 
             BackupRecord(
                 id = (index + 1).toLong(),
@@ -220,8 +213,7 @@ object BackupMigration {
                         color = it.color,
                         type = it.type,
                         isDefault = it.isDefault,
-                        sortOrder = it.sortOrder,
-                        parentId = it.parentId
+                        sortOrder = it.sortOrder
                     )
                 },
                 templates = emptyList(),
@@ -302,6 +294,5 @@ private data class LegacyDavCategory(
     val type: String,
     @SerialName("isDefault")
     val isDefault: Boolean,
-    val sortOrder: Int,
-    val parentId: Long? = null
+    val sortOrder: Int
 )

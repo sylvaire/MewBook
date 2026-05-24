@@ -83,10 +83,10 @@ class CategoriesViewModel @Inject constructor(
         }
     }
 
-    fun addCategory(name: String, icon: String, color: Long, type: RecordType, parentId: Long? = null) {
+    fun addCategory(name: String, icon: String, color: Long, type: RecordType) {
         viewModelScope.launch {
             val maxSortOrder = _uiState.value.categories
-                .filter { it.type == type && it.parentId == parentId }
+                .filter { it.type == type }
                 .maxOfOrNull { it.sortOrder } ?: -1
 
             val category = Category(
@@ -96,8 +96,7 @@ class CategoriesViewModel @Inject constructor(
                 color = color,
                 type = type,
                 isDefault = false,
-                sortOrder = maxSortOrder + 1,
-                parentId = parentId
+                sortOrder = maxSortOrder + 1
             )
             addCategoryUseCase(category)
             hideAddDialog()
@@ -151,12 +150,6 @@ class CategoriesViewModel @Inject constructor(
     }
 
     private fun reorderableSiblings(category: Category): List<Category> {
-        return if (category.parentId == null) {
-            CategorySelectionPolicy.visibleTopLevelCategories(_uiState.value.categories, category.type)
-        } else {
-            _uiState.value.categories
-                .filter { it.type == category.type && it.parentId == category.parentId }
-                .sortedBy { it.sortOrder }
-        }
+        return CategorySelectionPolicy.visibleCategories(_uiState.value.categories, category.type)
     }
 }

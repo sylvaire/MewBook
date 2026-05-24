@@ -23,6 +23,7 @@ import com.mewbook.app.data.local.dao.AccountDao
 import com.mewbook.app.data.local.dao.BudgetDao
 import com.mewbook.app.data.local.dao.CategoryDao
 import com.mewbook.app.data.local.dao.DavConfigDao
+import com.mewbook.app.data.local.dao.DeletedRecordDao
 import com.mewbook.app.data.local.dao.LedgerDao
 import com.mewbook.app.data.local.dao.RecurringTemplateDao
 import com.mewbook.app.data.local.dao.RecordDao
@@ -55,6 +56,7 @@ class BackupRepository @Inject constructor(
     private val recurringTemplateDao: RecurringTemplateDao,
     private val ledgerDao: LedgerDao,
     private val davConfigDao: DavConfigDao,
+    private val deletedRecordDao: DeletedRecordDao,
     private val themePreferencesRepository: ThemePreferencesRepository
 ) : BackupSnapshotDataSource {
 
@@ -215,6 +217,7 @@ class BackupRepository @Inject constructor(
             categoryDao.deleteAllCategories()
             ledgerDao.deleteAllLedgers()
             davConfigDao.deleteDavConfig()
+            deletedRecordDao.deleteAllDeletedRecords()
         }
     }
 
@@ -228,6 +231,7 @@ class BackupRepository @Inject constructor(
             categoryDao.deleteAllCategories()
             ledgerDao.deleteAllLedgers()
             davConfigDao.deleteDavConfig()
+            deletedRecordDao.deleteAllDeletedRecords()
 
             if (envelope.payload.ledgers.isNotEmpty()) {
                 ledgerDao.insertLedgers(envelope.payload.ledgers.map { it.toEntity() })
@@ -282,8 +286,7 @@ class BackupRepository @Inject constructor(
         color = color,
         type = type,
         isDefault = isDefault,
-        sortOrder = sortOrder,
-        parentId = parentId
+        sortOrder = sortOrder
     )
 
     private fun AccountEntity.toBackup() = BackupAccount(
@@ -348,8 +351,7 @@ class BackupRepository @Inject constructor(
         color = color,
         type = type,
         isDefault = isDefault,
-        sortOrder = sortOrder,
-        parentId = parentId
+        sortOrder = sortOrder
     )
 
     private fun BackupAccount.toEntity() = AccountEntity(

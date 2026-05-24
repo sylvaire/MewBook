@@ -1,7 +1,6 @@
 package com.mewbook.app.data.local.dao
 
 import androidx.room.Dao
-import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
@@ -43,9 +42,6 @@ interface RecordDao {
 
     @Update
     suspend fun updateRecord(record: RecordEntity)
-
-    @Delete
-    suspend fun deleteRecord(record: RecordEntity)
 
     @Query("DELETE FROM records WHERE id = :id")
     suspend fun deleteRecordById(id: Long)

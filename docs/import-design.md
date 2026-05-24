@@ -1,6 +1,6 @@
 # MewBook 第三方数据导入设计文档
 
-> 最后更新：2026-05-02
+> 最后更新：2026-05-24
 
 ## 1. 概述
 
@@ -9,7 +9,7 @@ MewBook 支持两条导入路径，将第三方记账数据转换为本地记录
 - **智能导入（AI 辅助）**：文本或文件发送到 OpenAI 兼容 API，AI 返回结构化 JSON，解析后合并到本地
 - **CSV 导入（本地解析）**：CSV 文件由 `BackupImportPolicy.parseExternalCsv` 直接解析，无需网络
 
-两条路径共享统一的合并管线：`BackupImportPolicy.mergeRecordImport`，通过语义分类匹配、去重和事务写入完成导入。
+两条路径共享统一的合并管线：`BackupImportPolicy.mergeRecordImport`，通过单层语义分类匹配、去重和事务写入完成导入。
 
 ## 2. 架构
 
@@ -116,10 +116,10 @@ AI 被要求返回 JSON 格式，包含 `records` 数组，每条记录：
 | `date` | `String?` | `yyyy-MM-dd`，空则用当天 |
 | `type` | `String` | `"EXPENSE"` 或 `"INCOME"` |
 | `amount` | `Double` | 始终为正数 |
-| `category` | `String` | 一级分类名称 |
+| `category` | `String` | 分类名称；若同时提供 `subCategory`，导入时优先使用 `subCategory` 作为最终单层分类 |
 | `categorySemantic` | `String?` | 英文语义标签（如 `food`, `transport`） |
-| `subCategory` | `String?` | 二级分类名称 |
-| `subCategorySemantic` | `String?` | 二级分类语义标签 |
+| `subCategory` | `String?` | 兼容旧二级分类输入，非空时作为最终单层分类名 |
+| `subCategorySemantic` | `String?` | 兼容旧二级分类语义输入 |
 | `account` | `String?` | 账户名称 |
 | `ledger` | `String?` | 账本名称 |
 | `note` | `String?` | 备注 |
@@ -135,7 +135,7 @@ AI 被要求返回 JSON 格式，包含 `records` 数组，每条记录：
    - 类型规范化：`expense`/`支出`/`花费`/`消费` → `EXPENSE`；`income`/`收入`/`进账` → `INCOME`
    - 日期解析：`yyyy-MM-dd` → `LocalDate.parse`，失败用当天
    - 账本创建：按规范化名称去重，默认 `"我的账本"`
-   - 分类创建：支持父子层级，用 `CategorySemanticPolicy.chooseIcon` 选图标
+   - 分类创建：创建单层分类，优先使用子分类/路径末段，用 `CategorySemanticPolicy.chooseIcon` 选图标
    - 账户创建：按名称推断类型（支付宝/微信/信用卡/银行卡/现金/投资）
    - 记录创建：自增 ID，epoch-day 日期，UUID syncId
 
@@ -148,7 +148,7 @@ AI 被要求返回 JSON 格式，包含 `records` 数组，每条记录：
 - 各块独立调用 AI
 - `mergeSmartImportEnvelopes` 合并多个响应：
   - 全局唯一顺序 ID
-  - 分类 `parentId` 引用重映射
+  - 分类按名称/语义去重后重映射记录引用
 
 ### 3.6 隐私保护
 
@@ -180,7 +180,7 @@ AI 被要求返回 JSON 格式，包含 `records` 数组，每条记录：
 | 收入金额 | 替代 | `收入金额`, `入账金额`, `incomeamount` |
 | 支出金额 | 替代 | `支出金额`, `出账金额`, `expenseamount` |
 | 类型 | 否 | `类型`, `type`, `收支类型` |
-| 子分类 | 否 | `子分类`, `subcategory`, `二级分类` |
+| 子分类 | 否 | `子分类`, `subcategory`, `二级分类`；兼容旧格式，非空时作为最终分类名 |
 | 备注 | 否 | `备注`, `note`, `memo`, `remark`, `description` |
 | 账户 | 否 | `账户`, `account`, `支付方式`, `钱包` |
 | 账本 | 否 | `账本`, `ledger`, `book` |
@@ -231,29 +231,25 @@ AI 被要求返回 JSON 格式，包含 `records` 数组，每条记录：
 4. 负数金额 → EXPENSE
 5. 默认 → EXPENSE
 
-### 4.6 分类路径解析
+### 4.6 分类名解析
 
-`resolveCategoryPath` 处理层级分类：
+`resolveCategoryName` 将旧层级输入折叠为单层分类：
 
-- 若 `subCategory` 列存在且非空 → `category` 为父，`subCategory` 为子
+- 若 `subCategory` 列存在且非空 → 使用 `subCategory` 作为最终分类名
 - 否则按路径分隔符拆分：`/`, `／`, `>`, `＞`, `|`, `｜`
-  - 含分隔符 → 首段为父，末段为子
+  - 含分隔符 → 使用末段作为最终分类名
   - 无分隔符 → 单级分类
 
 ## 5. 语义分类匹配
 
 ### 5.1 匹配瀑布
 
-`CategorySemanticPolicy.resolveExistingCategory` 四级匹配：
+`CategorySemanticPolicy.resolveExistingCategory` 单层匹配：
 
 ```
-① 同类型 + 同父级 + 精确规范化名称匹配
+① 同类型 + 精确规范化名称匹配
    ↓ 未命中
-② 同类型 + 精确规范化名称匹配（忽略父级，仅当目标为顶级分类时）
-   ↓ 未命中
-③ 同类型 + 同父级 + 语义标签匹配
-   ↓ 未命中
-④ 同类型 + 语义标签匹配（忽略父级，仅当目标为顶级分类时）
+② 同类型 + 语义标签匹配
    ↓ 未命中
 → CREATE_NEW
 ```
@@ -317,7 +313,7 @@ AI 被要求返回 JSON 格式，包含 `records` 数组，每条记录：
 - 构建 `ledgerIdMap[incomingId] → targetId`
 
 **Step 2 — 分类映射**
-- 排序：父分类优先处理
+- 排序：按 `sortOrder` 与原始 ID 稳定处理
 - 对每个传入分类调用 `CategorySemanticPolicy.resolveExistingCategory`
 - 匹配成功 → `REUSE_EXISTING`，记录目标 ID
 - 匹配失败 → `CREATE_NEW`，分配新 ID

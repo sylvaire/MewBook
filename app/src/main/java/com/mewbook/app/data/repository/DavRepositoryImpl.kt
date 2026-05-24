@@ -256,9 +256,10 @@ class DavRepositoryImpl @Inject constructor(
 
     private fun isBackupFile(value: String): Boolean {
         val name = value.substringAfterLast('/')
-        return name.startsWith("mewbook_backup_", ignoreCase = true) ||
+        return name.endsWith(".json", ignoreCase = true) &&
+            (name.startsWith("mewbook_backup_", ignoreCase = true) ||
             name.startsWith("mewbook_auto_backup_", ignoreCase = true) ||
-            name.startsWith("manual_", ignoreCase = true)
+            name.startsWith("manual_", ignoreCase = true))
     }
 
     private fun normalizeManualBackupFileName(fileName: String?): String? {

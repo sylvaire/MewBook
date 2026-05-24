@@ -8,6 +8,7 @@ import com.mewbook.app.data.local.dao.AccountDao
 import com.mewbook.app.data.local.dao.BudgetDao
 import com.mewbook.app.data.local.dao.CategoryDao
 import com.mewbook.app.data.local.dao.DavConfigDao
+import com.mewbook.app.data.local.dao.DeletedRecordDao
 import com.mewbook.app.data.local.dao.LedgerDao
 import com.mewbook.app.data.local.dao.RecurringTemplateDao
 import com.mewbook.app.data.local.dao.RecordDao
@@ -68,6 +69,58 @@ object DatabaseModule {
         }
     }
 
+    private val MIGRATION_4_5 = object : Migration(4, 5) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                """
+                    CREATE TABLE IF NOT EXISTS categories_flat (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        name TEXT NOT NULL,
+                        icon TEXT NOT NULL,
+                        color INTEGER NOT NULL,
+                        type TEXT NOT NULL,
+                        isDefault INTEGER NOT NULL,
+                        sortOrder INTEGER NOT NULL
+                    )
+                """.trimIndent()
+            )
+            db.execSQL(
+                """
+                    INSERT INTO categories_flat (id, name, icon, color, type, isDefault, sortOrder)
+                    SELECT id, name, icon, color, type, isDefault, sortOrder FROM categories
+                """.trimIndent()
+            )
+            db.execSQL("DROP TABLE categories")
+            db.execSQL("ALTER TABLE categories_flat RENAME TO categories")
+        }
+    }
+
+    private val MIGRATION_5_6 = object : Migration(5, 6) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                """
+                    CREATE TABLE IF NOT EXISTS deleted_records (
+                        recordId INTEGER PRIMARY KEY NOT NULL,
+                        amount REAL NOT NULL,
+                        type TEXT NOT NULL,
+                        categoryId INTEGER NOT NULL,
+                        note TEXT,
+                        date INTEGER NOT NULL,
+                        createdAt INTEGER NOT NULL,
+                        updatedAt INTEGER NOT NULL,
+                        syncId TEXT,
+                        ledgerId INTEGER NOT NULL,
+                        accountId INTEGER,
+                        deletedAt INTEGER NOT NULL
+                    )
+                """.trimIndent()
+            )
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_deleted_records_deletedAt ON deleted_records(deletedAt)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_deleted_records_date ON deleted_records(date)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_deleted_records_ledgerId ON deleted_records(ledgerId)")
+        }
+    }
+
     @Provides
     @Singleton
     fun provideDatabase(
@@ -78,7 +131,7 @@ object DatabaseModule {
             MewBookDatabase::class.java,
             MewBookDatabase.DATABASE_NAME
         )
-            .addMigrations(MIGRATION_2_3, MIGRATION_3_4)
+            .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
             .build()
     }
 
@@ -122,5 +175,11 @@ object DatabaseModule {
     @Singleton
     fun provideRecurringTemplateDao(database: MewBookDatabase): RecurringTemplateDao {
         return database.recurringTemplateDao()
+    }
+
+    @Provides
+    @Singleton
+    fun provideDeletedRecordDao(database: MewBookDatabase): DeletedRecordDao {
+        return database.deletedRecordDao()
     }
 }

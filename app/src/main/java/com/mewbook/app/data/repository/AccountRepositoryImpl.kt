@@ -4,6 +4,7 @@ import com.mewbook.app.data.local.dao.AccountDao
 import com.mewbook.app.data.local.entity.AccountEntity
 import com.mewbook.app.domain.model.Account
 import com.mewbook.app.domain.model.AccountType
+import com.mewbook.app.domain.policy.MoneyAmountPolicy
 import com.mewbook.app.domain.repository.AccountRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -44,7 +45,7 @@ class AccountRepositoryImpl @Inject constructor(
     }
 
     override suspend fun updateBalance(id: Long, balance: Double) {
-        accountDao.updateBalance(id, balance)
+        accountDao.updateBalance(id, MoneyAmountPolicy.normalizeCurrency(balance))
     }
 
     private fun AccountEntity.toDomain(): Account {
@@ -52,7 +53,7 @@ class AccountRepositoryImpl @Inject constructor(
             id = id,
             name = name,
             type = AccountType.valueOf(type),
-            balance = balance,
+            balance = MoneyAmountPolicy.normalizeCurrency(balance),
             icon = icon,
             color = color,
             isDefault = isDefault,
@@ -66,7 +67,7 @@ class AccountRepositoryImpl @Inject constructor(
             id = id,
             name = name,
             type = type.name,
-            balance = balance,
+            balance = MoneyAmountPolicy.normalizeCurrency(balance),
             icon = icon,
             color = color,
             isDefault = isDefault,

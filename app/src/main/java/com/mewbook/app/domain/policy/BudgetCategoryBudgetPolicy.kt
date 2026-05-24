@@ -20,7 +20,7 @@ object BudgetCategoryBudgetPolicy {
         editingBudget?.categoryId?.let(reservedCategoryIds::remove)
 
         return categories
-            .let { CategorySelectionPolicy.visibleTopLevelCategories(it, RecordType.EXPENSE) }
+            .let { CategorySelectionPolicy.visibleCategories(it, RecordType.EXPENSE) }
             .asSequence()
             .filter { it.id !in reservedCategoryIds }
             .sortedWith(compareBy(Category::sortOrder, Category::name))

@@ -47,7 +47,8 @@ data class CategoryExpenseDetailUiState(
     val accounts: List<Account> = emptyList(),
     val categories: List<Category> = emptyList(),
     val recentNotesByCategory: Map<Long, List<String>> = emptyMap(),
-    val defaultAccountId: Long? = null
+    val defaultAccountId: Long? = null,
+    val message: String? = null
 )
 
 private data class DetailBaseState(
@@ -82,6 +83,7 @@ class CategoryExpenseDetailViewModel @Inject constructor(
     private val _browsingRecord = MutableStateFlow<Record?>(null)
     private val _editingRecord = MutableStateFlow<Record?>(null)
     private val _showAddEditSheet = MutableStateFlow(false)
+    private val _message = MutableStateFlow<String?>(null)
 
     private val baseState: StateFlow<DetailBaseState> = combine(
         getRecordsUseCase.getExpenseByCategoryAndDateRange(categoryId, periodStart, periodEnd),
@@ -100,8 +102,9 @@ class CategoryExpenseDetailViewModel @Inject constructor(
         baseState,
         _browsingRecord,
         _editingRecord,
-        _showAddEditSheet
-    ) { base, browsingRecord, editingRecord, showAddEditSheet ->
+        _showAddEditSheet,
+        _message
+    ) { base, browsingRecord, editingRecord, showAddEditSheet, message ->
         val cat = base.categories.find { it.id == categoryId }
         val name = cat?.name ?: "未知"
         val subtitle = formatPeriodSubtitle(periodStart, periodEnd)
@@ -122,7 +125,8 @@ class CategoryExpenseDetailViewModel @Inject constructor(
             accounts = base.accounts,
             categories = base.categories,
             recentNotesByCategory = RecentNoteHistory.notesByCategory(filteredRecords, activeLedgerId),
-            defaultAccountId = AccountDefaultsPolicy.resolveDefaultAccountId(ledgerAccounts)
+            defaultAccountId = AccountDefaultsPolicy.resolveDefaultAccountId(ledgerAccounts),
+            message = message
         )
     }.stateIn(
         viewModelScope,
@@ -224,22 +228,20 @@ class CategoryExpenseDetailViewModel @Inject constructor(
 
     fun deleteRecord(id: Long) {
         viewModelScope.launch {
-            database.withTransaction {
-                val record = _editingRecord.value?.takeIf { it.id == id }
-                    ?: _browsingRecord.value?.takeIf { it.id == id }
-                    ?: uiState.value.records.find { rec -> rec.id == id }
-                if (record?.accountId != null) {
-                    val accId = record.accountId
-                    val account = accountRepository.getAccountById(accId)
-                    if (account != null) {
-                        val balanceChange = if (record.type == RecordType.INCOME) -record.amount else record.amount
-                        accountRepository.updateBalance(accId, account.balance + balanceChange)
-                    }
-                }
-                deleteRecordUseCase(id)
-            }
+            val movedToTrash = deleteRecordUseCase(id)
             _browsingRecord.update { current -> current?.takeIf { it.id != id } }
+            _message.update {
+                if (movedToTrash) {
+                    "已移入回收站，可在 30 天内找回"
+                } else {
+                    "记录不存在或已删除"
+                }
+            }
         }
+    }
+
+    fun clearMessage() {
+        _message.update { null }
     }
 
     private fun formatPeriodSubtitle(start: LocalDate, end: LocalDate): String {

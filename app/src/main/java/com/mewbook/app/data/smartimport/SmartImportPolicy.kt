@@ -70,26 +70,12 @@ object SmartImportPolicy {
 
         fun ensureCategory(
             type: String,
-            parentName: String?,
             name: String,
             semanticLabel: String?,
             proposedIcon: String?
         ): Long {
-            val parentId = parentName
-                ?.trim()
-                ?.takeIf { it.isNotEmpty() }
-                ?.let {
-                    ensureCategory(
-                        type = type,
-                        parentName = null,
-                        name = it,
-                        semanticLabel = null,
-                        proposedIcon = null
-                    )
-                }
             val key = CategoryKey(
                 type = type,
-                parentId = parentId,
                 normalizedName = CategorySemanticPolicy.normalize(name)
             )
             return categoryIdsByKey.getOrPut(key) {
@@ -101,14 +87,12 @@ object SmartImportPolicy {
                         type = type,
                         categoryName = name,
                         semanticLabel = semanticLabel,
-                        isChild = parentId != null,
                         proposedIcon = proposedIcon
                     ),
                     color = defaultCategoryColor(type),
                     type = type,
                     isDefault = false,
-                    sortOrder = categories.count { it.type == type && it.parentId == parentId },
-                    parentId = parentId,
+                    sortOrder = categories.count { it.type == type },
                     semanticLabel = semanticLabel
                 )
                 id
@@ -142,27 +126,17 @@ object SmartImportPolicy {
             val amount = requireNotNull(record.amount) { "缺少金额" }
             require(amount > 0.0) { "金额必须大于 0" }
             val date = parseDate(record.date, fallbackDate)
-            val categoryName = record.category.trim()
+            val categoryName = record.subCategory?.trim()?.takeIf { it.isNotBlank() }
+                ?: record.category.trim()
             require(categoryName.isNotBlank()) { "缺少分类" }
 
             val ledgerId = ensureLedger(record.ledger)
-            val categoryId = if (record.subCategory.isNullOrBlank()) {
-                ensureCategory(
-                    type = type,
-                    parentName = null,
-                    name = categoryName,
-                    semanticLabel = record.categorySemantic,
-                    proposedIcon = record.icon
-                )
-            } else {
-                ensureCategory(
-                    type = type,
-                    parentName = categoryName,
-                    name = record.subCategory,
-                    semanticLabel = record.subCategorySemantic ?: record.categorySemantic,
-                    proposedIcon = record.icon
-                )
-            }
+            val categoryId = ensureCategory(
+                type = type,
+                name = categoryName,
+                semanticLabel = record.subCategorySemantic ?: record.categorySemantic,
+                proposedIcon = record.icon
+            )
             val accountId = ensureAccount(ledgerId, record.account)
             val createdAt = fallbackTimestamp + index
 
@@ -264,7 +238,6 @@ object SmartImportPolicy {
 
     private data class CategoryKey(
         val type: String,
-        val parentId: Long?,
         val normalizedName: String
     )
 

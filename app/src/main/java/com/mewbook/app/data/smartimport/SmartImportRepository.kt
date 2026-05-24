@@ -305,10 +305,7 @@ class SmartImportRepository internal constructor(
             envelope.payload.categories.forEach { category ->
                 val newId = nextCategoryId++
                 categoryIdMap[category.id] = newId
-                mergedCategories += category.copy(
-                    id = newId,
-                    parentId = category.parentId?.let { categoryIdMap[it] }
-                )
+                mergedCategories += category.copy(id = newId)
             }
 
             val accountIdMap = mutableMapOf<Long, Long>()
@@ -437,10 +434,8 @@ class SmartImportRepository internal constructor(
       "date": "yyyy-MM-dd，可选；原始数据没有日期或时间时留空",
       "type": "EXPENSE 或 INCOME",
       "amount": 正数,
-      "category": "一级分类或主要分类",
+      "category": "分类名称",
       "categorySemantic": "food/transport/housing/salary/refund/investment/shopping/medical/education/entertainment 等英文语义标签",
-      "subCategory": "可选二级分类",
-      "subCategorySemantic": "可选二级分类英文语义标签",
       "account": "可选账户",
       "ledger": "可选账本",
       "note": "可选备注",

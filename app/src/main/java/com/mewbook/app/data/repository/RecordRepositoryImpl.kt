@@ -74,14 +74,6 @@ class RecordRepositoryImpl @Inject constructor(
         recordDao.updateRecord(record.toEntity())
     }
 
-    override suspend fun deleteRecord(record: Record) {
-        recordDao.deleteRecord(record.toEntity())
-    }
-
-    override suspend fun deleteRecordById(id: Long) {
-        recordDao.deleteRecordById(id)
-    }
-
     override suspend fun getAllRecordsOnce(): List<Record> {
         return recordDao.getAllRecordsOnce().map { it.toDomain() }
     }

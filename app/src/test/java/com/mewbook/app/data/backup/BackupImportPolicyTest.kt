@@ -20,8 +20,9 @@ class BackupImportPolicyTest {
         val envelope = BackupImportPolicy.parseExternalCsv(csv)
 
         assertEquals(2, envelope.payload.records.size)
-        assertEquals(3, envelope.payload.categories.size)
+        assertEquals(2, envelope.payload.categories.size)
         assertEquals(2, envelope.payload.accounts.size)
+        assertTrue(envelope.payload.categories.any { it.name == "早餐" })
         assertTrue(envelope.payload.records.any { it.note == "豆浆油条" })
         assertTrue(envelope.payload.records.any { it.type == "INCOME" })
     }
@@ -150,8 +151,7 @@ class BackupImportPolicyTest {
         assertEquals("EXPENSE", record.type)
         assertEquals(32.8, record.amount, 0.0)
         assertEquals(date.toEpochDay(), record.date)
-        assertTrue(envelope.payload.categories.any { it.name == "餐饮" && it.parentId == null })
-        assertTrue(envelope.payload.categories.any { it.name == "晚餐" && it.parentId != null })
+        assertEquals(listOf("晚餐"), envelope.payload.categories.map { it.name })
     }
 
     @Test
@@ -224,7 +224,7 @@ class BackupImportPolicyTest {
         val current = semanticCurrentEnvelope(
             categories = listOf(
                 BackupCategory(1, "餐饮", "restaurant", 0xFFFF6B6B, "EXPENSE", true, 0),
-                BackupCategory(2, "早餐", "free_breakfast", 0xFFFF9F43, "EXPENSE", true, 0, parentId = 1),
+                BackupCategory(2, "早餐", "free_breakfast", 0xFFFF9F43, "EXPENSE", true, 0),
                 BackupCategory(3, "工资", "payments", 0xFF4CAF50, "INCOME", true, 0)
             )
         )
@@ -277,6 +277,76 @@ class BackupImportPolicyTest {
         assertTrue(preview.categoryMappings.any { it.sourceName == "房租" && it.action == BackupCategoryImportAction.CREATE_NEW && it.icon == "home" })
         assertEquals("房租", createdCategory.name)
         assertEquals("home", createdCategory.icon)
+    }
+
+    @Test
+    fun mergeRecordImport_ignoresIncomingLegacyCategoryParents() {
+        val current = semanticCurrentEnvelope(categories = emptyList())
+        val incoming = BackupMigration.parseToCurrentEnvelope(
+            """
+                {
+                  "schemaVersion": 4,
+                  "appVersion": "1.0.9",
+                  "exportedAt": "2026-04-25T00:00:00",
+                  "payload": {
+                    "records": [
+                      {
+                        "id": 1,
+                        "amount": 12.0,
+                        "type": "EXPENSE",
+                        "categoryId": 11,
+                        "note": null,
+                        "date": 20568,
+                        "createdAt": 1,
+                        "updatedAt": 1,
+                        "syncId": "sync-1",
+                        "ledgerId": 1,
+                        "accountId": null
+                      }
+                    ],
+                    "categories": [
+                      {
+                        "id": 10,
+                        "name": "餐饮",
+                        "icon": "restaurant",
+                        "color": 4294925235,
+                        "type": "EXPENSE",
+                        "isDefault": true,
+                        "sortOrder": 0,
+                        "parentId": null
+                      },
+                      {
+                        "id": 11,
+                        "name": "早餐",
+                        "icon": "free_breakfast",
+                        "color": 4294934339,
+                        "type": "EXPENSE",
+                        "isDefault": true,
+                        "sortOrder": 0,
+                        "parentId": 10
+                      }
+                    ],
+                    "ledgers": [
+                      {
+                        "id": 1,
+                        "name": "我的账本",
+                        "type": "PERSONAL",
+                        "icon": "person",
+                        "color": 4283215696,
+                        "createdAt": 1,
+                        "isDefault": true
+                      }
+                    ]
+                  }
+                }
+            """.trimIndent()
+        )
+
+        val preview = BackupImportPolicy.previewRecordImport(current, incoming)
+        val merged = BackupImportPolicy.mergeRecordImport(current, incoming)
+
+        assertEquals(2, preview.categoriesToCreate)
+        assertEquals("早餐", merged.payload.categories.first { it.id == merged.payload.records.single().categoryId }.name)
     }
 
     @Test

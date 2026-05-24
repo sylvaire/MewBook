@@ -4,34 +4,49 @@ import com.mewbook.app.domain.model.Category
 import com.mewbook.app.domain.model.DefaultCategories
 import com.mewbook.app.domain.model.RecordType
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class CategorySelectionPolicyTest {
 
     @Test
-    fun visibleTopLevelCategories_excludesLegacySubwayAndChildCategories() {
-        val result = CategorySelectionPolicy.visibleTopLevelCategories(
+    fun visibleCategories_includesEveryCategoryOfTheRequestedType() {
+        val result = CategorySelectionPolicy.visibleCategories(
             categories = listOf(
                 category(id = 1L, name = "地铁", type = RecordType.EXPENSE),
                 category(id = 2L, name = "交通", type = RecordType.EXPENSE),
                 category(id = 3L, name = "工资", type = RecordType.INCOME),
-                category(id = 4L, name = "公交", type = RecordType.EXPENSE, parentId = 2L)
+                category(id = 4L, name = "公交", type = RecordType.EXPENSE)
             ),
             type = RecordType.EXPENSE
         ).map(Category::id)
 
-        assertEquals(listOf(2L), result)
+        assertEquals(listOf(1L, 2L, 4L), result)
     }
 
     @Test
-    fun recordSelectionCandidates_keepsSelectedChildButHidesLegacySubway() {
+    fun recordSelectionCandidates_returnsRecordEntryExpenseCategoriesAndCustomCategories() {
         val result = CategorySelectionPolicy.recordSelectionCandidates(
             categories = listOf(
                 category(id = 1L, name = "地铁", type = RecordType.EXPENSE),
                 category(id = 2L, name = "交通", type = RecordType.EXPENSE),
-                category(id = 3L, name = "公交", type = RecordType.EXPENSE, parentId = 2L),
-                category(id = 4L, name = "工资", type = RecordType.INCOME)
+                category(id = 3L, name = "公交", type = RecordType.EXPENSE),
+                category(id = 4L, name = "工资", type = RecordType.INCOME),
+                category(id = 5L, name = "自定义支出", type = RecordType.EXPENSE, isDefault = false)
+            ),
+            type = RecordType.EXPENSE
+        ).map(Category::id)
+
+        assertEquals(listOf(2L, 5L), result)
+    }
+
+    @Test
+    fun recordSelectionCandidates_keepsSelectedHiddenExpenseCategoryForEditing() {
+        val result = CategorySelectionPolicy.recordSelectionCandidates(
+            categories = listOf(
+                category(id = 1L, name = "地铁", type = RecordType.EXPENSE),
+                category(id = 2L, name = "交通", type = RecordType.EXPENSE),
+                category(id = 3L, name = "公交", type = RecordType.EXPENSE)
             ),
             type = RecordType.EXPENSE,
             selectedCategoryId = 3L
@@ -41,7 +56,7 @@ class CategorySelectionPolicyTest {
     }
 
     @Test
-    fun resolvePreferredTopLevelCategoryId_fallsBackToFirstVisibleCategory() {
+    fun resolvePreferredCategoryId_fallsBackToFirstVisibleCategory() {
         val categories = listOf(
             category(id = 1L, name = "地铁", type = RecordType.EXPENSE),
             category(id = 2L, name = "交通", type = RecordType.EXPENSE),
@@ -49,8 +64,8 @@ class CategorySelectionPolicyTest {
         )
 
         assertEquals(
-            2L,
-            CategorySelectionPolicy.resolvePreferredTopLevelCategoryId(
+            1L,
+            CategorySelectionPolicy.resolvePreferredCategoryId(
                 categories = categories,
                 type = RecordType.EXPENSE,
                 preferredCategoryId = 1L
@@ -58,7 +73,7 @@ class CategorySelectionPolicyTest {
         )
         assertEquals(
             3L,
-            CategorySelectionPolicy.resolvePreferredTopLevelCategoryId(
+            CategorySelectionPolicy.resolvePreferredCategoryId(
                 categories = categories,
                 type = RecordType.EXPENSE,
                 preferredCategoryId = 3L
@@ -67,23 +82,30 @@ class CategorySelectionPolicyTest {
     }
 
     @Test
-    fun defaultExpenseCategories_noLongerContainsTopLevelSubway() {
-        assertFalse(DefaultCategories.expenseCategories.any { it.name == "地铁" })
+    fun defaultCategories_areAllFlatCategories() {
+        assertEquals(DefaultCategories.expenseCategories + DefaultCategories.incomeCategories, DefaultCategories.all)
+    }
+
+    @Test
+    fun defaultExpenseCategories_preserveFormerNestedCategoriesAsFlatDefaults() {
+        val defaultExpenseNames = DefaultCategories.expenseCategories.map(Category::name).toSet()
+
+        assertEquals(DefaultCategories.expenseCategories.size, defaultExpenseNames.size)
+        assertTrue(defaultExpenseNames.containsAll(setOf("早餐", "地铁", "打车", "房租")))
     }
 
     private fun category(
         id: Long,
         name: String,
         type: RecordType,
-        parentId: Long? = null
+        isDefault: Boolean = true
     ) = Category(
         id = id,
         name = name,
         icon = "more_horiz",
         color = 0xFF808080,
         type = type,
-        isDefault = true,
-        sortOrder = id.toInt(),
-        parentId = parentId
+        isDefault = isDefault,
+        sortOrder = id.toInt()
     )
 }

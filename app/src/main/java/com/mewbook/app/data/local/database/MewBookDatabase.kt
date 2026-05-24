@@ -7,6 +7,7 @@ import com.mewbook.app.data.local.dao.AccountDao
 import com.mewbook.app.data.local.dao.BudgetDao
 import com.mewbook.app.data.local.dao.CategoryDao
 import com.mewbook.app.data.local.dao.DavConfigDao
+import com.mewbook.app.data.local.dao.DeletedRecordDao
 import com.mewbook.app.data.local.dao.LedgerDao
 import com.mewbook.app.data.local.dao.RecurringTemplateDao
 import com.mewbook.app.data.local.dao.RecordDao
@@ -14,6 +15,7 @@ import com.mewbook.app.data.local.entity.AccountEntity
 import com.mewbook.app.data.local.entity.BudgetEntity
 import com.mewbook.app.data.local.entity.CategoryEntity
 import com.mewbook.app.data.local.entity.DavConfigEntity
+import com.mewbook.app.data.local.entity.DeletedRecordEntity
 import com.mewbook.app.data.local.entity.LedgerEntity
 import com.mewbook.app.data.local.entity.RecurringTemplateEntity
 import com.mewbook.app.data.local.entity.RecordEntity
@@ -26,9 +28,10 @@ import com.mewbook.app.data.local.entity.RecordEntity
         AccountEntity::class,
         BudgetEntity::class,
         LedgerEntity::class,
-        RecurringTemplateEntity::class
+        RecurringTemplateEntity::class,
+        DeletedRecordEntity::class
     ],
-    version = 4,
+    version = 6,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -40,6 +43,7 @@ abstract class MewBookDatabase : RoomDatabase() {
     abstract fun budgetDao(): BudgetDao
     abstract fun ledgerDao(): LedgerDao
     abstract fun recurringTemplateDao(): RecurringTemplateDao
+    abstract fun deletedRecordDao(): DeletedRecordDao
 
     companion object {
         const val DATABASE_NAME = "mewbook.db"

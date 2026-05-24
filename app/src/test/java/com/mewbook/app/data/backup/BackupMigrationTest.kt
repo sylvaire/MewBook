@@ -30,7 +30,8 @@ class BackupMigrationTest {
 
         assertEquals(BackupMigration.CURRENT_SCHEMA_VERSION, envelope.schemaVersion)
         assertEquals(1, envelope.payload.records.size)
-        assertEquals(2, envelope.payload.categories.size)
+        assertEquals(1, envelope.payload.categories.size)
+        assertEquals("早餐", envelope.payload.categories.single().name)
         assertEquals("legacy-export-v1", envelope.appVersion)
         assertEquals(1L, envelope.payload.records.first().ledgerId)
     }
@@ -114,6 +115,57 @@ class BackupMigrationTest {
         assertEquals("system", envelope.payload.themeMode)
         assertEquals(1, envelope.payload.ledgers.size)
         assertNull(envelope.payload.davConfig)
+    }
+
+    @Test
+    fun parseCurrentEnvelope_ignoresLegacyCategoryParentFields() {
+        val currentJson = """
+            {
+              "schemaVersion": 4,
+              "appVersion": "1.0.9",
+              "exportedAt": "2026-04-18T12:00:00",
+              "payload": {
+                "records": [],
+                "categories": [
+                  {
+                    "id": 1,
+                    "name": "餐饮",
+                    "icon": "restaurant",
+                    "color": 4294925235,
+                    "type": "EXPENSE",
+                    "isDefault": true,
+                    "sortOrder": 0,
+                    "parentId": null
+                  },
+                  {
+                    "id": 2,
+                    "name": "早餐",
+                    "icon": "free_breakfast",
+                    "color": 4294934339,
+                    "type": "EXPENSE",
+                    "isDefault": true,
+                    "sortOrder": 0,
+                    "parentId": 1
+                  }
+                ],
+                "ledgers": [
+                  {
+                    "id": 1,
+                    "name": "我的账本",
+                    "type": "PERSONAL",
+                    "icon": "person",
+                    "color": 4283215696,
+                    "createdAt": 1,
+                    "isDefault": true
+                  }
+                ]
+              }
+            }
+        """.trimIndent()
+
+        val envelope = BackupMigration.parseToCurrentEnvelope(currentJson)
+
+        assertEquals(listOf("餐饮", "早餐"), envelope.payload.categories.map { it.name })
     }
 
     @Test

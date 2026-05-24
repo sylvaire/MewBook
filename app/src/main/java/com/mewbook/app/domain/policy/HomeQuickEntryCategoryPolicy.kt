@@ -14,10 +14,8 @@ object HomeQuickEntryCategoryPolicy {
         limit: Int = 6
     ): List<Category> {
         val categoriesById = categories.associateBy { it.id }
-        val visibleCategoryIds = CategorySelectionPolicy
-            .visibleTopLevelCategories(categories, type)
-            .map(Category::id)
-            .toSet()
+        val candidateCategories = CategorySelectionPolicy.recordSelectionCandidates(categories, type)
+        val visibleCategoryIds = candidateCategories.map(Category::id).toSet()
         val usageRanking = records
             .asSequence()
             .filter { it.ledgerId == ledgerId && it.type == type }
@@ -43,7 +41,7 @@ object HomeQuickEntryCategoryPolicy {
             return recentSuggestions.take(limit)
         }
 
-        return CategorySelectionPolicy.visibleTopLevelCategories(categories, type)
+        return candidateCategories
             .asSequence()
             .sortedWith(compareBy<Category> { it.sortOrder }.thenBy { it.id })
             .take(limit)

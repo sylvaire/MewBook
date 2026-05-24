@@ -26,9 +26,11 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -44,6 +46,7 @@ import com.mewbook.app.domain.model.Category
 import com.mewbook.app.domain.model.RecordType
 import com.mewbook.app.ui.components.CategoryIconBadge
 import com.mewbook.app.ui.components.MewCompactTopAppBar
+import com.mewbook.app.ui.components.MewSnackbarHost
 import com.mewbook.app.ui.components.RecordItem
 import com.mewbook.app.ui.screens.add.AddEditRecordSheet
 import com.mewbook.app.ui.screens.home.RecordDetailDialog
@@ -61,8 +64,17 @@ fun CategoryExpenseDetailScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var pendingDeleteRecordId by remember { mutableLongStateOf(0L) }
     var showDeleteConfirmDialog by remember { mutableStateOf(false) }
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    uiState.message?.let { message ->
+        LaunchedEffect(message) {
+            snackbarHostState.showSnackbar(message)
+            viewModel.clearMessage()
+        }
+    }
 
     Scaffold(
+        snackbarHost = { MewSnackbarHost(snackbarHostState) },
         topBar = {
             MewCompactTopAppBar(
                 title = "分类支出",
@@ -302,7 +314,7 @@ fun CategoryExpenseDetailScreen(
                     pendingDeleteRecordId = 0L
                 },
                 title = { Text("确认删除") },
-                text = { Text("删除后无法恢复，确定要删除这条记录吗？") },
+                text = { Text("删除后可在 30 天内从回收站找回，确定要删除这条记录吗？") },
                 confirmButton = {
                     TextButton(
                         onClick = {

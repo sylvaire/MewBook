@@ -37,18 +37,18 @@ Requirements for milestone v1.0.11: UX 打磨与交互优化.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| HAPT-01 | — | Pending |
-| HAPT-02 | — | Pending |
-| INPT-01 | — | Pending |
-| CAT-01 | — | Pending |
-| CAT-02 | — | Pending |
-| SETT-01 | — | Pending |
+| HAPT-01 | Phase 4 | Pending |
+| HAPT-02 | Phase 4 | Pending |
+| INPT-01 | Phase 6 | Pending |
+| CAT-01 | Phase 5 | Pending |
+| CAT-02 | Phase 5 | Pending |
+| SETT-01 | Phase 6 | Pending |
 
 **Coverage:**
 - v1.0.11 requirements: 6 total
-- Mapped to phases: 0
-- Unmapped: 6 ⚠️
+- Mapped to phases: 6
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-05-26*
-*Last updated: 2026-05-26 after initial definition*
+*Last updated: 2026-05-26 after roadmap created*

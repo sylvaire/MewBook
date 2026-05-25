@@ -1,28 +1,65 @@
-# 路线图
+# Roadmap
 
-## 里程碑：网盘自动备份
+**Milestone:** v1.0.11 -- UX 打磨与交互优化
 
-### Phase 1 — 自动备份决策与状态
+## Phases
 
-- 新增 `DavAutoBackupPolicy`，覆盖是否应执行与远端保留文件筛选。
-- 新增 DataStore 状态仓库，保存最近尝试日期、尝试时间、成功时间和错误/警告信息。
-- 新增单元测试锁定每日一次、配置条件与保留 30 份策略。
+- [ ] **Phase 4: 震动反馈** -- 数字键盘按键震动反馈与设置开关
+- [ ] **Phase 5: 分类清理与拖拽排序** -- 删除旧二级分类残留代码，分类列表支持长按拖拽排序
+- [ ] **Phase 6: 输入与设置收尾** -- 备注自动弹输入法，版本号可点击跳转 GitHub
 
-### Phase 2 — DAV 上传、清理与前台触发
+## Phase Details
 
-- 扩展 DAV remote/repository，支持 DELETE 与 `pruneBackupFiles(config, keepLatestCount = 30)`。
-- 新增 `DavAutoBackupCoordinator`，由 `MainActivity.onStart` 调用，并用 mutex 防止并发上传。
-- 自动备份复用现有 DAV 导出快照逻辑；上传成功后只清理旧自动备份，不删除手动导出文件。
+### Phase 4: 震动反馈
+**Goal:** 用户在数字键盘每次按键时获得触觉确认，并可在设置中控制该行为
 
-### Phase 3 — 设置页展示与验证
+**Depends on:** Nothing (milestone start)
 
-- DAV 设置页新增“打开 App 自动备份”开关，保存配置后生效。
-- DAV 设置页显示最近自动备份尝试、成功、错误或清理警告。
-- DAV 手动导出支持自定义文件名；留空时使用默认文件名。
-- DAV 导入流程改为先列出远端备份，用户手动选择后预览并确认恢复同一文件。
-- 运行单元测试、Debug 构建与 lint。
+**Requirements:** HAPT-01, HAPT-02
 
-## 后续（Backlog，非本里程碑）
+**Success Criteria** (what must be TRUE):
+  1. 用户在数字键盘上点击任意数字键或运算符键时，设备产生短暂震动反馈
+  2. 用户可在设置页面找到震动反馈开关，并切换开启/关闭状态
+  3. 当震动开关关闭时，数字键盘按键不再产生震动
+  4. 震动开关状态在应用重启后保持不变
 
-- 可选备份频率、保留份数配置。
-- 后台定时备份或网络条件约束。
+**Plans:** TBD
+
+### Phase 5: 分类清理与拖拽排序
+**Goal:** 分类相关代码彻底清除旧二级分类残留，用户可通过长按拖拽对分类列表进行排序
+
+**Depends on:** Phase 4
+
+**Requirements:** CAT-01, CAT-02
+
+**Success Criteria** (what must be TRUE):
+  1. 代码库中不再存在旧二级分类的父子层级字段、表结构、迁移逻辑或相关引用
+  2. 所有分类相关界面（管理、选择、统计下钻）在单层分类模型下正常工作
+  3. 用户在分类列表中长按某一分类可触发拖拽模式
+  4. 用户可将分类拖拽至列表中新的位置，松手后分类排在目标位置
+  5. 拖拽排序后的顺序持久保存，并在所有分类选择界面上保持一致显示
+
+**Plans:** TBD
+
+**UI hint:** yes
+
+### Phase 6: 输入与设置收尾
+**Goal:** 备注输入体验更流畅，设置页版本号提供快捷仓库访问
+
+**Depends on:** Phase 5
+
+**Requirements:** INPT-01, SETT-01
+
+**Success Criteria** (what must be TRUE):
+  1. 用户进入记账页备注编辑区域时，系统输入法自动弹出，无需手动点击输入框
+  2. 用户在设置页面点击版本号，系统浏览器打开 GitHub 仓库页面
+
+**Plans:** TBD
+
+## Progress
+
+| Phase | Plans Complete | Status | Completed |
+|-------|----------------|--------|-----------|
+| 4. 震动反馈 | 0/1 | Not started | - |
+| 5. 分类清理与拖拽排序 | 0/1 | Not started | - |
+| 6. 输入与设置收尾 | 0/1 | Not started | - |

@@ -14,7 +14,7 @@ Requirements for milestone v1.0.11: UX 打磨与交互优化.
 
 ### 输入体验 (INPT)
 
-- [ ] **INPT-01**: 进入备注编辑框时自动弹出输入法，无需用户手动点击
+- [x] **INPT-01**: 进入备注编辑框时自动弹出输入法，无需用户手动点击
 
 ### 分类管理 (CAT)
 
@@ -23,7 +23,7 @@ Requirements for milestone v1.0.11: UX 打磨与交互优化.
 
 ### 设置 (SETT)
 
-- [ ] **SETT-01**: 点击设置页版本号跳转 GitHub 仓库页面
+- [x] **SETT-01**: 点击设置页版本号跳转 GitHub 仓库页面
 
 ## Out of Scope
 
@@ -39,10 +39,10 @@ Requirements for milestone v1.0.11: UX 打磨与交互优化.
 |-------------|-------|--------|
 | HAPT-01 | Phase 4 | Complete |
 | HAPT-02 | Phase 4 | Complete |
-| INPT-01 | Phase 6 | Pending |
+| INPT-01 | Phase 6 | Complete |
 | CAT-01 | Phase 5 | Complete |
 | CAT-02 | Phase 5 | Complete |
-| SETT-01 | Phase 6 | Pending |
+| SETT-01 | Phase 6 | Complete |
 
 **Coverage:**
 - v1.0.11 requirements: 6 total

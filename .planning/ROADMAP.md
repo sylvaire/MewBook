@@ -42,9 +42,11 @@ Plans:
   4. 用户可将分类拖拽至列表中新的位置，松手后分类排在目标位置
   5. 拖拽排序后的顺序持久保存，并在所有分类选择界面上保持一致显示
 
-**Plans:** TBD
+**Plans:** 2 plans
+Plans:
+- [ ] 05-01-PLAN.md -- Clean up legacy subcategory code: merge flatExpenseAdditions, remove filtering in CategorySelectionPolicy (CAT-01)
+- [ ] 05-02-PLAN.md -- Add drag reorder to category list: reorderable library, DragHandle, batch sortOrder persistence (CAT-02)
 
-**UI hint:** yes
 
 ### Phase 6: 输入与设置收尾
 **Goal:** 备注输入体验更流畅，设置页版本号提供快捷仓库访问
@@ -57,12 +59,12 @@ Plans:
   1. 用户进入记账页备注编辑区域时，系统输入法自动弹出，无需手动点击输入框
   2. 用户在设置页面点击版本号，系统浏览器打开 GitHub 仓库页面
 
-**Plans:** TBD
+**Plans:** 2 plans
 
 ## Progress
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 4. 震动反馈 | 1/1 | Complete   | 2026-05-26 |
-| 5. 分类清理与拖拽排序 | 0/1 | Not started | - |
+| 5. 分类清理与拖拽排序 | 0/2 | Planned | - |
 | 6. 输入与设置收尾 | 0/1 | Not started | - |

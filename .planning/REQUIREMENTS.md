@@ -9,8 +9,8 @@ Requirements for milestone v1.0.11: UX 打磨与交互优化.
 
 ### 交互反馈 (HAPT)
 
-- [ ] **HAPT-01**: 数字键盘按键按下时触发震动反馈
-- [ ] **HAPT-02**: 设置页面提供震动开关，可控制键盘震动开关行为
+- [x] **HAPT-01**: 数字键盘按键按下时触发震动反馈
+- [x] **HAPT-02**: 设置页面提供震动开关，可控制键盘震动开关行为
 
 ### 输入体验 (INPT)
 
@@ -37,8 +37,8 @@ Requirements for milestone v1.0.11: UX 打磨与交互优化.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| HAPT-01 | Phase 4 | Pending |
-| HAPT-02 | Phase 4 | Pending |
+| HAPT-01 | Phase 4 | Complete |
+| HAPT-02 | Phase 4 | Complete |
 | INPT-01 | Phase 6 | Pending |
 | CAT-01 | Phase 5 | Pending |
 | CAT-02 | Phase 5 | Pending |

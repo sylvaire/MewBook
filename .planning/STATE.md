@@ -2,17 +2,17 @@
 
 ## Current Position
 
-Phase: Phase 4 (roadmap created, not started)
-Plan: —
-Status: Roadmap created, awaiting phase planning
-Last activity: 2026-05-26 — ROADMAP.md written for milestone v1.0.11
+Phase: Phase 4 (plan 1 complete, roadmap advancing)
+Plan: 1 — 震动反馈 (Haptic Feedback) complete
+Status: Plan 04-01 complete; ready for next plan or phase
+Last activity: 2026-05-26 — Plan 04-01 震动反馈 executed and verified
 
 ## 当前里程碑
 
 v1.0.11: UX 打磨与交互优化
 
 **Phases:**
-- [ ] Phase 4: 震动反馈 (HAPT-01, HAPT-02)
+- [x] Phase 4: 震动反馈 (HAPT-01, HAPT-02)
 - [ ] Phase 5: 分类清理与拖拽排序 (CAT-01, CAT-02)
 - [ ] Phase 6: 输入与设置收尾 (INPT-01, SETT-01)
 

@@ -4,7 +4,7 @@
 
 ## Phases
 
-- [ ] **Phase 4: 震动反馈** -- 数字键盘按键震动反馈与设置开关
+- [x] **Phase 4: 震动反馈** -- 数字键盘按键震动反馈与设置开关
 - [ ] **Phase 5: 分类清理与拖拽排序** -- 删除旧二级分类残留代码，分类列表支持长按拖拽排序
 - [ ] **Phase 6: 输入与设置收尾** -- 备注自动弹输入法，版本号可点击跳转 GitHub
 
@@ -23,10 +23,10 @@
   3. 当震动开关关闭时，数字键盘按键不再产生震动
   4. 震动开关状态在应用重启后保持不变
 
-**Plans:** 1 plan
+**Plans:** 1/1 plans complete
 
 Plans:
-- [ ] 04-01-PLAN.md -- Create HapticPreferencesRepository, add settings toggle, wire haptic feedback into KeyboardKey
+- [x] 04-01-PLAN.md -- Create HapticPreferencesRepository, add settings toggle, wire haptic feedback into KeyboardKey
 
 ### Phase 5: 分类清理与拖拽排序
 **Goal:** 分类相关代码彻底清除旧二级分类残留，用户可通过长按拖拽对分类列表进行排序
@@ -63,6 +63,6 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 4. 震动反馈 | 0/1 | Not started | - |
+| 4. 震动反馈 | 1/1 | Complete   | 2026-05-26 |
 | 5. 分类清理与拖拽排序 | 0/1 | Not started | - |
 | 6. 输入与设置收尾 | 0/1 | Not started | - |

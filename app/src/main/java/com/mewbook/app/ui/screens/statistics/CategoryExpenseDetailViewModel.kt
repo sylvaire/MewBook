@@ -110,14 +110,13 @@ class CategoryExpenseDetailViewModel @Inject constructor(
         DetailBaseState(emptyList(), emptyList(), null, emptyList())
     )
 
-    val uiState: StateFlow<CategoryExpenseDetailUiState> = combine(
+    private val partialUiState: StateFlow<CategoryExpenseDetailUiState> = combine(
         baseState,
         _browsingRecord,
         _editingRecord,
         _showAddEditSheet,
-        _message,
-        _keyPressHapticEnabled
-    ) { base, browsingRecord, editingRecord, showAddEditSheet, message, keyPressHapticEnabled ->
+        _message
+    ) { base, browsingRecord, editingRecord, showAddEditSheet, message ->
         val cat = base.categories.find { it.id == categoryId }
         val name = cat?.name ?: "未知"
         val subtitle = formatPeriodSubtitle(periodStart, periodEnd)
@@ -139,9 +138,19 @@ class CategoryExpenseDetailViewModel @Inject constructor(
             categories = base.categories,
             recentNotesByCategory = RecentNoteHistory.notesByCategory(filteredRecords, activeLedgerId),
             defaultAccountId = AccountDefaultsPolicy.resolveDefaultAccountId(ledgerAccounts),
-            keyPressHapticEnabled = keyPressHapticEnabled,
             message = message
         )
+    }.stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(5000),
+        CategoryExpenseDetailUiState(isLoading = true)
+    )
+
+    val uiState: StateFlow<CategoryExpenseDetailUiState> = combine(
+        partialUiState,
+        _keyPressHapticEnabled
+    ) { state, keyPressHapticEnabled ->
+        state.copy(keyPressHapticEnabled = keyPressHapticEnabled)
     }.stateIn(
         viewModelScope,
         SharingStarted.WhileSubscribed(5000),

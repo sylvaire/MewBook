@@ -744,12 +744,8 @@ private fun RowScope.KeyboardKey(
             .background(if (enabled) containerColor else containerColor.copy(alpha = 0.35f))
             .clickable(enabled = enabled) {
                 if (keyPressHapticEnabled && enabled) {
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-                        hapticFeedback.performHapticFeedback(HapticFeedbackType.KeyboardTap)
-                    } else {
-                        @Suppress("DEPRECATION")
-                        hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
-                    }
+                    @Suppress("DEPRECATION")
+                    hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
                 }
                 onClick()
             },

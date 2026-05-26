@@ -13,6 +13,7 @@ interface CategoryRepository {
     suspend fun insertCategory(category: Category): Long
     suspend fun insertCategories(categories: List<Category>)
     suspend fun updateCategory(category: Category)
+    suspend fun updateCategories(categories: List<Category>)
     suspend fun deleteCategory(category: Category)
     suspend fun getCategoryCount(): Int
 }

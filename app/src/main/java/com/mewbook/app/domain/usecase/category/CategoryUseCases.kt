@@ -96,3 +96,18 @@ class DeleteCategoryUseCase @Inject constructor(
         categoryRepository.deleteCategory(category)
     }
 }
+
+class ReorderCategoriesUseCase @Inject constructor(
+    private val categoryRepository: CategoryRepository
+) {
+    suspend operator fun invoke(updates: List<Pair<Long, Int>>) {
+        val allCategories = categoryRepository.getAllCategoriesOnce()
+        val sortOrderMap = updates.toMap()
+        val updatedCategories = allCategories
+            .filter { it.id in sortOrderMap }
+            .map { it.copy(sortOrder = sortOrderMap[it.id]!!) }
+        if (updatedCategories.isNotEmpty()) {
+            categoryRepository.updateCategories(updatedCategories)
+        }
+    }
+}

@@ -111,6 +111,9 @@ dependencies {
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")
 
+    // Reorderable - drag-and-drop reorder for LazyColumn
+    implementation("sh.calvin.reorderable:reorderable:2.2.0")
+
     // Navigation
     implementation("androidx.navigation:navigation-compose:2.7.7")
 

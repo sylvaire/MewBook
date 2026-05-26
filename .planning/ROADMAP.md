@@ -23,7 +23,10 @@
   3. 当震动开关关闭时，数字键盘按键不再产生震动
   4. 震动开关状态在应用重启后保持不变
 
-**Plans:** TBD
+**Plans:** 1 plan
+
+Plans:
+- [ ] 04-01-PLAN.md -- Create HapticPreferencesRepository, add settings toggle, wire haptic feedback into KeyboardKey
 
 ### Phase 5: 分类清理与拖拽排序
 **Goal:** 分类相关代码彻底清除旧二级分类残留，用户可通过长按拖拽对分类列表进行排序

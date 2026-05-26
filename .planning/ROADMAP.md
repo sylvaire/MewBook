@@ -44,7 +44,7 @@ Plans:
 
 **Plans:** 2 plans
 Plans:
-- [ ] 05-01-PLAN.md -- Clean up legacy subcategory code: merge flatExpenseAdditions, remove filtering in CategorySelectionPolicy (CAT-01)
+- [x] 05-01-PLAN.md -- Clean up legacy subcategory code: merge flatExpenseAdditions, remove filtering in CategorySelectionPolicy (CAT-01)
 - [ ] 05-02-PLAN.md -- Add drag reorder to category list: reorderable library, DragHandle, batch sortOrder persistence (CAT-02)
 
 
@@ -66,5 +66,5 @@ Plans:
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 4. 震动反馈 | 1/1 | Complete   | 2026-05-26 |
-| 5. 分类清理与拖拽排序 | 0/2 | Planned | - |
+| 5. 分类清理与拖拽排序 | 1/2 | In Progress | - |
 | 6. 输入与设置收尾 | 0/1 | Not started | - |

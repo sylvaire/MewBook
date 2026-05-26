@@ -2,10 +2,10 @@
 
 ## Current Position
 
-Phase: Phase 4 (plan 1 complete, roadmap advancing)
-Plan: 1 — 震动反馈 (Haptic Feedback) complete
-Status: Plan 04-01 complete; ready for next plan or phase
-Last activity: 2026-05-26 — Plan 04-01 震动反馈 executed and verified
+Phase: Phase 5 — 分类清理与拖拽排序 (CAT-01, CAT-02)
+Plan: 1 — 删除二级分类残留代码 complete
+Status: Plan 05-01 complete; ready for Plan 05-02 (drag reorder)
+Last activity: 2026-05-26 — Plan 05-01 删除二级分类残留代码 executed
 
 ## 当前里程碑
 

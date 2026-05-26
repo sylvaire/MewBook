@@ -47,10 +47,7 @@ object DefaultCategories {
         Category(name = "学习", icon = "auto_stories", color = 0xFF9FA8DA, type = RecordType.EXPENSE, isDefault = true, sortOrder = 32),
         Category(name = "礼金", icon = "attach_money", color = 0xFFFFD180, type = RecordType.EXPENSE, isDefault = true, sortOrder = 33),
         Category(name = "礼物", icon = "card_giftcard", color = 0xFFE1BEE7, type = RecordType.EXPENSE, isDefault = true, sortOrder = 34),
-        Category(name = "其他", icon = "more_horiz", color = 0xFF9E9E9E, type = RecordType.EXPENSE, isDefault = true, sortOrder = 35)
-    )
-
-    private val flatExpenseAdditions = listOf(
+        Category(name = "其他", icon = "more_horiz", color = 0xFF9E9E9E, type = RecordType.EXPENSE, isDefault = true, sortOrder = 35),
         Category(name = "早餐", icon = "free_breakfast", color = 0xFFFF9F43, type = RecordType.EXPENSE, isDefault = true, sortOrder = 0),
         Category(name = "午餐", icon = "lunch_dining", color = 0xFFFF6B6B, type = RecordType.EXPENSE, isDefault = true, sortOrder = 0),
         Category(name = "晚餐", icon = "dinner_dining", color = 0xFFE74C3C, type = RecordType.EXPENSE, isDefault = true, sortOrder = 0),
@@ -104,9 +101,7 @@ object DefaultCategories {
         Category(name = "虚拟货币", icon = "monetization_on", color = 0xFFFF9800, type = RecordType.EXPENSE, isDefault = true, sortOrder = 0)
     )
 
-    val recordEntryExpenseCategories = normalizeSortOrder(baseExpenseCategories)
-    val legacyExpenseSubCategoryNames = flatExpenseAdditions.map(Category::name).toSet()
-    val expenseCategories = normalizeSortOrder(recordEntryExpenseCategories + flatExpenseAdditions)
+    val expenseCategories = normalizeSortOrder(baseExpenseCategories)
 
     val incomeCategories = listOf(
         Category(name = "工资", icon = "payments", color = 0xFF4CAF50, type = RecordType.INCOME, isDefault = true, sortOrder = 0),

@@ -88,9 +88,14 @@ fun SettingsSummaryCard(
     modifier: Modifier = Modifier,
     icon: ImageVector? = null,
     accentColor: Color = MaterialTheme.colorScheme.primary,
-    trailing: (@Composable () -> Unit)? = null
+    trailing: (@Composable () -> Unit)? = null,
+    onClick: (() -> Unit)? = null
 ) {
-    SettingsSurfaceCard(modifier = modifier) {
+    SettingsSurfaceCard(
+        modifier = modifier.then(
+            if (onClick != null) Modifier.clip(RoundedCornerShape(ClayDesign.CardRadius)).clickable(onClick = onClick) else Modifier
+        )
+    ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()

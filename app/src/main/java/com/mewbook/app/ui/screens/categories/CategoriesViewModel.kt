@@ -8,6 +8,7 @@ import com.mewbook.app.domain.policy.CategorySelectionPolicy
 import com.mewbook.app.domain.usecase.category.AddCategoryUseCase
 import com.mewbook.app.domain.usecase.category.DeleteCategoryUseCase
 import com.mewbook.app.domain.usecase.category.GetCategoriesUseCase
+import com.mewbook.app.domain.usecase.category.ReorderCategoriesUseCase
 import com.mewbook.app.domain.usecase.category.UpdateCategoryUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -31,7 +32,8 @@ class CategoriesViewModel @Inject constructor(
     private val getCategoriesUseCase: GetCategoriesUseCase,
     private val addCategoryUseCase: AddCategoryUseCase,
     private val updateCategoryUseCase: UpdateCategoryUseCase,
-    private val deleteCategoryUseCase: DeleteCategoryUseCase
+    private val deleteCategoryUseCase: DeleteCategoryUseCase,
+    private val reorderCategoriesUseCase: ReorderCategoriesUseCase
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(CategoriesUiState())
@@ -124,28 +126,35 @@ class CategoriesViewModel @Inject constructor(
     }
 
     fun moveCategoryUp(category: Category) {
-        viewModelScope.launch {
-            val siblings = reorderableSiblings(category)
-            val currentIndex = siblings.indexOfFirst { it.id == category.id }
-            if (currentIndex <= 0) return@launch
-
-            val current = siblings[currentIndex]
-            val previous = siblings[currentIndex - 1]
-            updateCategoryUseCase(current.copy(sortOrder = previous.sortOrder))
-            updateCategoryUseCase(previous.copy(sortOrder = current.sortOrder))
+        val siblings = reorderableSiblings(category)
+        val currentIndex = siblings.indexOfFirst { it.id == category.id }
+        if (currentIndex > 0) {
+            moveCategory(fromIndex = currentIndex, toIndex = currentIndex - 1, type = category.type)
         }
     }
 
     fun moveCategoryDown(category: Category) {
-        viewModelScope.launch {
-            val siblings = reorderableSiblings(category)
-            val currentIndex = siblings.indexOfFirst { it.id == category.id }
-            if (currentIndex == -1 || currentIndex >= siblings.lastIndex) return@launch
+        val siblings = reorderableSiblings(category)
+        val currentIndex = siblings.indexOfFirst { it.id == category.id }
+        if (currentIndex < siblings.lastIndex) {
+            moveCategory(fromIndex = currentIndex, toIndex = currentIndex + 1, type = category.type)
+        }
+    }
 
-            val current = siblings[currentIndex]
-            val next = siblings[currentIndex + 1]
-            updateCategoryUseCase(current.copy(sortOrder = next.sortOrder))
-            updateCategoryUseCase(next.copy(sortOrder = current.sortOrder))
+    fun moveCategory(fromIndex: Int, toIndex: Int, type: RecordType) {
+        if (fromIndex == toIndex) return
+        viewModelScope.launch {
+            val siblings = CategorySelectionPolicy.visibleCategories(_uiState.value.categories, type)
+            if (fromIndex < 0 || fromIndex >= siblings.size || toIndex < 0 || toIndex >= siblings.size) return@launch
+
+            val mutable = siblings.toMutableList()
+            val item = mutable.removeAt(fromIndex)
+            mutable.add(toIndex, item)
+
+            val updates = mutable.mapIndexed { index, category ->
+                category.id to index
+            }
+            reorderCategoriesUseCase(updates)
         }
     }
 

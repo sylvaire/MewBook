@@ -29,9 +29,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -70,6 +69,10 @@ import com.mewbook.app.ui.components.SettingsSectionHeader
 import com.mewbook.app.ui.components.SettingsSummaryCard
 import com.mewbook.app.ui.theme.ClayDesign
 import com.mewbook.app.ui.theme.clayCardShadow
+import sh.calvin.reorderable.ReorderableItem
+import sh.calvin.reorderable.draggableHandle
+import sh.calvin.reorderable.rememberReorderableLazyListState
+import sh.calvin.reorderable.reorderable
 
 // 可选的图标列表
 val availableIcons = listOf(
@@ -105,6 +108,7 @@ fun CategoriesScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var selectedTabIndex by remember { mutableIntStateOf(0) }
+    val currentType = if (selectedTabIndex == 0) RecordType.EXPENSE else RecordType.INCOME
 
     val expenseCategories = CategorySelectionPolicy.visibleCategories(
         categories = uiState.categories,
@@ -183,7 +187,19 @@ fun CategoriesScreen(
 
             val displayedCategories = if (selectedTabIndex == 0) expenseCategories else incomeCategories
 
+            val reorderableState = rememberReorderableLazyListState(
+                onMove = { from, to ->
+                    viewModel.moveCategory(
+                        fromIndex = from.index,
+                        toIndex = to.index,
+                        type = currentType
+                    )
+                }
+            )
+
             LazyColumn(
+                state = reorderableState.listState,
+                modifier = Modifier.reorderable(reorderableState),
                 contentPadding = PaddingValues(
                     start = 12.dp,
                     end = 12.dp,
@@ -196,7 +212,7 @@ fun CategoriesScreen(
                     SettingsSummaryCard(
                         icon = Icons.Filled.Edit,
                         title = if (selectedTabIndex == 0) "支出分类" else "收入分类",
-                        subtitle = "当前显示 ${displayedCategories.size} 个分类。点击分类编辑，右侧箭头调整排序。"
+                        subtitle = "当前显示 ${displayedCategories.size} 个分类。点击分类编辑，长按拖拽调整排序。"
                     )
                 }
 
@@ -205,14 +221,12 @@ fun CategoriesScreen(
                 }
 
                 items(displayedCategories, key = { it.id }) { category ->
-                    CategoryRowItem(
-                        category = category,
-                        canMoveUp = displayedCategories.firstOrNull()?.id != category.id,
-                        canMoveDown = displayedCategories.lastOrNull()?.id != category.id,
-                        onMoveUpClick = { viewModel.moveCategoryUp(category) },
-                        onMoveDownClick = { viewModel.moveCategoryDown(category) },
-                        onEditClick = { viewModel.showEditDialog(category) }
-                    )
+                    ReorderableItem(reorderableState, key = category.id) { _ ->
+                        CategoryItemCard(
+                            category = category,
+                            onEditClick = { viewModel.showEditDialog(category) }
+                        )
+                    }
                 }
             }
         }
@@ -220,35 +234,12 @@ fun CategoriesScreen(
 }
 
 @Composable
-private fun CategoryRowItem(
-    category: Category,
-    canMoveUp: Boolean,
-    canMoveDown: Boolean,
-    onMoveUpClick: () -> Unit,
-    onMoveDownClick: () -> Unit,
-    onEditClick: () -> Unit
-) {
-    CategoryItemCard(
-        category = category,
-        canMoveUp = canMoveUp,
-        canMoveDown = canMoveDown,
-        onMoveUpClick = onMoveUpClick,
-        onMoveDownClick = onMoveDownClick,
-        onClick = onEditClick
-    )
-}
-
-@Composable
 private fun CategoryItemCard(
     category: Category,
-    canMoveUp: Boolean,
-    canMoveDown: Boolean,
-    onMoveUpClick: () -> Unit,
-    onMoveDownClick: () -> Unit,
-    onClick: () -> Unit
+    onEditClick: () -> Unit
 ) {
     Card(
-        onClick = onClick,
+        onClick = onEditClick,
         modifier = Modifier
             .fillMaxWidth()
             .clayCardShadow(),
@@ -264,6 +255,17 @@ private fun CategoryItemCard(
                 .padding(horizontal = 12.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            Icon(
+                imageVector = Icons.Filled.DragHandle,
+                contentDescription = "拖拽排序",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier
+                    .size(24.dp)
+                    .draggableHandle()
+            )
+
+            Spacer(modifier = Modifier.width(4.dp))
+
             CategoryIconBadge(
                 category = category,
                 emphasized = true,
@@ -290,33 +292,6 @@ private fun CategoryItemCard(
                         text = "自定义",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-
-            Column(horizontalAlignment = Alignment.End) {
-                IconButton(
-                    onClick = onMoveUpClick,
-                    enabled = canMoveUp,
-                    modifier = Modifier.size(28.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.KeyboardArrowUp,
-                        contentDescription = "上移",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(16.dp)
-                    )
-                }
-                IconButton(
-                    onClick = onMoveDownClick,
-                    enabled = canMoveDown,
-                    modifier = Modifier.size(28.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.KeyboardArrowDown,
-                        contentDescription = "下移",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(16.dp)
                     )
                 }
             }

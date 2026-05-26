@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.room.withTransaction
 import com.mewbook.app.data.local.database.MewBookDatabase
+import com.mewbook.app.data.preferences.HapticPreferencesRepository
 import com.mewbook.app.data.preferences.HomePreferencesRepository
 import com.mewbook.app.domain.model.Account
 import com.mewbook.app.domain.model.Budget
@@ -125,6 +126,7 @@ data class HomeUiState(
     val recentNotesByCategory: Map<Long, List<String>> = emptyMap(),
     val defaultAccountId: Long? = null,
     val showHomeOverviewCards: Boolean = true,
+    val keyPressHapticEnabled: Boolean = true,
     val quickCategories: List<Category> = emptyList(),
     val message: String? = null
 )
@@ -150,6 +152,7 @@ class HomeViewModel @Inject constructor(
     private val budgetRepository: BudgetRepository,
     private val recurringTemplateRepository: RecurringTemplateRepository,
     private val homePreferencesRepository: HomePreferencesRepository,
+    private val hapticPreferencesRepository: HapticPreferencesRepository,
     private val database: MewBookDatabase
 ) : ViewModel() {
 
@@ -171,6 +174,7 @@ class HomeViewModel @Inject constructor(
     private val _totalBudget = MutableStateFlow(0.0)
     private val _budgetRemaining = MutableStateFlow(0.0)
     private val _showHomeOverviewCards = MutableStateFlow(true)
+    private val _keyPressHapticEnabled = MutableStateFlow(true)
     private val _message = MutableStateFlow<String?>(null)
     private val _calendarMonth = MutableStateFlow(YearMonth.now())
     private val _datesWithRecords = MutableStateFlow<Set<LocalDate>>(emptySet())
@@ -238,8 +242,9 @@ class HomeViewModel @Inject constructor(
             period to Triple(summary, context, interaction)
         },
         _datesWithRecords,
-        _message
-    ) { (period, triple), datesWithRecords, message ->
+        _message,
+        _keyPressHapticEnabled
+    ) { (period, triple), datesWithRecords, message, keyPressHapticEnabled ->
         val (summary, context, interaction) = triple
         val overlay = interaction.overlay
         val search = interaction.search
@@ -295,6 +300,7 @@ class HomeViewModel @Inject constructor(
             ),
             defaultAccountId = AccountDefaultsPolicy.resolveDefaultAccountId(ledgerAccounts),
             showHomeOverviewCards = interaction.showHomeOverviewCards,
+            keyPressHapticEnabled = keyPressHapticEnabled,
             quickCategories = HomeQuickEntryCategoryPolicy.suggest(
                 categories = context.categories,
                 records = context.allRecords,
@@ -315,6 +321,7 @@ class HomeViewModel @Inject constructor(
         initializeData()
         restoreSelectedPeriodType()
         restoreHomeOverviewVisibility()
+        restoreHapticPreference()
         observePeriodData()
         observeCalendarMonthData()
     }
@@ -342,6 +349,14 @@ class HomeViewModel @Inject constructor(
         viewModelScope.launch {
             homePreferencesRepository.showHomeOverviewCards.collectLatest { show ->
                 _showHomeOverviewCards.update { show }
+            }
+        }
+    }
+
+    private fun restoreHapticPreference() {
+        viewModelScope.launch {
+            hapticPreferencesRepository.keyPressHapticEnabled.collectLatest { enabled ->
+                _keyPressHapticEnabled.update { enabled }
             }
         }
     }

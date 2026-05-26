@@ -4,6 +4,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.room.withTransaction
+import com.mewbook.app.data.preferences.HapticPreferencesRepository
 import com.mewbook.app.data.local.database.MewBookDatabase
 import com.mewbook.app.domain.model.Account
 import com.mewbook.app.domain.model.Category
@@ -48,6 +49,7 @@ data class CategoryExpenseDetailUiState(
     val categories: List<Category> = emptyList(),
     val recentNotesByCategory: Map<Long, List<String>> = emptyMap(),
     val defaultAccountId: Long? = null,
+    val keyPressHapticEnabled: Boolean = true,
     val message: String? = null
 )
 
@@ -67,6 +69,7 @@ class CategoryExpenseDetailViewModel @Inject constructor(
     private val addRecordUseCase: AddRecordUseCase,
     private val updateRecordUseCase: UpdateRecordUseCase,
     private val deleteRecordUseCase: DeleteRecordUseCase,
+    private val hapticPreferencesRepository: HapticPreferencesRepository,
     private val database: MewBookDatabase,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
@@ -84,6 +87,15 @@ class CategoryExpenseDetailViewModel @Inject constructor(
     private val _editingRecord = MutableStateFlow<Record?>(null)
     private val _showAddEditSheet = MutableStateFlow(false)
     private val _message = MutableStateFlow<String?>(null)
+    private val _keyPressHapticEnabled = MutableStateFlow(true)
+
+    init {
+        viewModelScope.launch {
+            hapticPreferencesRepository.keyPressHapticEnabled.collect { enabled ->
+                _keyPressHapticEnabled.value = enabled
+            }
+        }
+    }
 
     private val baseState: StateFlow<DetailBaseState> = combine(
         getRecordsUseCase.getExpenseByCategoryAndDateRange(categoryId, periodStart, periodEnd),
@@ -103,8 +115,9 @@ class CategoryExpenseDetailViewModel @Inject constructor(
         _browsingRecord,
         _editingRecord,
         _showAddEditSheet,
-        _message
-    ) { base, browsingRecord, editingRecord, showAddEditSheet, message ->
+        _message,
+        _keyPressHapticEnabled
+    ) { base, browsingRecord, editingRecord, showAddEditSheet, message, keyPressHapticEnabled ->
         val cat = base.categories.find { it.id == categoryId }
         val name = cat?.name ?: "未知"
         val subtitle = formatPeriodSubtitle(periodStart, periodEnd)
@@ -126,6 +139,7 @@ class CategoryExpenseDetailViewModel @Inject constructor(
             categories = base.categories,
             recentNotesByCategory = RecentNoteHistory.notesByCategory(filteredRecords, activeLedgerId),
             defaultAccountId = AccountDefaultsPolicy.resolveDefaultAccountId(ledgerAccounts),
+            keyPressHapticEnabled = keyPressHapticEnabled,
             message = message
         )
     }.stateIn(

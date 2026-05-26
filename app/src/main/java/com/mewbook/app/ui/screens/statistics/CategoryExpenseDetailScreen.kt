@@ -302,7 +302,8 @@ fun CategoryExpenseDetailScreen(
                 onDelete = { id ->
                     pendingDeleteRecordId = id
                     showDeleteConfirmDialog = true
-                }
+                },
+                keyPressHapticEnabled = uiState.keyPressHapticEnabled
             )
         }
 

@@ -375,7 +375,8 @@ fun HomeScreen(
                 onDelete = { id ->
                     pendingDeleteRecordId = id
                     showDeleteConfirmDialog = true
-                }
+                },
+                keyPressHapticEnabled = uiState.keyPressHapticEnabled
             )
         }
 

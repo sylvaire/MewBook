@@ -80,6 +80,8 @@ import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -117,7 +119,8 @@ fun AddEditRecordSheet(
     initialType: RecordType = RecordType.EXPENSE,
     onDismiss: () -> Unit,
     onSave: (Double, RecordType, Long, String?, LocalDate, Long?) -> Unit,
-    onDelete: (Long) -> Unit
+    onDelete: (Long) -> Unit,
+    keyPressHapticEnabled: Boolean = true
 ) {
     val editingKey = editingRecord?.id ?: -1L
     val initialTypeName = initialType.name
@@ -276,7 +279,8 @@ fun AddEditRecordSheet(
                                 if (amount != null && amount > 0) {
                                     onSave(amount, selectedType, category.id, note.ifBlank { null }, selectedDate, selectedAccountId.takeIf { it > 0L })
                                 }
-                            }
+                            },
+                            keyPressHapticEnabled = keyPressHapticEnabled
                         )
                     }
                 }
@@ -565,7 +569,8 @@ private fun KeyboardPanel(
     onDelete: () -> Unit,
     onClear: () -> Unit,
     onDismissKeyboard: () -> Unit,
-    onSave: () -> Unit
+    onSave: () -> Unit,
+    keyPressHapticEnabled: Boolean = true
 ) {
     var dragOffset by remember { mutableStateOf(0f) }
     Surface(
@@ -680,32 +685,33 @@ private fun KeyboardPanel(
                 }
             }
             KeyboardRow {
-                KeyboardKey("7", { onKeyPress('7') })
-                KeyboardKey("8", { onKeyPress('8') })
-                KeyboardKey("9", { onKeyPress('9') })
-                KeyboardKey("删", onDelete, containerColor = Color.White.copy(alpha = 0.12f))
+                KeyboardKey("7", { onKeyPress('7') }, keyPressHapticEnabled = keyPressHapticEnabled)
+                KeyboardKey("8", { onKeyPress('8') }, keyPressHapticEnabled = keyPressHapticEnabled)
+                KeyboardKey("9", { onKeyPress('9') }, keyPressHapticEnabled = keyPressHapticEnabled)
+                KeyboardKey("删", onDelete, containerColor = Color.White.copy(alpha = 0.12f), keyPressHapticEnabled = keyPressHapticEnabled)
             }
             KeyboardRow {
-                KeyboardKey("4", { onKeyPress('4') })
-                KeyboardKey("5", { onKeyPress('5') })
-                KeyboardKey("6", { onKeyPress('6') })
-                KeyboardKey("+", { onKeyPress('+') }, containerColor = keyAccent.copy(alpha = 0.18f))
+                KeyboardKey("4", { onKeyPress('4') }, keyPressHapticEnabled = keyPressHapticEnabled)
+                KeyboardKey("5", { onKeyPress('5') }, keyPressHapticEnabled = keyPressHapticEnabled)
+                KeyboardKey("6", { onKeyPress('6') }, keyPressHapticEnabled = keyPressHapticEnabled)
+                KeyboardKey("+", { onKeyPress('+') }, containerColor = keyAccent.copy(alpha = 0.18f), keyPressHapticEnabled = keyPressHapticEnabled)
             }
             KeyboardRow {
-                KeyboardKey("1", { onKeyPress('1') })
-                KeyboardKey("2", { onKeyPress('2') })
-                KeyboardKey("3", { onKeyPress('3') })
-                KeyboardKey("-", { onKeyPress('-') }, containerColor = keyAccent.copy(alpha = 0.18f))
+                KeyboardKey("1", { onKeyPress('1') }, keyPressHapticEnabled = keyPressHapticEnabled)
+                KeyboardKey("2", { onKeyPress('2') }, keyPressHapticEnabled = keyPressHapticEnabled)
+                KeyboardKey("3", { onKeyPress('3') }, keyPressHapticEnabled = keyPressHapticEnabled)
+                KeyboardKey("-", { onKeyPress('-') }, containerColor = keyAccent.copy(alpha = 0.18f), keyPressHapticEnabled = keyPressHapticEnabled)
             }
             KeyboardRow {
-                KeyboardKey(".", { onKeyPress('.') })
-                KeyboardKey("0", { onKeyPress('0') })
-                KeyboardKey("清空", onClear, containerColor = Color.White.copy(alpha = 0.12f))
+                KeyboardKey(".", { onKeyPress('.') }, keyPressHapticEnabled = keyPressHapticEnabled)
+                KeyboardKey("0", { onKeyPress('0') }, keyPressHapticEnabled = keyPressHapticEnabled)
+                KeyboardKey("清空", onClear, containerColor = Color.White.copy(alpha = 0.12f), keyPressHapticEnabled = keyPressHapticEnabled)
                 KeyboardKey(
                     label = if (amountExpression.isBlank()) "保存" else "完成",
                     onClick = onSave,
                     enabled = canSave,
-                    containerColor = keyAccent
+                    containerColor = keyAccent,
+                    keyPressHapticEnabled = keyPressHapticEnabled
                 )
             }
         }
@@ -726,15 +732,27 @@ private fun RowScope.KeyboardKey(
     label: String,
     onClick: () -> Unit,
     enabled: Boolean = true,
-    containerColor: Color = Color.White.copy(alpha = 0.10f)
+    containerColor: Color = Color.White.copy(alpha = 0.10f),
+    keyPressHapticEnabled: Boolean = true
 ) {
+    val hapticFeedback = LocalHapticFeedback.current
     Box(
         modifier = Modifier
             .weight(1f)
             .height(40.dp)
             .clip(RoundedCornerShape(14.dp))
             .background(if (enabled) containerColor else containerColor.copy(alpha = 0.35f))
-            .clickable(enabled = enabled, onClick = onClick),
+            .clickable(enabled = enabled) {
+                if (keyPressHapticEnabled && enabled) {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                        hapticFeedback.performHapticFeedback(HapticFeedbackType.KeyboardTap)
+                    } else {
+                        @Suppress("DEPRECATION")
+                        hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                    }
+                }
+                onClick()
+            },
         contentAlignment = Alignment.Center
     ) {
         Text(

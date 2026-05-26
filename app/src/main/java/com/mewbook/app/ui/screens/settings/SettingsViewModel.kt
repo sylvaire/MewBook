@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mewbook.app.data.preferences.AppThemeMode
 import com.mewbook.app.data.preferences.AppUpdatePreferencesRepository
+import com.mewbook.app.data.preferences.HapticPreferencesRepository
 import com.mewbook.app.data.preferences.HomePreferencesRepository
 import com.mewbook.app.data.preferences.ThemePreferencesRepository
 import com.mewbook.app.data.repository.BackupRepository
@@ -20,6 +21,7 @@ class SettingsViewModel @Inject constructor(
     private val themePreferencesRepository: ThemePreferencesRepository,
     private val homePreferencesRepository: HomePreferencesRepository,
     private val appUpdatePreferencesRepository: AppUpdatePreferencesRepository,
+    private val hapticPreferencesRepository: HapticPreferencesRepository,
     private val backupRepository: BackupRepository
 ) : ViewModel() {
 
@@ -42,6 +44,12 @@ class SettingsViewModel @Inject constructor(
     )
 
     val updateEnabled: StateFlow<Boolean> = appUpdatePreferencesRepository.updateEnabled.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = true
+    )
+
+    val keyPressHapticEnabled: StateFlow<Boolean> = hapticPreferencesRepository.keyPressHapticEnabled.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
         initialValue = true
@@ -71,6 +79,12 @@ class SettingsViewModel @Inject constructor(
             if (enabled) {
                 appUpdatePreferencesRepository.clearSnoozedVersion()
             }
+        }
+    }
+
+    fun setKeyPressHapticEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            hapticPreferencesRepository.setKeyPressHapticEnabled(enabled)
         }
     }
 

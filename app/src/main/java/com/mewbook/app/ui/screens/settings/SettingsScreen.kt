@@ -19,6 +19,7 @@ import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.TouchApp
 import androidx.compose.material.icons.filled.Restore
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -72,6 +73,7 @@ fun SettingsScreen(
     val showHomeOverviewCards by viewModel.showHomeOverviewCards.collectAsStateWithLifecycle()
     val selectedHomePeriod by viewModel.selectedHomePeriod.collectAsStateWithLifecycle()
     val updateEnabled by viewModel.updateEnabled.collectAsStateWithLifecycle()
+    val keyPressHapticEnabled by viewModel.keyPressHapticEnabled.collectAsStateWithLifecycle()
     var showThemeDialog by remember { mutableStateOf(false) }
     var showClearDataDialog by remember { mutableStateOf(false) }
     var clearDataConfirmText by remember { mutableStateOf("") }
@@ -154,15 +156,6 @@ fun SettingsScreen(
                 subtitle = "版本 ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})"
             )
 
-            val updateSubtitle = updateStatusSubtitle(updateUiState)
-            if (updateSubtitle != null) {
-                SettingsSummaryCard(
-                    icon = Icons.Filled.Download,
-                    title = "更新状态",
-                    subtitle = updateSubtitle
-                )
-            }
-
             SettingsSectionHeader(
                 title = "偏好",
                 description = "控制主题、首页信息密度和默认统计周期。"
@@ -181,6 +174,14 @@ fun SettingsScreen(
                 subtitle = "控制首页是否显示收支概览卡片",
                 checked = showHomeOverviewCards,
                 onCheckedChange = viewModel::setShowHomeOverviewCards
+            )
+
+            SettingsSwitchRowCard(
+                icon = Icons.Filled.TouchApp,
+                title = "按键震动",
+                subtitle = "记账键盘按键时触发震动反馈",
+                checked = keyPressHapticEnabled,
+                onCheckedChange = viewModel::setKeyPressHapticEnabled
             )
 
             HomePeriodPreferenceItem(
@@ -255,7 +256,7 @@ fun SettingsScreen(
             SettingsSwitchRowCard(
                 icon = Icons.Filled.CloudSync,
                 title = "自动检查更新",
-                subtitle = if (updateEnabled) "已开启" else "已关闭",
+                subtitle = if (updateEnabled) "启动时自动检查新版本" else "已关闭，仅保留手动检查",
                 checked = updateEnabled,
                 onCheckedChange = viewModel::setUpdateEnabled
             )
@@ -264,7 +265,7 @@ fun SettingsScreen(
                 icon = Icons.Filled.Download,
                 title = "检查更新",
                 subtitle = updateStatusSubtitle(updateUiState)
-                    ?: if (updateEnabled) "点击检查" else "自动检查已关闭，可手动检查",
+                    ?: if (updateEnabled) "立即检查 GitHub Release" else "点击手动检查",
                 onClick = onCheckForUpdates
             )
 

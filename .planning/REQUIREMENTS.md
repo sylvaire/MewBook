@@ -19,7 +19,7 @@ Requirements for milestone v1.0.11: UX 打磨与交互优化.
 ### 分类管理 (CAT)
 
 - [x] **CAT-01**: 彻底删除代码中残留的旧二级分类相关代码和数据结构
-- [ ] **CAT-02**: 分类列表支持长按拖拽上下移动来调整排序
+- [x] **CAT-02**: 分类列表支持长按拖拽上下移动来调整排序
 
 ### 设置 (SETT)
 
@@ -41,7 +41,7 @@ Requirements for milestone v1.0.11: UX 打磨与交互优化.
 | HAPT-02 | Phase 4 | Complete |
 | INPT-01 | Phase 6 | Pending |
 | CAT-01 | Phase 5 | Complete |
-| CAT-02 | Phase 5 | Pending |
+| CAT-02 | Phase 5 | Complete |
 | SETT-01 | Phase 6 | Pending |
 
 **Coverage:**

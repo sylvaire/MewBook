@@ -3,9 +3,9 @@
 ## Current Position
 
 Phase: Phase 5 — 分类清理与拖拽排序 (CAT-01, CAT-02)
-Plan: 1 — 删除二级分类残留代码 complete
-Status: Plan 05-01 complete; ready for Plan 05-02 (drag reorder)
-Last activity: 2026-05-26 — Plan 05-01 删除二级分类残留代码 executed
+Plan: 2 — 拖拽排序 (Drag Reorder) complete
+Status: Phase 5 complete; ready for Phase 6
+Last activity: 2026-05-26 — Plan 05-02 拖拽排序 executed and verified
 
 ## 当前里程碑
 
@@ -13,7 +13,7 @@ v1.0.11: UX 打磨与交互优化
 
 **Phases:**
 - [x] Phase 4: 震动反馈 (HAPT-01, HAPT-02)
-- [ ] Phase 5: 分类清理与拖拽排序 (CAT-01, CAT-02)
+- [x] Phase 5: 分类清理与拖拽排序 (CAT-01, CAT-02)
 - [ ] Phase 6: 输入与设置收尾 (INPT-01, SETT-01)
 
 ## 已完成（2026-05-24 会话）

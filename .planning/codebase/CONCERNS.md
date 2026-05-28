@@ -12,11 +12,12 @@
 ## 发布构建
 
 - Release **未开启 R8/混淆**（`isMinifyEnabled = false`），APK 体积与反编译可读性较差防护；若上架商店，建议评估 `minify` + 规则。
-- `.github/workflows/release.yml` 的 GitHub Release body 仍含 1.0.6 的静态发布说明；下一次正式发版前应改为读取生成的 release notes 或手动同步正文，避免重复发布旧内容。
+- `.github/workflows/release.yml` 的 GitHub Release body 需随正式发版手动同步，避免重复发布旧内容。
 
 ## 数据可靠性
 
-- Room `exportSchema = false`：团队内应通过迁移测试与备份路径保证升级安全；当前数据库版本为 `4`。
+- Room `exportSchema = false`：团队内应通过迁移测试与备份路径保证升级安全；当前数据库版本为 `6`。
+- **回收站本地语义**：`deleted_records` 只在本地保留 30 天，不进入普通备份导出；完整恢复和清除数据会清空回收站，产品文案与用户预期需保持一致。
 - **多设备同步**：WebDAV 与本地合并冲突策略需在业务层明确（若尚未文档化，属于产品/技术债）。
 
 ## 测试缺口

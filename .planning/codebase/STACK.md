@@ -12,8 +12,8 @@ MewBook 为单模块 Android 应用（`app`），使用 Kotlin、Jetpack Compose
 | JVM 目标 | 17 |
 | Android Gradle Plugin | 8.2.2 |
 | minSdk / targetSdk | 26 / 34 |
-| 应用版本 | versionCode 7, versionName 1.0.6 |
-| Room 数据库 | `mewbook.db` version 4 |
+| 应用版本 | versionCode 13, versionName 1.1.0 |
+| Room 数据库 | `mewbook.db` version 6 |
 
 ## UI
 
@@ -29,7 +29,7 @@ MewBook 为单模块 Android 应用（`app`），使用 Kotlin、Jetpack Compose
 
 ## 数据与存储
 
-- **Room**（`2.6.1`）：本地 SQLite，实体含流水、分类、账本、资产、预算、WebDAV 配置、周期模板等
+- **Room**（`2.6.1`）：本地 SQLite，实体含流水、单层分类、账本、资产、预算、WebDAV 配置、周期模板、删除记录回收站等
 - **DataStore Preferences**：主题、首页周期、首页概览卡片等偏好
 - **kotlinx-serialization-json**（`1.6.2`）：JSON 序列化（备份等场景）
 

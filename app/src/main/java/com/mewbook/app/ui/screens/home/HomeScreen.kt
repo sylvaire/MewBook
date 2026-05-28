@@ -53,11 +53,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.compose.material3.AlertDialog
@@ -90,11 +88,13 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mewbook.app.domain.model.RecordType
 import com.mewbook.app.domain.model.Record
 import com.mewbook.app.domain.model.Category
+import com.mewbook.app.domain.policy.HapticFeedbackPolicy
 import com.mewbook.app.domain.policy.HomeScreenLayoutPolicy
 import com.mewbook.app.ui.components.BudgetPeriodNavigator
 import com.mewbook.app.ui.components.MewSnackbarHost
 import com.mewbook.app.ui.components.RecordItem
 import com.mewbook.app.ui.components.MewCompactTopAppBar
+import com.mewbook.app.ui.components.rememberMewHapticFeedback
 import com.mewbook.app.ui.screens.add.AddEditRecordSheet
 import com.mewbook.app.ui.screens.add.QuickAddRecordSheet
 import com.mewbook.app.ui.theme.BudgetWarning
@@ -128,6 +128,7 @@ fun HomeScreen(
     var scrollToDate by remember { mutableStateOf<LocalDate?>(null) }
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
+    val hapticFeedback = rememberMewHapticFeedback(uiState.keyPressHapticEnabled)
 
     LaunchedEffect(uiState.showAddEditSheet) {
         onAddSheetVisibilityChanged(uiState.showAddEditSheet)
@@ -191,6 +192,7 @@ fun HomeScreen(
                     actions = {
                         IconButton(
                             onClick = {
+                                hapticFeedback.perform(HapticFeedbackPolicy.Interaction.RowClick)
                                 if (uiState.isSearchMode) {
                                     viewModel.exitSearchMode()
                                 } else {
@@ -210,6 +212,7 @@ fun HomeScreen(
                 HomeFloatingAddButton(
                     isMenuExpanded = showQuickFabMenu,
                     isDarkTheme = isDarkTheme,
+                    hapticFeedbackEnabled = uiState.keyPressHapticEnabled,
                     onAddClick = {
                         showQuickFabMenu = false
                         viewModel.showAddSheet()
@@ -591,12 +594,13 @@ private fun HomeDatePickerDialog(
 private fun HomeFloatingAddButton(
     isMenuExpanded: Boolean,
     isDarkTheme: Boolean,
+    hapticFeedbackEnabled: Boolean,
     onAddClick: () -> Unit,
     onLongPress: () -> Unit,
     onQuickExpenseClick: () -> Unit,
     onQuickIncomeClick: () -> Unit
 ) {
-    val haptics = LocalHapticFeedback.current
+    val hapticFeedback = rememberMewHapticFeedback(hapticFeedbackEnabled)
     val iconRotation by animateFloatAsState(
         targetValue = if (isMenuExpanded) 45f else 0f,
         label = "homeFabIconRotation"
@@ -620,12 +624,14 @@ private fun HomeFloatingAddButton(
                     label = "快速收入",
                     icon = Icons.AutoMirrored.Filled.TrendingUp,
                     tint = IncomeGreen,
+                    hapticFeedbackEnabled = hapticFeedbackEnabled,
                     onClick = onQuickIncomeClick
                 )
                 QuickFabAction(
                     label = "快速支出",
                     icon = Icons.AutoMirrored.Filled.TrendingDown,
                     tint = ExpenseRed,
+                    hapticFeedbackEnabled = hapticFeedbackEnabled,
                     onClick = onQuickExpenseClick
                 )
             }
@@ -649,10 +655,13 @@ private fun HomeFloatingAddButton(
                     onClickLabel = "添加记录",
                     onLongClickLabel = "显示快速记账",
                     onLongClick = {
-                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                        hapticFeedback.perform(HapticFeedbackPolicy.Interaction.LongPressAction)
                         onLongPress()
                     },
-                    onClick = onAddClick
+                    onClick = {
+                        hapticFeedback.perform(HapticFeedbackPolicy.Interaction.RowClick)
+                        onAddClick()
+                    }
                 ),
             shape = CircleShape,
             color = MaterialTheme.colorScheme.primary,
@@ -679,8 +688,11 @@ private fun QuickFabAction(
     label: String,
     icon: ImageVector,
     tint: Color,
+    hapticFeedbackEnabled: Boolean,
     onClick: () -> Unit
 ) {
+    val hapticFeedback = rememberMewHapticFeedback(hapticFeedbackEnabled)
+
     Surface(
         modifier = Modifier
             .shadow(
@@ -689,7 +701,10 @@ private fun QuickFabAction(
                 spotColor = tint.copy(alpha = 0.18f)
             )
             .heightIn(min = 48.dp)
-            .clickable(onClick = onClick),
+            .clickable {
+                hapticFeedback.perform(HapticFeedbackPolicy.Interaction.RowClick)
+                onClick()
+            },
         shape = RoundedCornerShape(24.dp),
         color = MaterialTheme.colorScheme.surface,
         contentColor = MaterialTheme.colorScheme.onSurface,

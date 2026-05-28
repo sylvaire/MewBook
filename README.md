@@ -118,8 +118,8 @@ app/src/main/java/com/mewbook/app
 - `compileSdk = 34`
 - `targetSdk = 34`
 - `minSdk = 26`
-- `versionName = 1.0.10`
-- `versionCode = 11`
+- `versionName = 1.1.0`
+- `versionCode = 13`
 - `AGP = 8.2.2`
 - `Kotlin = 1.9.22`
 

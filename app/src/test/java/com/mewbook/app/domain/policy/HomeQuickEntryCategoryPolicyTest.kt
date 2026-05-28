@@ -110,6 +110,41 @@ class HomeQuickEntryCategoryPolicyTest {
     }
 
     @Test
+    fun suggest_fallbackKeepsCategoryManagementOrderWhenSortOrderTies() {
+        val transport = Category(
+            id = 1L,
+            name = "交通",
+            icon = "directions_bus",
+            color = 0xFF4ECDC4,
+            type = RecordType.EXPENSE,
+            isDefault = true,
+            sortOrder = 0
+        )
+        val dining = Category(
+            id = 2L,
+            name = "餐饮",
+            icon = "restaurant",
+            color = 0xFFFF6B6BL,
+            type = RecordType.EXPENSE,
+            isDefault = true,
+            sortOrder = 0
+        )
+
+        val suggestions = HomeQuickEntryCategoryPolicy.suggest(
+            categories = listOf(transport, dining),
+            records = emptyList(),
+            ledgerId = 1L,
+            type = RecordType.EXPENSE,
+            limit = 4
+        )
+
+        assertEquals(
+            CategorySelectionPolicy.visibleCategories(listOf(transport, dining), RecordType.EXPENSE),
+            suggestions
+        )
+    }
+
+    @Test
     fun suggest_excludesHiddenDefaultExpenseCategoriesFromRecentAndFallbackSuggestions() {
         val subway = Category(
             id = 1L,
@@ -155,7 +190,7 @@ class HomeQuickEntryCategoryPolicyTest {
     }
 
     @Test
-    fun suggest_excludesLegacyExpenseSubcategoriesEvenWhenImportedAsCustomCategories() {
+    fun suggest_keepsCustomCategoriesConsistentWithCategoryManagement() {
         val subway = Category(
             id = 1L,
             name = "地铁",
@@ -187,7 +222,7 @@ class HomeQuickEntryCategoryPolicyTest {
             limit = 4
         )
 
-        assertEquals(listOf(transport), suggestions)
+        assertEquals(listOf(subway, transport), suggestions)
     }
 
     private fun record(

@@ -21,7 +21,7 @@ MewBook/
 | `MainActivity.kt` | 单一 Activity，Compose 入口、主题与应用更新弹窗 |
 | `MewBookApplication.kt` | `@HiltAndroidApp` Application |
 | `di/` | Hilt：`DatabaseModule`、`NetworkModule`、`RepositoryModule` |
-| `data/local/` | Room：`entity/`、`dao/`、`database/`、`Converters` |
+| `data/local/` | Room：`entity/`、`dao/`、`database/`、`Converters`，含 `deleted_records` 回收站表 |
 | `data/remote/` | `DavClient`、`DavRemoteDataSource` |
 | `data/repository/` | 各 Repository 实现、备份、导出等 |
 | `data/backup/` | 备份模型、迁移 |
@@ -29,11 +29,11 @@ MewBook/
 | `data/smartimport/` | OpenAI 兼容智能导入、配置存储、AI 响应解析 |
 | `data/update/` | GitHub Release 更新检查与 APK 下载 |
 | `domain/model/` | 领域模型 |
-| `domain/policy/` | 可单测业务规则，如首页搜索、预算、周期模板、DAV 自动备份、更新选择 |
+| `domain/policy/` | 可单测业务规则，如首页搜索、预算、周期模板、DAV 自动备份、更新选择、回收站 30 天保留策略 |
 | `domain/repository/` | Repository 接口 |
 | `domain/usecase/` | `account/`、`category/`、`dav/`、`ledger/`、`record/` 等 |
 | `ui/navigation/` | `NavHost.kt`、`Screen.kt` |
-| `ui/screens/` | 各功能屏：`home`、`statistics`、`asset`、`budget`、`settings`、`dav`、`export`、`smartimport`、`ledger`、`categories`、`recurring`、`add` 等 |
+| `ui/screens/` | 各功能屏：`home`、`statistics`、`asset`、`budget`、`settings`、`recyclebin`、`dav`、`export`、`smartimport`、`ledger`、`categories`、`recurring`、`add` 等 |
 | `ui/components/` | 复用组件（如 `RecordItem`、`CategoryChip`、TopBar） |
 | `ui/theme/` | `Theme`、`Color`、`Type`、`ThemeViewModel` |
 | `ui/update/` | 应用更新 UI 状态与 ViewModel |

@@ -17,8 +17,8 @@
 ## 导航
 
 - 单一 Activity（`MainActivity`）承载 Compose；`MewBookNavHost` 使用 Navigation Compose。
-- 主导航为底部四 Tab：`Home`、`Statistics`、`Asset`、`Settings`；其他功能（账本管理、分类、WebDAV、导出、智能导入、周期模板、账户编辑等）通过路由进入。
-- `Screen` sealed class 集中定义 route，当前包含带参数的 `AccountEdit` 与统计分类下钻 `CategoryExpenseDetail`。
+- 主导航为底部四 Tab：`Home`、`Statistics`、`Asset`、`Settings`；其他功能（账本管理、分类、回收站、WebDAV、导出、智能导入、周期模板、账户编辑等）通过路由进入。
+- `Screen` sealed class 集中定义 route，当前包含带参数的 `AccountEdit`、统计分类下钻 `CategoryExpenseDetail` 与 `RecycleBin`。
 
 ## 状态与主题
 
@@ -35,7 +35,9 @@
 
 ## 数据边界
 
-- Room 实体与领域模型在 Repository 实现中映射；当前数据库版本为 `4`。
-- 备份/迁移逻辑在 `data.backup` 与数据库版本演进中体现；新增实体或字段时同步更新备份模型、迁移与测试。
+- Room 实体与领域模型在 Repository 实现中映射；当前数据库版本为 `6`。
+- 分类持久化为单层模型，`CategoryEntity` 与 `BackupCategory` 不再保存父子层级字段；旧备份/CSV 中的子分类按最终分类名兼容导入。
+- 删除找回使用独立 `deleted_records` 表保存记录快照与 `deletedAt`，不对 `records` 做软删除。删除时从活跃流水移入回收站并回滚账户余额，恢复时写回活跃流水并恢复账户余额。
+- 备份/迁移逻辑在 `data.backup` 与数据库版本演进中体现；新增实体或字段时同步更新备份模型、迁移与测试。回收站记录保持本地 30 天语义，不参与普通备份导出；完整恢复和清除数据会清空 `deleted_records`。
 - 导入恢复前自动创建本地安全备份（`context.filesDir/safety_backups/`），最多保留 3 份。
 - 账户初始化：`EnsureDefaultAccountForLedgerUseCase` 按 `ledgerId` 检查，若该账本下无账户则自动创建"现金"默认账户。`HomeViewModel` 初始化时调用，确保首页加载时当前账本已有可用账户。新建账本时 `LedgerManagementViewModel.addLedger()` 也会自动创建默认账户。

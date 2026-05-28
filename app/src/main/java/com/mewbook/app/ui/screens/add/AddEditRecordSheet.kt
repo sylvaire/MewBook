@@ -82,8 +82,6 @@ import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -95,9 +93,11 @@ import com.mewbook.app.domain.model.Category
 import com.mewbook.app.domain.model.Record
 import com.mewbook.app.domain.model.RecordType
 import com.mewbook.app.domain.policy.CategorySelectionPolicy
+import com.mewbook.app.domain.policy.HapticFeedbackPolicy
 import com.mewbook.app.ui.components.AccountTypeIconBadge
 import com.mewbook.app.ui.components.CategoryIconBadge
 import com.mewbook.app.ui.components.CategoryChip
+import com.mewbook.app.ui.components.rememberMewHapticFeedback
 import com.mewbook.app.ui.theme.ExpenseRed
 import com.mewbook.app.ui.theme.IncomeGreen
 import java.time.Instant
@@ -163,9 +163,6 @@ fun AddEditRecordSheet(
             categories = categories,
             type = selectedType,
             selectedCategoryId = selectedCategoryId
-        ).sortedWith(
-            compareBy<Category> { it.sortOrder }
-                .thenBy { it.id }
         )
     }
     val selectedCategory = remember(selectedCategoryId, categoriesById) { categoriesById[selectedCategoryId] }
@@ -737,7 +734,7 @@ private fun RowScope.KeyboardKey(
     containerColor: Color = Color.White.copy(alpha = 0.10f),
     keyPressHapticEnabled: Boolean = true
 ) {
-    val hapticFeedback = LocalHapticFeedback.current
+    val hapticFeedback = rememberMewHapticFeedback(keyPressHapticEnabled)
     Box(
         modifier = Modifier
             .weight(1f)
@@ -745,10 +742,7 @@ private fun RowScope.KeyboardKey(
             .clip(RoundedCornerShape(14.dp))
             .background(if (enabled) containerColor else containerColor.copy(alpha = 0.35f))
             .clickable(enabled = enabled) {
-                if (keyPressHapticEnabled && enabled) {
-                    @Suppress("DEPRECATION")
-                    hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
-                }
+                hapticFeedback.perform(HapticFeedbackPolicy.Interaction.AmountKey, controlEnabled = enabled)
                 onClick()
             },
         contentAlignment = Alignment.Center

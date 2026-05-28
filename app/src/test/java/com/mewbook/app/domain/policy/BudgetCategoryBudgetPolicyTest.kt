@@ -13,9 +13,9 @@ class BudgetCategoryBudgetPolicyTest {
     fun availableExpenseCategories_excludesIncomeAndAlreadyBudgetedCategories() {
         val result = BudgetCategoryBudgetPolicy.availableExpenseCategories(
             categories = listOf(
-                category(id = 1L, type = RecordType.EXPENSE),
-                category(id = 2L, type = RecordType.EXPENSE),
-                category(id = 3L, type = RecordType.INCOME)
+                category(id = 1L, type = RecordType.EXPENSE, name = "餐饮"),
+                category(id = 2L, type = RecordType.EXPENSE, name = "交通"),
+                category(id = 3L, type = RecordType.INCOME, name = "工资")
             ),
             budgets = listOf(
                 budget(id = 10L, categoryId = null),
@@ -31,8 +31,8 @@ class BudgetCategoryBudgetPolicyTest {
     fun availableExpenseCategories_keepsCurrentCategoryWhenEditingExistingBudget() {
         val result = BudgetCategoryBudgetPolicy.availableExpenseCategories(
             categories = listOf(
-                category(id = 1L, type = RecordType.EXPENSE),
-                category(id = 2L, type = RecordType.EXPENSE)
+                category(id = 1L, type = RecordType.EXPENSE, name = "餐饮"),
+                category(id = 2L, type = RecordType.EXPENSE, name = "交通")
             ),
             budgets = listOf(
                 budget(id = 11L, categoryId = 2L)
@@ -44,10 +44,10 @@ class BudgetCategoryBudgetPolicyTest {
     }
 
     @Test
-    fun availableExpenseCategories_includesSubwayAsNormalFlatCategory() {
+    fun availableExpenseCategories_keepsCustomLegacyNamedCategoryConsistentWithCategoryManagement() {
         val result = BudgetCategoryBudgetPolicy.availableExpenseCategories(
             categories = listOf(
-                category(id = 1L, type = RecordType.EXPENSE, name = "地铁"),
+                category(id = 1L, type = RecordType.EXPENSE, name = "地铁", isDefault = false),
                 category(id = 2L, type = RecordType.EXPENSE, name = "交通")
             ),
             budgets = emptyList(),
@@ -60,14 +60,15 @@ class BudgetCategoryBudgetPolicyTest {
     private fun category(
         id: Long,
         type: RecordType,
-        name: String = "Category-$id"
+        name: String = "Category-$id",
+        isDefault: Boolean = true
     ) = Category(
         id = id,
         name = name,
         icon = "more_horiz",
         color = 0xFF808080,
         type = type,
-        isDefault = true,
+        isDefault = isDefault,
         sortOrder = id.toInt()
     )
 

@@ -33,7 +33,7 @@
 
 ## 本地持久化
 
-- **Room**：主数据库 `MewBookDatabase`（`mewbook.db`），版本 4，含流水、分类、账本、账户、预算、WebDAV 配置与周期模板等 DAO。
+- **Room**：主数据库 `MewBookDatabase`（`mewbook.db`），版本 6，含流水、单层分类、账本、账户、预算、WebDAV 配置、周期模板与 `deleted_records` 回收站等 DAO。
 - **DataStore**：`ThemePreferencesRepository`、`HomePreferencesRepository`、`DavAutoBackupPreferencesRepository`、`AppUpdatePreferencesRepository` 等，用于主题模式、首页周期、首页概览卡片、DAV 自动备份状态与应用更新偏好。
 
 ## 文件与系统
@@ -42,7 +42,7 @@
 
 ## 数据交换与备份
 
-- **备份/迁移**：`data.backup` 包（如 `BackupRepository`、`BackupMigration`、`BackupModels`），配合序列化模型做快照与版本迁移。
+- **备份/迁移**：`data.backup` 包（如 `BackupRepository`、`BackupMigration`、`BackupModels`），配合序列化模型做快照与版本迁移。普通备份导出只包含活跃数据，不包含 `deleted_records`；完整恢复和清除数据会清空回收站。
 - **导出与导入**：`ExportRepository`、`ExportScreen` / `ExportViewModel` 负责备份还原、格式导出、外部导入预览与进入智能导入。
 
 ## 发布与分发

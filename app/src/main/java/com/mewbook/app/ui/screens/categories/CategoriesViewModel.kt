@@ -129,7 +129,11 @@ class CategoriesViewModel @Inject constructor(
         val siblings = reorderableSiblings(category)
         val currentIndex = siblings.indexOfFirst { it.id == category.id }
         if (currentIndex > 0) {
-            moveCategory(fromIndex = currentIndex, toIndex = currentIndex - 1, type = category.type)
+            moveCategory(
+                fromCategoryId = category.id,
+                toCategoryId = siblings[currentIndex - 1].id,
+                type = category.type
+            )
         }
     }
 
@@ -137,23 +141,23 @@ class CategoriesViewModel @Inject constructor(
         val siblings = reorderableSiblings(category)
         val currentIndex = siblings.indexOfFirst { it.id == category.id }
         if (currentIndex < siblings.lastIndex) {
-            moveCategory(fromIndex = currentIndex, toIndex = currentIndex + 1, type = category.type)
+            moveCategory(
+                fromCategoryId = category.id,
+                toCategoryId = siblings[currentIndex + 1].id,
+                type = category.type
+            )
         }
     }
 
-    fun moveCategory(fromIndex: Int, toIndex: Int, type: RecordType) {
-        if (fromIndex == toIndex) return
+    fun moveCategory(fromCategoryId: Long, toCategoryId: Long, type: RecordType) {
+        if (fromCategoryId == toCategoryId) return
         viewModelScope.launch {
-            val siblings = CategorySelectionPolicy.visibleCategories(_uiState.value.categories, type)
-            if (fromIndex < 0 || fromIndex >= siblings.size || toIndex < 0 || toIndex >= siblings.size) return@launch
-
-            val mutable = siblings.toMutableList()
-            val item = mutable.removeAt(fromIndex)
-            mutable.add(toIndex, item)
-
-            val updates = mutable.mapIndexed { index, category ->
-                category.id to index
-            }
+            val updates = CategorySelectionPolicy.reorderSortUpdates(
+                categories = _uiState.value.categories,
+                type = type,
+                fromCategoryId = fromCategoryId,
+                toCategoryId = toCategoryId
+            )
             reorderCategoriesUseCase(updates)
         }
     }

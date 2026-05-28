@@ -1,15 +1,15 @@
 package com.mewbook.app.ui.screens.settings
 
-import android.content.Intent
-import android.net.Uri
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountBalance
 import androidx.compose.material.icons.filled.Category
@@ -38,7 +38,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -46,6 +50,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mewbook.app.BuildConfig
 import com.mewbook.app.data.preferences.AppThemeMode
 import com.mewbook.app.domain.model.BudgetPeriodType
+import com.mewbook.app.domain.policy.HapticFeedbackPolicy
 import com.mewbook.app.ui.components.BudgetPeriodTypeSelector
 import com.mewbook.app.ui.components.MewCompactTopAppBar
 import com.mewbook.app.ui.components.SettingsDangerRowCard
@@ -56,9 +61,10 @@ import com.mewbook.app.ui.components.SettingsSummaryCard
 import com.mewbook.app.ui.components.SettingsSurfaceCard
 import com.mewbook.app.ui.components.SettingsSwitchRowCard
 import com.mewbook.app.ui.components.displayLabel
+import com.mewbook.app.ui.components.rememberMewHapticFeedback
 import com.mewbook.app.ui.update.AppUpdateUiState
 
-private const val GITHUB_REPO_URL = "https://github.com/sylvaire/MewBook"
+private const val PROJECT_REPOSITORY_URL = "https://github.com/sylvaire/MewBook"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -79,14 +85,34 @@ fun SettingsScreen(
     val selectedHomePeriod by viewModel.selectedHomePeriod.collectAsStateWithLifecycle()
     val updateEnabled by viewModel.updateEnabled.collectAsStateWithLifecycle()
     val keyPressHapticEnabled by viewModel.keyPressHapticEnabled.collectAsStateWithLifecycle()
+    val hapticFeedback = rememberMewHapticFeedback(keyPressHapticEnabled)
+    var showAppInfoDialog by remember { mutableStateOf(false) }
     var showThemeDialog by remember { mutableStateOf(false) }
     var showClearDataDialog by remember { mutableStateOf(false) }
     var clearDataConfirmText by remember { mutableStateOf("") }
-    val context = LocalContext.current
+
+    fun performWithHaptic(
+        interaction: HapticFeedbackPolicy.Interaction,
+        action: () -> Unit
+    ) {
+        hapticFeedback.perform(interaction)
+        action()
+    }
+
+    if (showAppInfoDialog) {
+        AppInfoDialog(
+            updateUiState = updateUiState,
+            updateEnabled = updateEnabled,
+            hapticFeedbackEnabled = keyPressHapticEnabled,
+            onCheckForUpdates = onCheckForUpdates,
+            onDismiss = { showAppInfoDialog = false }
+        )
+    }
 
     if (showThemeDialog) {
         ThemeModeDialog(
             selectedThemeMode = themeMode,
+            hapticFeedbackEnabled = keyPressHapticEnabled,
             onDismiss = { showThemeDialog = false },
             onSelect = {
                 viewModel.setThemeMode(it)
@@ -128,9 +154,11 @@ fun SettingsScreen(
             confirmButton = {
                 TextButton(
                     onClick = {
-                        viewModel.clearAllData()
-                        showClearDataDialog = false
-                        clearDataConfirmText = ""
+                        performWithHaptic(HapticFeedbackPolicy.Interaction.DialogAction) {
+                            viewModel.clearAllData()
+                            showClearDataDialog = false
+                            clearDataConfirmText = ""
+                        }
                     },
                     enabled = confirmed
                 ) {
@@ -139,8 +167,10 @@ fun SettingsScreen(
             },
             dismissButton = {
                 TextButton(onClick = {
-                    showClearDataDialog = false
-                    clearDataConfirmText = ""
+                    performWithHaptic(HapticFeedbackPolicy.Interaction.DialogAction) {
+                        showClearDataDialog = false
+                        clearDataConfirmText = ""
+                    }
                 }) {
                     Text("取消")
                 }
@@ -161,7 +191,9 @@ fun SettingsScreen(
                 title = "喵喵记账",
                 subtitle = "版本 ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
                 onClick = {
-                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(GITHUB_REPO_URL)))
+                    performWithHaptic(HapticFeedbackPolicy.Interaction.RowClick) {
+                        showAppInfoDialog = true
+                    }
                 }
             )
 
@@ -174,7 +206,11 @@ fun SettingsScreen(
                 icon = Icons.Filled.Palette,
                 title = "主题",
                 subtitle = themeMode.displayName,
-                onClick = { showThemeDialog = true }
+                onClick = {
+                    performWithHaptic(HapticFeedbackPolicy.Interaction.RowClick) {
+                        showThemeDialog = true
+                    }
+                }
             )
 
             SettingsSwitchRowCard(
@@ -182,19 +218,28 @@ fun SettingsScreen(
                 title = "首页收支概览",
                 subtitle = "控制首页是否显示收支概览卡片",
                 checked = showHomeOverviewCards,
-                onCheckedChange = viewModel::setShowHomeOverviewCards
+                onCheckedChange = {
+                    performWithHaptic(HapticFeedbackPolicy.Interaction.Toggle) {
+                        viewModel.setShowHomeOverviewCards(it)
+                    }
+                }
             )
 
             SettingsSwitchRowCard(
                 icon = Icons.Filled.TouchApp,
-                title = "按键震动",
-                subtitle = "记账键盘按键时触发震动反馈",
+                title = "触感反馈",
+                subtitle = "记账键盘、设置操作和快捷入口提供震动反馈",
                 checked = keyPressHapticEnabled,
-                onCheckedChange = viewModel::setKeyPressHapticEnabled
+                onCheckedChange = {
+                    performWithHaptic(HapticFeedbackPolicy.Interaction.Toggle) {
+                        viewModel.setKeyPressHapticEnabled(it)
+                    }
+                }
             )
 
             HomePeriodPreferenceItem(
                 selectedPeriodType = selectedHomePeriod,
+                hapticFeedbackEnabled = keyPressHapticEnabled,
                 onSelect = viewModel::setSelectedHomePeriod
             )
 
@@ -207,28 +252,36 @@ fun SettingsScreen(
                 icon = Icons.Filled.AccountBalance,
                 title = "账本管理",
                 subtitle = "长按删除，自定义排序",
-                onClick = onNavigateToLedgerManagement
+                onClick = {
+                    performWithHaptic(HapticFeedbackPolicy.Interaction.RowClick, onNavigateToLedgerManagement)
+                }
             )
 
             SettingsRowCard(
                 icon = Icons.Filled.Category,
                 title = "分类管理",
                 subtitle = "管理收支分类",
-                onClick = onNavigateToCategories
+                onClick = {
+                    performWithHaptic(HapticFeedbackPolicy.Interaction.RowClick, onNavigateToCategories)
+                }
             )
 
             SettingsRowCard(
                 icon = Icons.Filled.AccountBalanceWallet,
                 title = "预算管理",
                 subtitle = "设置不同周期及类型预算",
-                onClick = onNavigateToBudget
+                onClick = {
+                    performWithHaptic(HapticFeedbackPolicy.Interaction.RowClick, onNavigateToBudget)
+                }
             )
 
             SettingsRowCard(
                 icon = Icons.Filled.CalendarMonth,
                 title = "周期模板",
                 subtitle = "工资、房租、订阅等固定记账",
-                onClick = onNavigateToRecurringTemplates
+                onClick = {
+                    performWithHaptic(HapticFeedbackPolicy.Interaction.RowClick, onNavigateToRecurringTemplates)
+                }
             )
 
             SettingsSectionHeader(
@@ -240,49 +293,55 @@ fun SettingsScreen(
                 icon = Icons.Filled.CloudSync,
                 title = "DAV同步",
                 subtitle = "自动备份、手动导入导出与同步预览",
-                onClick = onNavigateToDavSettings
+                onClick = {
+                    performWithHaptic(HapticFeedbackPolicy.Interaction.RowClick, onNavigateToDavSettings)
+                }
             )
 
             SettingsRowCard(
                 icon = Icons.Filled.Download,
                 title = "迁移与备份",
                 subtitle = "外部导入、本地备份、还原与格式导出",
-                onClick = onNavigateToExport
+                onClick = {
+                    performWithHaptic(HapticFeedbackPolicy.Interaction.RowClick, onNavigateToExport)
+                }
             )
 
             SettingsRowCard(
                 icon = Icons.Filled.Restore,
                 title = "回收站",
                 subtitle = "找回 30 天内删除的记录",
-                onClick = onNavigateToRecycleBin
+                onClick = {
+                    performWithHaptic(HapticFeedbackPolicy.Interaction.RowClick, onNavigateToRecycleBin)
+                }
             )
 
             SettingsSectionHeader(
                 title = "应用与安全",
-                description = "更新检查和不可恢复的数据操作集中在这里。"
+                description = "自动更新偏好和不可恢复的数据操作集中在这里。"
             )
 
             SettingsSwitchRowCard(
                 icon = Icons.Filled.CloudSync,
                 title = "自动检查更新",
-                subtitle = if (updateEnabled) "启动时自动检查新版本" else "已关闭，仅保留手动检查",
+                subtitle = if (updateEnabled) "启动时自动检查新版本" else "已关闭，可在版本详情中手动检查",
                 checked = updateEnabled,
-                onCheckedChange = viewModel::setUpdateEnabled
-            )
-
-            SettingsRowCard(
-                icon = Icons.Filled.Download,
-                title = "检查更新",
-                subtitle = updateStatusSubtitle(updateUiState)
-                    ?: if (updateEnabled) "立即检查 GitHub Release" else "点击手动检查",
-                onClick = onCheckForUpdates
+                onCheckedChange = {
+                    performWithHaptic(HapticFeedbackPolicy.Interaction.Toggle) {
+                        viewModel.setUpdateEnabled(it)
+                    }
+                }
             )
 
             SettingsDangerRowCard(
                 icon = Icons.Filled.DeleteForever,
                 title = "清除数据",
                 subtitle = "删除所有记账数据，不可恢复",
-                onClick = { showClearDataDialog = true }
+                onClick = {
+                    performWithHaptic(HapticFeedbackPolicy.Interaction.RowClick) {
+                        showClearDataDialog = true
+                    }
+                }
             )
         }
     }
@@ -302,8 +361,119 @@ private fun updateStatusSubtitle(updateUiState: AppUpdateUiState): String? {
 }
 
 @Composable
+private fun AppInfoDialog(
+    updateUiState: AppUpdateUiState,
+    updateEnabled: Boolean,
+    hapticFeedbackEnabled: Boolean,
+    onCheckForUpdates: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val updateStatus = updateStatusSubtitle(updateUiState)
+        ?: if (updateEnabled) "自动检查更新已开启" else "自动检查更新已关闭"
+    val canCheckUpdates = !updateUiState.isChecking && !updateUiState.isDownloading
+    val uriHandler = LocalUriHandler.current
+    val hapticFeedback = rememberMewHapticFeedback(hapticFeedbackEnabled)
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = {
+            Icon(
+                imageVector = Icons.Filled.Info,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary
+            )
+        },
+        title = { Text("应用详情") },
+        text = {
+            Column {
+                AppInfoDetailRow(label = "应用", value = "喵喵记账")
+                AppInfoDetailRow(label = "版本", value = BuildConfig.VERSION_NAME)
+                AppInfoDetailRow(label = "构建号", value = BuildConfig.VERSION_CODE.toString())
+                AppInfoDetailRow(label = "更新", value = updateStatus)
+                AppInfoDetailRow(
+                    label = "项目仓库",
+                    value = PROJECT_REPOSITORY_URL,
+                    valueColor = MaterialTheme.colorScheme.primary,
+                    textDecoration = TextDecoration.Underline,
+                    onClick = {
+                        hapticFeedback.perform(HapticFeedbackPolicy.Interaction.ExternalLink)
+                        uriHandler.openUri(PROJECT_REPOSITORY_URL)
+                    }
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    hapticFeedback.perform(HapticFeedbackPolicy.Interaction.DialogAction)
+                    onDismiss()
+                }
+            ) {
+                Text("关闭")
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = {
+                    hapticFeedback.perform(HapticFeedbackPolicy.Interaction.DialogAction)
+                    onDismiss()
+                    onCheckForUpdates()
+                },
+                enabled = canCheckUpdates
+            ) {
+                Text("检查更新")
+            }
+        }
+    )
+}
+
+@Composable
+private fun AppInfoDetailRow(
+    label: String,
+    value: String,
+    valueColor: Color = MaterialTheme.colorScheme.onSurface,
+    textDecoration: TextDecoration? = null,
+    onClick: (() -> Unit)? = null
+) {
+    val rowModifier = Modifier
+        .fillMaxWidth()
+        .heightIn(min = if (onClick == null) 36.dp else 48.dp)
+        .then(
+            if (onClick == null) {
+                Modifier
+            } else {
+                Modifier
+                    .clip(RoundedCornerShape(12.dp))
+                    .clickable(onClick = onClick)
+            }
+        )
+        .padding(vertical = 6.dp)
+
+    Row(
+        modifier = rowModifier,
+        verticalAlignment = Alignment.Top
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.Medium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.width(72.dp)
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.bodyMedium,
+            color = valueColor,
+            textDecoration = textDecoration,
+            modifier = Modifier.weight(1f)
+        )
+    }
+}
+
+@Composable
 private fun HomePeriodPreferenceItem(
     selectedPeriodType: BudgetPeriodType,
+    hapticFeedbackEnabled: Boolean,
     onSelect: (BudgetPeriodType) -> Unit
 ) {
     SettingsSurfaceCard {
@@ -343,7 +513,8 @@ private fun HomePeriodPreferenceItem(
             BudgetPeriodTypeSelector(
                 selectedPeriodType = selectedPeriodType,
                 onSelect = onSelect,
-                modifier = Modifier.padding(top = 12.dp)
+                modifier = Modifier.padding(top = 12.dp),
+                hapticFeedbackEnabled = hapticFeedbackEnabled
             )
         }
     }
@@ -352,9 +523,12 @@ private fun HomePeriodPreferenceItem(
 @Composable
 private fun ThemeModeDialog(
     selectedThemeMode: AppThemeMode,
+    hapticFeedbackEnabled: Boolean,
     onDismiss: () -> Unit,
     onSelect: (AppThemeMode) -> Unit
 ) {
+    val hapticFeedback = rememberMewHapticFeedback(hapticFeedbackEnabled)
+
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("选择主题") },
@@ -364,7 +538,13 @@ private fun ThemeModeDialog(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clickable { onSelect(themeMode) }
+                            .clickable {
+                                hapticFeedback.perform(
+                                    HapticFeedbackPolicy.Interaction.Selection,
+                                    controlEnabled = selectedThemeMode != themeMode
+                                )
+                                onSelect(themeMode)
+                            }
                             .padding(vertical = 12.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -386,7 +566,12 @@ private fun ThemeModeDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = onDismiss) {
+            TextButton(
+                onClick = {
+                    hapticFeedback.perform(HapticFeedbackPolicy.Interaction.DialogAction)
+                    onDismiss()
+                }
+            ) {
                 Text("关闭")
             }
         }

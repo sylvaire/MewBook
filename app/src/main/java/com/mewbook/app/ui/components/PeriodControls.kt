@@ -34,13 +34,17 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.mewbook.app.domain.model.BudgetPeriodType
+import com.mewbook.app.domain.policy.HapticFeedbackPolicy
 
 @Composable
 fun BudgetPeriodTypeSelector(
     selectedPeriodType: BudgetPeriodType,
     onSelect: (BudgetPeriodType) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    hapticFeedbackEnabled: Boolean = false
 ) {
+    val hapticFeedback = rememberMewHapticFeedback(hapticFeedbackEnabled)
+
     Surface(
         modifier = modifier
             .fillMaxWidth()
@@ -93,7 +97,13 @@ fun BudgetPeriodTypeSelector(
                         .clickable(
                             interactionSource = interactionSource,
                             indication = null
-                        ) { onSelect(periodType) },
+                        ) {
+                            hapticFeedback.perform(
+                                HapticFeedbackPolicy.Interaction.Selection,
+                                controlEnabled = !selected
+                            )
+                            onSelect(periodType)
+                        },
                     contentAlignment = Alignment.Center
                 ) {
                     Text(

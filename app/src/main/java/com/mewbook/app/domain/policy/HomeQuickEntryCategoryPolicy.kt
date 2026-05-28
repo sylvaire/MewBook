@@ -41,10 +41,6 @@ object HomeQuickEntryCategoryPolicy {
             return recentSuggestions.take(limit)
         }
 
-        return candidateCategories
-            .asSequence()
-            .sortedWith(compareBy<Category> { it.sortOrder }.thenBy { it.id })
-            .take(limit)
-            .toList()
+        return candidateCategories.take(limit)
     }
 }

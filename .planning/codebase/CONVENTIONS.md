@@ -20,7 +20,7 @@
 
 ## 日志与调试
 
-- `DavClient` 使用 `Log.d` 输出探测请求信息（含部分脱敏的用户名前缀），发布前可考虑统一日志开关或 ProGuard 规则。
+- `DavClient` 与 `DavSettingsViewModel` 的 `Log.d` 调试输出需保持在 `BuildConfig.DEBUG` 守卫内；不要在 release 日志或文档中暴露完整 WebDAV URL、用户名、密码或智能导入 API Key。
 
 ## 版本与数据库
 

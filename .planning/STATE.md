@@ -1,82 +1,78 @@
-# GSD 状态 — 2026-05-26
+# GSD 状态 — 2026-05-29
 
 ## Current Position
 
-Phase: Phase 6 — 输入与设置收尾 (INPT-01, SETT-01)
-Plan: 1 — 输入与设置收尾 complete
-Status: Phase 6 complete; milestone v1.0.11 complete
-Last activity: 2026-05-26 — Plan 06-01 输入与设置收尾 executed and verified
+Phase: Phase 7 — v1.1.0 发布打磨
+Plan: ad hoc polish and release prep complete
+Status: 本地实现、验证、知识库收尾提交与 tag 已完成；远端推送/发布待可用 GitHub 凭据或 SSH 环境
+Last activity: 2026-05-29 — 分类管理、版本详情、触感反馈与 1.1.0 发布资料完成验证
 
 ## 当前里程碑
 
-v1.0.11: UX 打磨与交互优化
+v1.1.0: 发布打磨与交互优化
 
 **Phases:**
 - [x] Phase 4: 震动反馈 (HAPT-01, HAPT-02)
 - [x] Phase 5: 分类清理与拖拽排序 (CAT-01, CAT-02)
 - [x] Phase 6: 输入与设置收尾 (INPT-01, SETT-01)
+- [x] Phase 7: v1.1.0 发布打磨 (HAPT-03, CAT-03/04/05, SETT-02/03)
 
-## 已完成（2026-05-26 会话 — Phase 6）
+## 已完成（2026-05-29 会话 — v1.1.0 发布打磨）
 
-- [x] NoteEditorDialog 自动弹出输入法（FocusRequester + LaunchedEffect）
-- [x] SettingsSummaryCard 添加 onClick 参数支持点击
-- [x] 设置页版本卡片点击跳转 GitHub（Intent.ACTION_VIEW）
+- [x] 分类管理删除默认旧二级分类残留项，新增记录的分类选择与分类管理可见分类保持一致；编辑旧记录时保留当前已选退休分类。
+- [x] 分类管理补充更多常用图标（含汽车、交通、医疗、购物、家居、金融等），并新增 `CategoryIconOptionsTest` 锁定关键图标。
+- [x] 分类管理 UI 调整为更贴近整体 Clay 风格，移除颜色圆点和右侧编辑图标，修正收支分段控件内外圆角不协调。
+- [x] 设置页版本卡片改为打开 `AppInfoDialog`，弹窗展示应用、版本、构建号、更新状态、项目 GitHub 仓库链接和“检查更新”。
+- [x] 设置列表删除独立手动“检查更新”入口；自动检查更新开关仍保留。
+- [x] “按键震动”升级为“触感反馈”，覆盖数字键盘、设置行/开关/弹窗、周期选择、首页快捷入口等合适点击事件，并新增 `HapticFeedbackPolicyTest`。
+- [x] 版本升级为 `versionName = "1.1.0"`、`versionCode = 13`，README 与 `.github/workflows/release.yml` release body 已同步。
+- [x] 本地应用实现验证提交 `06c7556` 已创建；其后追加知识库收尾提交，且本地 `v1.1.0` tag 指向最新本地 HEAD。
 
-## 已完成（2026-05-24 会话）
+## 验证
 
-- [x] 旧二级分类设计清理为单层分类模型，`CategoryEntity` / `Category` / `BackupCategory` 不再保存父子层级字段
-- [x] 删除记录移入本地 `deleted_records` 回收站，30 天内可恢复或永久删除
-- [x] 设置页新增回收站入口，`RecycleBinScreen` / `RecycleBinViewModel` 展示删除记录、剩余天数、恢复与永久删除操作
-- [x] 首页与统计下钻删除流程改为可找回文案和"已移入回收站"提示
-- [x] 记账页支出分类显示恢复旧版常用主类，底层分类仍保持单层
+- [x] `git diff --check`
+- [x] `testDebugUnitTest :app:lintDebug :app:assembleDebug :app:assembleRelease -Dandroid.enableJetifier=false`
 
-## 已完成（2026-05-02 会话）
+验证结果：Gradle `BUILD SUCCESSFUL`。日志仍会出现 Kotlin daemon `AccessDeniedException` 与 SDK XML warning，但 Gradle 已回退并成功完成构建。
 
-- [x] 分类管理移除左滑删除（`CategoriesScreen.kt` 清除 `AnchoredDraggableState` 相关代码）
-- [x] DAV 密码丢失修复（`BackupRepository.restoreEnvelope()` 在事务外读取现有 DAV 配置）
-- [x] `AccountEditScreen` 重设计为 Claymorphism 风格（hero card + 编辑卡片 + 变更检测）
-- [x] `AddAccountScreen` 升级为 Clay 卡片风格
-- [x] `AccountEditScreen` 合并 `updateName()`+`updateBalance()` 为单一 `saveChanges()`
-- [x] `AssetScreen` 空态添加"立即添加"引导按钮
-- [x] 新建账本自动创建默认"现金"账户（`LedgerManagementViewModel.addLedger()`）
-- [x] 新建 `EnsureDefaultAccountForLedgerUseCase`：按账本检查，无账户时自动创建"现金"
-- [x] `HomeViewModel` 初始化时调用 `EnsureDefaultAccountForLedgerUseCase`，确保首页加载时当前账本已有默认账户
-- [x] `AssetViewModel` 改用 `EnsureDefaultAccountForLedgerUseCase`（替换原全局版）
-- [x] 删除废弃的 `InitializeDefaultAccountsUseCase` 和 `DefaultAccounts` 对象
+## 发布状态
+
+- 本地 branch：`main`，tracking `origin/codex/full-app-rewrite`
+- 本地 HEAD：最新本地提交（当前在远端 tracking branch 之上）
+- 本地 tag：`v1.1.0`（指向最新本地 HEAD）
+- 远端 `refs/tags/v1.1.0`：截至 2026-05-29 检查时不存在
+- 远端发布阻塞：`gh auth status` 显示 token 无效；sandbox 内 `git push` 因 `known_hosts` 权限被拒绝；自动 escalation 审批超时
+
+待在可用凭据/SSH 环境中执行：
+
+```powershell
+git push origin HEAD:codex/full-app-rewrite
+git push origin v1.1.0
+```
+
+推送 tag 后 `.github/workflows/release.yml` 会构建并发布 GitHub Release。
 
 ## 已完成历史里程碑
 
+- [x] v1.0.11 UX 打磨（震动反馈、备注自动聚焦、分类拖拽排序、版本入口）
+- [x] 分类扁平化与本地 30 天回收站
 - [x] 网盘自动备份（随 1.0.7 发布）
 - [x] UI 修复、账本命名统一、清除数据功能（随 1.0.7 发布）
 - [x] 统计页支出构成分类下钻（随 1.0.3 发布）
 - [x] 周期模板、首页快捷入口、还原预览与多周期预算（随 1.0.4 发布）
 - [x] 智能导入、应用内更新、统计体验改进（随 1.0.5 发布）
 
-## 代码审查
-
-2026-05-01 完成标准代码审查（37 个源文件），修复 2 个 Critical、5 个 Warning、3 个 Info 问题。详见 `.planning/REVIEW.md`。
-
 ## 工作区提醒
 
-2026-05-24 的工作区包含未提交改动，主要覆盖：
-
-- 分类扁平化：分类实体、领域模型、默认分类、导入/备份映射、预算/周期模板/统计/记账选择相关调用链；
-- 回收站：`deleted_records` Room 表、DAO、Repository、UseCases、设置页入口、回收站 UI、删除/恢复账户余额联动；
-- UI 调整：删除后提示条样式优化、回收站提示圆角与边框修正、记账页支出分类显示恢复旧版常用主类。
-
-这些改动应视为"待验证本地工作"，发版或交接前需要运行标准验证并阅读 `git diff`。
+- `git status` 仅显示未跟踪 `.codegraph/`，该目录是本地分析缓存，不属于发布内容。
+- `.planning/` 已在当前仓库中被跟踪；更新这些文档时仍要避免提交 `.omx/`、`.agents/`、签名材料或生成构建产物。
 
 ## 阻塞项
 
-无已知硬阻塞。
+- 远端推送与 GitHub Release 发布需要有效 GitHub 凭据或可访问 SSH `known_hosts` 的环境。
 
 ## 备注
 
-- 每个账本现在至少有一个默认"现金"账户：新建账本时自动创建，已有账本在 HomeViewModel 初始化时补建。
 - 回收站记录只本地保留 30 天，不参与普通备份导出；完整恢复和清除数据会清空 `deleted_records`。
-- `EnsureDefaultAccountForLedgerUseCase` 按 `ledgerId` 检查（非全局），解决了旧版 `InitializeDefaultAccountsUseCase` 只为 `ledgerId=1` 创建默认账户的问题。
-- 自动备份失败静默记录在 DAV 设置页，不弹窗、不 Snackbar。
-- 自动备份只上传本地完整备份，不做自动恢复或双向同步。
-- 统计页下钻已落地为 `CategoryExpenseDetailScreen` / `CategoryExpenseDetailViewModel` 与 `Screen.CategoryExpenseDetail` 路由。2026-05-01 重新设计为 Claymorphism 卡片风格，并新增记录详情查看、编辑和删除功能。
+- 旧二级分类只作为外部导入/备份兼容概念保留，当前 Room/领域/备份模型保持单层分类。
 - `DavClient` 和 `DavSettingsViewModel` 的所有 `Log.d()` 调用已用 `BuildConfig.DEBUG` 守卫。
-- `DavConfig` 新增 `isInsecure()` 方法，DAV 设置页对 HTTP URL 显示安全警告。

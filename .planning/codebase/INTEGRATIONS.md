@@ -28,7 +28,8 @@
 
 - **实现位置**：`data.update.AppUpdateRepository`、`ui.update.AppUpdateViewModel`、`domain.policy.AppUpdatePolicy`、`data.preferences.AppUpdatePreferencesRepository`。
 - **用途**：查询 `https://api.github.com/repos/sylvaire/MewBook/releases/latest`，选择可安装 APK asset，下载到应用外部 files 下载目录，并交给系统安装器。
-- **偏好设置**：`AppUpdatePreferencesRepository`（DataStore）存储 `snoozedVersionName`（跳过的版本号）和 `updateEnabled`（更新开关，默认 true）。静默检查时自动跳过已跳过版本；设置页可重新开启更新并清除跳过记录。
+- **偏好设置**：`AppUpdatePreferencesRepository`（DataStore）存储 `snoozedVersionName`（跳过的版本号）和 `updateEnabled`（更新开关，默认 true）。静默检查时自动跳过已跳过版本；设置页保留自动检查更新开关，手动“检查更新”入口位于版本详情弹窗中。
+- **版本详情**：设置页版本卡片打开应用详情弹窗，展示应用版本、构建号、更新状态和项目仓库链接 `https://github.com/sylvaire/MewBook`。
 - **权限**：`AndroidManifest.xml` 声明 `REQUEST_INSTALL_PACKAGES`，用于 Android 8.0+ 安装未知来源 APK 的授权流程。
 
 ## 本地持久化

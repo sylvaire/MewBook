@@ -7,8 +7,8 @@ tags: [kotlin, category, refactor, legacy-cleanup]
 # Dependency graph
 requires: []
 provides:
-  - Unified expense category list in DefaultCategories (87 items, single source of truth)
-  - Simplified recordSelectionCandidates with no legacy subcategory filtering
+  - Unified flat expense category model in DefaultCategories
+  - 2026-05-29 follow-up: retired default secondary categories are filtered from current visible/default lists while import compatibility remains
   - Removal of flatExpenseAdditions, legacyExpenseSubCategoryNames, recordEntryExpenseCategories
 affects: [05-02-category-drag-reorder]
 
@@ -31,7 +31,7 @@ key-decisions:
   - "Kept normalizeSortOrder function unchanged (dedup by type+name, then renumber sortOrder)"
 
 patterns-established:
-  - "Single-source-of-truth: all expense categories in one list, derived lists via normalizeSortOrder only"
+  - "Single-source-of-truth: current visible categories are flat; retired legacy names remain only for compatibility/editing edge cases"
 
 requirements-completed: [CAT-01]
 
@@ -43,6 +43,8 @@ completed: 2026-05-26
 # Phase 5 Plan 1: 删除二级分类残留代码 Summary
 
 **Removed legacy subcategory code — merged 87 expense categories into unified list, eliminated type-specific filtering in CategorySelectionPolicy**
+
+> 2026-05-29 follow-up: default legacy secondary categories such as "早餐", "地铁", "打车", and "房租" were retired from current defaults/visible lists. `CategorySelectionPolicy` now keeps a selected retired category visible only while editing older records, and新增记录的分类选择与分类管理保持一致。
 
 ## Performance
 
@@ -89,7 +91,7 @@ None - no external service configuration required.
 ## Next Phase Readiness
 - CAT-01 complete. DefaultCategories provides a clean, unified expenseCategories list.
 - Ready for CAT-02: drag-to-reorder category sorting with sh.calvin.reorderable library.
-- CategorySelectionPolicy.recordSelectionCandidates no longer imposes any legacy filtering — all categories appear uniformly.
+- Current follow-up state: CategorySelectionPolicy filters retired default secondary categories for new records; custom categories with the same names remain visible, and selected retired categories remain visible while editing older records.
 
 ---
 *Phase: 05-category-cleanup-reorder*

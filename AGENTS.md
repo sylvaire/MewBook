@@ -4,7 +4,7 @@
 
 - MewBook（喵喵记账）是单模块 Android 应用，模块名为 `app`。
 - 技术栈：Kotlin、Jetpack Compose、Material 3、Navigation Compose、Room、Hilt、DataStore、OkHttp、kotlinx-serialization。
-- 当前构建事实来自 `app/build.gradle.kts`：`minSdk = 26`、`targetSdk = 34`、`versionCode = 11`、`versionName = "1.0.10"`。
+- 当前构建事实来自 `app/build.gradle.kts`：`minSdk = 26`、`targetSdk = 34`、`versionCode = 13`、`versionName = "1.1.0"`。
 - 当前 Room 数据库事实来自 `MewBookDatabase.kt`：数据库名 `mewbook.db`，版本 `6`，`exportSchema = false`。
 
 ## Standard Commands
@@ -40,10 +40,11 @@ Unix-like shells:
 - Home: add/edit/delete records, with delete moving records to the local 30-day recycle bin; quick entry, record details, inline search, day/week/month period controls, optional overview cards.
 - Statistics: weekly/monthly/yearly charts, income/expense summaries, category breakdown, and category expense drilldown with record detail view, edit, and trash-backed delete feedback.
 - Assets and ledgers: account CRUD, ledger management, default ledger behavior, manual ordering, per-ledger default account initialization (`EnsureDefaultAccountForLedgerUseCase`).
-- Categories and budgets: flat one-level category management, total budgets, category budgets, multiple budget period types. Record-entry expense selection intentionally shows the familiar legacy primary categories while the stored category model stays flat.
+- Categories and budgets: flat one-level category management with retired default subcategory cleanup, expanded icon picker, manual ordering, total budgets, category budgets, and multiple budget period types. Record-entry category selection matches category management for new records and only keeps a retired selected category visible while editing older records.
+- Touch feedback: DataStore-backed haptic feedback covers the amount keyboard, settings interactions, period selection, quick-entry actions, and other suitable taps; the setting is labeled "触感反馈".
 - Recurring templates: fixed income/expense templates with schedule policy and usage guidance.
 - Migration and data exchange: local backup/restore, CSV/JSON export, external import preview, smart import. Recycle-bin records stay local-only and are excluded from normal backup exports; full restore and clear-all-data clear `deleted_records`.
-- Sync and update: WebDAV sync/backup flows with server config dialog, manual DAV export with optional custom file names (auto-prefixed `manual_`), manual remote backup selection for restore, daily first-open DAV auto-backup with single retry and 60s prune timeout, import safety backup to local storage, GitHub Release update check with snooze/disable support, APK download, and installer handoff.
+- Sync and update: WebDAV sync/backup flows with server config dialog, manual DAV export with optional custom file names (auto-prefixed `manual_`), manual remote backup selection for restore, daily first-open DAV auto-backup with single retry and 60s prune timeout, import safety backup to local storage, GitHub Release update check with snooze/disable support, APK download, installer handoff, and a version-details dialog that contains the project GitHub link plus the manual update action.
 
 ## Safety Notes
 

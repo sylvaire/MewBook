@@ -1,7 +1,9 @@
 # Phase 4: 震动反馈 - Context
 
+> 2026-05-29 follow-up: this planning context captured the original keyboard-only scope. Current v1.1.0 behavior labels the setting as "触感反馈", uses `HapticFeedbackType.LongPress` through `MewHapticFeedback`, and extends the same preference to settings interactions, period selection, quick-entry actions, dialogs, and external-link taps.
+
 **Gathered:** 2026-05-26
-**Status:** Ready for planning
+**Status:** Historical context; superseded by v1.1.0 polish notes
 
 <domain>
 ## Phase Boundary

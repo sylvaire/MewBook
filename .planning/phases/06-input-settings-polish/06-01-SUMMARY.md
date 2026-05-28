@@ -8,7 +8,7 @@ tags: [compose, focusrequester, intent, settings]
 requires: []
 provides:
   - Auto-focus note editor via FocusRequester when NoteEditorDialog opens
-  - Clickable version card in Settings that opens GitHub repo in browser
+  - Clickable version card in Settings; 2026-05-29 follow-up opens an app-details dialog instead of directly opening the browser
 affects: [settings, add-record]
 
 # Tech tracking
@@ -26,7 +26,7 @@ key-files:
     - app/src/main/java/com/mewbook/app/ui/screens/settings/SettingsScreen.kt
 
 key-decisions:
-  - "GitHub URL click uses Intent.ACTION_VIEW directly (pure UI layer, no ViewModel)"
+  - "Superseded by v1.1.0 polish: version card opens AppInfoDialog; the GitHub repository link lives inside the dialog"
 
 patterns-established:
   - "Clickable card: Modifier.then(if (onClick != null) Modifier.clip().clickable() else Modifier)"
@@ -40,7 +40,9 @@ completed: 2026-05-26
 
 # Phase 6 Plan 1: 输入与设置收尾 Summary
 
-**NoteEditorDialog auto-focuses text field on open, triggering keyboard; Settings version card opens sylvaire/MewBook GitHub repo in browser**
+**NoteEditorDialog auto-focuses text field on open, triggering keyboard; Settings version card is now the app-details entry point**
+
+> 2026-05-29 follow-up: the version card no longer opens the browser directly. It now opens `AppInfoDialog`, which displays app/version/build/update details, the project GitHub link, and the manual "检查更新" action.
 
 ## Performance
 
@@ -53,7 +55,7 @@ completed: 2026-05-26
 ## Accomplishments
 - NoteEditorDialog now requests focus automatically when opened, so the user's keyboard appears without a manual tap
 - SettingsSummaryCard gained an optional onClick parameter, making it clickable when a handler is provided
-- Settings version card ("喵喵记账") now opens the GitHub repo (sylvaire/MewBook) in the browser via Intent.ACTION_VIEW
+- Original Phase 6 behavior made the Settings version card ("喵喵记账") open the GitHub repo in the browser; v1.1.0 polish replaced that with an app-details dialog and moved the repository link into the dialog
 
 ## Task Commits
 
@@ -65,10 +67,10 @@ Each task was committed atomically:
 ## Files Created/Modified
 - `app/src/main/java/com/mewbook/app/ui/screens/add/AddEditRecordSheet.kt` - Added FocusRequester + LaunchedEffect in NoteEditorDialog; OutlinedTextField now uses .focusRequester()
 - `app/src/main/java/com/mewbook/app/ui/components/SettingsLayout.kt` - Added onClick: (() -> Unit)? = null to SettingsSummaryCard; clickable wrapper via .then() modifier chain
-- `app/src/main/java/com/mewbook/app/ui/screens/settings/SettingsScreen.kt` - Added GITHUB_REPO_URL constant, LocalContext, and Intent.ACTION_VIEW onClick for version card
+- `app/src/main/java/com/mewbook/app/ui/screens/settings/SettingsScreen.kt` - Originally added direct GitHub opening; v1.1.0 polish now uses `PROJECT_REPOSITORY_URL`, `LocalUriHandler`, and `AppInfoDialog`
 
 ## Decisions Made
-- GitHub URL click bypasses ViewModel entirely — it's a pure UI-layer action (open browser). No architectural decision needed.
+- Current state: version details remain a UI-layer interaction; manual update checks still route through the existing update ViewModel callbacks.
 
 ## Deviations from Plan
 
@@ -76,7 +78,7 @@ None — plan executed exactly as written.
 
 ## Issues Encountered
 
-- **Pre-existing build failure in CategoriesScreen.kt:264** (`Unresolved reference: draggableHandle`): This is unrelated to Phase 06 changes and was present before this plan. It causes `./gradlew assembleDebug` to fail, but does not affect the correctness of the auto-focus or GitHub click features. Logged to `deferred-items.md`.
+- **Resolved by later work:** the earlier `CategoriesScreen.kt` build failure is no longer present. The 2026-05-29 release verification passed `testDebugUnitTest :app:lintDebug :app:assembleDebug :app:assembleRelease`.
 
 ## Known Stubs
 
@@ -84,7 +86,7 @@ None — all changes are fully wired and functional.
 
 ## Threat Flags
 
-None — no new security surface introduced. Intent.ACTION_VIEW opens an external browser for a hardcoded public URL.
+None — the project repository URL is still a hardcoded public URL, now opened from the app-details dialog.
 
 ## User Setup Required
 

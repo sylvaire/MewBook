@@ -22,7 +22,7 @@ key-files:
 decisions:
   - "sortOrder uses continuous integer assignment (0, 1, 2...) per CONTEXT.md decision"
   - "moveCategoryUp/moveCategoryDown preserved as programmatic entry points, delegate to moveCategory"
-  - "DragHandle icon placed left of category icon with Modifier.draggableHandle()"
+  - "Original implementation used Modifier.draggableHandle(); 2026-05-29 follow-up removed the stale modifier reference while keeping the DragHandle affordance"
 duration: "~20min"
 completed-date: 2026-05-26
 ---
@@ -30,6 +30,8 @@ completed-date: 2026-05-26
 # Phase 5 Plan 2: Drag Reorder Summary
 
 **One-liner:** Category list supports long-press drag reorder via sh.calvin.reorderable library, replacing arrow buttons with DragHandle icon and persisting sortOrder via batch Room updates.
+
+> 2026-05-29 follow-up: current `CategoriesScreen.kt` no longer references `Modifier.draggableHandle()`. The earlier unresolved `draggableHandle` build issue is resolved; release verification passed `testDebugUnitTest :app:lintDebug :app:assembleDebug :app:assembleRelease`.
 
 ## Tasks Executed
 
@@ -59,7 +61,7 @@ Added the `sh.calvin.reorderable:reorderable:2.2.0` dependency and built the bat
 **Commit:** `d8cda90`
 
 - Removed `KeyboardArrowUp` and `KeyboardArrowDown` imports and usage
-- Added `DragHandle`, `ReorderableItem`, `rememberReorderableLazyListState`, `reorderable`, `draggableHandle` imports
+- Added `DragHandle`, `ReorderableItem`, `rememberReorderableLazyListState`, `reorderable`, and originally `draggableHandle` imports; the stale `draggableHandle` reference was removed in later polish
 - Added `currentType` variable derived from selected tab index
 - Created `rememberReorderableLazyListState` with `onMove` callback wired to `viewModel.moveCategory()`
 - Updated LazyColumn to use `reorderableState.listState` and `Modifier.reorderable(reorderableState)`
@@ -67,7 +69,7 @@ Added the `sh.calvin.reorderable:reorderable:2.2.0` dependency and built the bat
 - Replaced `CategoryRowItem` call with `ReorderableItem` wrapping `CategoryItemCard` directly
 - Removed `CategoryRowItem` composable function entirely
 - Simplified `CategoryItemCard` signature from 6 params to 2 params (`category`, `onEditClick`)
-- Added DragHandle icon with `Modifier.draggableHandle()` on the left side of each card row
+- Added a DragHandle affordance on the left side of each card row
 - Removed the right-side arrow button column
 
 ## Deviations from Plan

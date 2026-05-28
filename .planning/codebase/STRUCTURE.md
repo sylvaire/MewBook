@@ -29,7 +29,7 @@ MewBook/
 | `data/smartimport/` | OpenAI 兼容智能导入、配置存储、AI 响应解析 |
 | `data/update/` | GitHub Release 更新检查与 APK 下载 |
 | `domain/model/` | 领域模型 |
-| `domain/policy/` | 可单测业务规则，如首页搜索、预算、周期模板、DAV 自动备份、更新选择、回收站 30 天保留策略 |
+| `domain/policy/` | 可单测业务规则，如首页搜索、预算、分类选择、触感反馈、周期模板、DAV 自动备份、更新选择、回收站 30 天保留策略 |
 | `domain/repository/` | Repository 接口 |
 | `domain/usecase/` | `account/`、`category/`、`dav/`、`ledger/`、`record/` 等 |
 | `ui/navigation/` | `NavHost.kt`、`Screen.kt` |

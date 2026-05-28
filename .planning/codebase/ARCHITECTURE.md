@@ -24,8 +24,9 @@
 
 - `MainActivity` 注入 `ThemeViewModel`，从 DataStore 读取 `AppThemeMode`，在 `MewBookTheme` 外层控制浅色/深色/跟随系统。
 - 启动背景由系统 launch theme 承担；`MainActivity` 不再额外叠加 Compose 启动遮罩。
-- `MainActivity` 同时持有 `AppUpdateViewModel`，负责 GitHub Release 更新弹窗、下载进度、安装权限与系统安装器 handoff。
+- `MainActivity` 同时持有 `AppUpdateViewModel`，负责 GitHub Release 更新弹窗、下载进度、安装权限与系统安装器 handoff。设置页版本卡片打开 `AppInfoDialog`，弹窗内展示项目 GitHub 仓库链接并承载手动检查更新入口。
 - `MainActivity.onStart` 触发 `DavAutoBackupCoordinator`，在 DAV 自动备份开启时每天首次进入前台上传一次备份。
+- 触感反馈由 `HapticPreferencesRepository` 的 DataStore 开关驱动，通过 `HapticFeedbackPolicy` 与 `rememberMewHapticFeedback` 统一控制记账键盘、设置交互、周期选择和快捷入口等点击反馈。
 
 ## 并发
 
@@ -36,7 +37,7 @@
 ## 数据边界
 
 - Room 实体与领域模型在 Repository 实现中映射；当前数据库版本为 `6`。
-- 分类持久化为单层模型，`CategoryEntity` 与 `BackupCategory` 不再保存父子层级字段；旧备份/CSV 中的子分类按最终分类名兼容导入。
+- 分类持久化为单层模型，`CategoryEntity` 与 `BackupCategory` 不再保存父子层级字段；默认旧二级分类已从当前分类集合退休，旧备份/CSV 中的子分类按最终分类名兼容导入。新增记录的分类选择与分类管理的可见分类保持一致，编辑旧记录时保留当前已选退休分类。
 - 删除找回使用独立 `deleted_records` 表保存记录快照与 `deletedAt`，不对 `records` 做软删除。删除时从活跃流水移入回收站并回滚账户余额，恢复时写回活跃流水并恢复账户余额。
 - 备份/迁移逻辑在 `data.backup` 与数据库版本演进中体现；新增实体或字段时同步更新备份模型、迁移与测试。回收站记录保持本地 30 天语义，不参与普通备份导出；完整恢复和清除数据会清空 `deleted_records`。
 - 导入恢复前自动创建本地安全备份（`context.filesDir/safety_backups/`），最多保留 3 份。

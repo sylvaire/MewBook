@@ -26,6 +26,17 @@ import kotlinx.coroutines.launch
 import java.time.LocalDateTime
 import javax.inject.Inject
 
+data class DavSyncOperationSummary(
+    val title: String,
+    val status: String,
+    val time: LocalDateTime,
+    val fileName: String? = null,
+    val remoteBackupCount: Int? = null,
+    val conflictCount: Int? = null,
+    val detail: String? = null,
+    val isError: Boolean = false
+)
+
 data class DavSettingsUiState(
     val serverUrl: String = "",
     val username: String = "",
@@ -47,6 +58,7 @@ data class DavSettingsUiState(
     val importPreview: BackupRestorePreview? = null,
     val autoBackupStatus: DavAutoBackupStatus = DavAutoBackupStatus(),
     val isRetrying: Boolean = false,
+    val lastOperation: DavSyncOperationSummary? = null,
     val message: String? = null
 )
 
@@ -116,8 +128,9 @@ class DavSettingsViewModel @Inject constructor(
     fun updateIsEnabled(enabled: Boolean) {
         _uiState.update { it.copy(isEnabled = enabled, message = null) }
         viewModelScope.launch {
-            val existing = getDavConfigUseCase.getOnce() ?: return@launch
-            saveDavConfigUseCase(existing.copy(isEnabled = enabled))
+            val existing = getDavConfigUseCase.getOnce()
+            val updatedConfig = existing?.copy(isEnabled = enabled) ?: currentConfig(isEnabled = enabled)
+            saveDavConfigUseCase(updatedConfig)
         }
     }
 
@@ -131,17 +144,18 @@ class DavSettingsViewModel @Inject constructor(
 
     fun saveConfig() {
         viewModelScope.launch {
-            val state = _uiState.value
-            val config = DavConfig(
-                serverUrl = state.serverUrl,
-                username = state.username,
-                password = state.password,
-                remotePath = state.remotePath,
-                isEnabled = state.isEnabled,
-                lastSyncTime = state.lastSyncTime
-            )
-            saveDavConfigUseCase(config)
-            _uiState.update { it.copy(message = "配置已保存") }
+            saveDavConfigUseCase(currentConfig())
+            _uiState.update {
+                it.copy(
+                    lastOperation = DavSyncOperationSummary(
+                        title = "服务器配置",
+                        status = "已保存",
+                        time = LocalDateTime.now(),
+                        detail = "远程路径：${it.remotePath}"
+                    ),
+                    message = "配置已保存"
+                )
+            }
         }
     }
 
@@ -150,18 +164,19 @@ class DavSettingsViewModel @Inject constructor(
             _uiState.update { it.copy(isTesting = true, message = null) }
             val state = _uiState.value
             if (BuildConfig.DEBUG) Log.d(TAG, "testConnection serverUrl=${state.serverUrl} remotePath=${state.remotePath}")
-            val config = DavConfig(
-                serverUrl = state.serverUrl,
-                username = state.username,
-                password = state.password,
-                remotePath = state.remotePath
-            )
-
-            val result = testConnectionUseCase(config)
+            val result = testConnectionUseCase(currentConfig())
+            val errorMessage = result.exceptionOrNull()?.message
             _uiState.update {
                 it.copy(
                     isTesting = false,
-                    message = if (result.isSuccess) "连接成功！" else "连接失败: ${result.exceptionOrNull()?.message}"
+                    lastOperation = DavSyncOperationSummary(
+                        title = "连接测试",
+                        status = if (result.isSuccess) "连接成功" else "连接失败",
+                        time = LocalDateTime.now(),
+                        detail = if (result.isSuccess) "服务器可访问，认证通过" else errorMessage,
+                        isError = result.isFailure
+                    ),
+                    message = if (result.isSuccess) "连接成功！" else "连接失败: $errorMessage"
                 )
             }
         }
@@ -196,22 +211,25 @@ class DavSettingsViewModel @Inject constructor(
             }
             val state = _uiState.value
             if (BuildConfig.DEBUG) Log.d(TAG, "exportData serverUrl=${state.serverUrl} remotePath=${state.remotePath}")
-            val config = DavConfig(
-                serverUrl = state.serverUrl,
-                username = state.username,
-                password = state.password,
-                remotePath = state.remotePath
-            )
             val requestedFileName = state.exportFileNameInput.trim().takeIf { it.isNotEmpty() }
 
-            val result = exportDataUseCase(config, requestedFileName)
+            val result = exportDataUseCase(currentConfig(), requestedFileName)
+            val errorMessage = result.exceptionOrNull()?.message
             _uiState.update {
                 val syncedAt = if (result.isSuccess) LocalDateTime.now() else it.lastSyncTime
                 it.copy(
                     isExporting = false,
                     exportFileNameInput = "",
                     lastSyncTime = syncedAt,
-                    message = if (result.isSuccess) "导出成功！" else "导出失败: ${result.exceptionOrNull()?.message}"
+                    lastOperation = DavSyncOperationSummary(
+                        title = "手动导出",
+                        status = if (result.isSuccess) "导出成功" else "导出失败",
+                        time = LocalDateTime.now(),
+                        fileName = requestedFileName?.let(::displayManualFileName) ?: "默认备份文件名",
+                        detail = if (result.isSuccess) "已上传到远程路径 ${state.remotePath}" else errorMessage,
+                        isError = result.isFailure
+                    ),
+                    message = if (result.isSuccess) "导出成功！" else "导出失败: $errorMessage"
                 )
             }
         }
@@ -231,20 +249,23 @@ class DavSettingsViewModel @Inject constructor(
             }
             val state = _uiState.value
             if (BuildConfig.DEBUG) Log.d(TAG, "previewImportData serverUrl=${state.serverUrl} remotePath=${state.remotePath}")
-            val config = DavConfig(
-                serverUrl = state.serverUrl,
-                username = state.username,
-                password = state.password,
-                remotePath = state.remotePath
-            )
-
-            val result = listBackupFilesUseCase(config)
+            val result = listBackupFilesUseCase(currentConfig())
+            val backupFiles = result.getOrNull().orEmpty()
+            val errorMessage = result.exceptionOrNull()?.message
             _uiState.update {
                 it.copy(
                     isLoadingBackupFiles = false,
-                    backupFiles = result.getOrNull().orEmpty(),
+                    backupFiles = backupFiles,
                     showBackupFilePicker = result.isSuccess,
-                    message = if (result.isSuccess) null else "备份列表加载失败: ${result.exceptionOrNull()?.message}"
+                    lastOperation = DavSyncOperationSummary(
+                        title = "备份列表",
+                        status = if (result.isSuccess) "已加载" else "加载失败",
+                        time = LocalDateTime.now(),
+                        remoteBackupCount = if (result.isSuccess) backupFiles.size else null,
+                        detail = if (result.isSuccess) "请选择要恢复的远程备份" else errorMessage,
+                        isError = result.isFailure
+                    ),
+                    message = if (result.isSuccess) null else "备份列表加载失败: $errorMessage"
                 )
             }
         }
@@ -261,21 +282,28 @@ class DavSettingsViewModel @Inject constructor(
                     importPreview = null
                 )
             }
-            val state = _uiState.value
             if (BuildConfig.DEBUG) Log.d(TAG, "previewImportData selected=${backupFile.fileUrl}")
-            val config = DavConfig(
-                serverUrl = state.serverUrl,
-                username = state.username,
-                password = state.password,
-                remotePath = state.remotePath
-            )
-
-            val result = previewImportDataUseCase(config, backupFile)
+            val result = previewImportDataUseCase(currentConfig(), backupFile)
+            val preview = result.getOrNull()
+            val errorMessage = result.exceptionOrNull()?.message
             _uiState.update {
                 it.copy(
                     isPreviewingImport = false,
-                    importPreview = result.getOrNull(),
-                    message = if (result.isSuccess) null else "导入预览失败: ${result.exceptionOrNull()?.message}"
+                    importPreview = preview,
+                    lastOperation = DavSyncOperationSummary(
+                        title = "导入预览",
+                        status = if (result.isSuccess) "预览完成" else "预览失败",
+                        time = LocalDateTime.now(),
+                        fileName = backupFile.displayName,
+                        conflictCount = preview?.conflicts?.totalConflicts,
+                        detail = if (result.isSuccess) {
+                            "导入将采用远端备份覆盖本地数据策略"
+                        } else {
+                            errorMessage
+                        },
+                        isError = result.isFailure
+                    ),
+                    message = if (result.isSuccess) null else "导入预览失败: $errorMessage"
                 )
             }
         }
@@ -286,26 +314,28 @@ class DavSettingsViewModel @Inject constructor(
             _uiState.update { it.copy(isImporting = true, message = null) }
             val state = _uiState.value
             if (BuildConfig.DEBUG) Log.d(TAG, "importData serverUrl=${state.serverUrl} remotePath=${state.remotePath}")
-            val config = DavConfig(
-                serverUrl = state.serverUrl,
-                username = state.username,
-                password = state.password,
-                remotePath = state.remotePath
-            )
-
             val selectedBackupFile = state.selectedImportBackupFile
             val result = if (selectedBackupFile == null) {
-                importDataUseCase(config)
+                importDataUseCase(currentConfig())
             } else {
-                importDataUseCase(config, selectedBackupFile)
+                importDataUseCase(currentConfig(), selectedBackupFile)
             }
+            val errorMessage = result.exceptionOrNull()?.message
             _uiState.update {
                 val syncedAt = if (result.isSuccess) LocalDateTime.now() else it.lastSyncTime
                 it.copy(
                     isImporting = false,
                     lastSyncTime = syncedAt,
                     selectedImportBackupFile = if (result.isSuccess) null else selectedBackupFile,
-                    message = if (result.isSuccess) "导入成功！" else "导入失败: ${result.exceptionOrNull()?.message}"
+                    lastOperation = DavSyncOperationSummary(
+                        title = "手动导入",
+                        status = if (result.isSuccess) "导入成功" else "导入失败",
+                        time = LocalDateTime.now(),
+                        fileName = selectedBackupFile?.displayName ?: "最新备份",
+                        detail = if (result.isSuccess) "本地数据已按远端备份完成恢复" else errorMessage,
+                        isError = result.isFailure
+                    ),
+                    message = if (result.isSuccess) "导入成功！" else "导入失败: $errorMessage"
                 )
             }
         }
@@ -334,8 +364,35 @@ class DavSettingsViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isRetrying = true, message = null) }
             davAutoBackupCoordinator.retry()
-            _uiState.update { it.copy(isRetrying = false) }
+            _uiState.update {
+                it.copy(
+                    isRetrying = false,
+                    lastOperation = DavSyncOperationSummary(
+                        title = "自动备份重试",
+                        status = "已触发",
+                        time = LocalDateTime.now(),
+                        detail = "最新结果会同步到自动备份状态"
+                    )
+                )
+            }
         }
+    }
+
+    private fun currentConfig(isEnabled: Boolean = _uiState.value.isEnabled): DavConfig {
+        val state = _uiState.value
+        return DavConfig(
+            serverUrl = state.serverUrl,
+            username = state.username,
+            password = state.password,
+            remotePath = state.remotePath,
+            isEnabled = isEnabled,
+            lastSyncTime = state.lastSyncTime
+        )
+    }
+
+    private fun displayManualFileName(fileName: String): String {
+        val normalized = if (fileName.endsWith(".json", ignoreCase = true)) fileName else "$fileName.json"
+        return if (normalized.startsWith("manual_", ignoreCase = true)) normalized else "manual_$normalized"
     }
 
     fun clearMessage() {

@@ -114,6 +114,12 @@ fun DavSettingsScreen(
                         Spacer(modifier = Modifier.height(8.dp))
                     }
                     Text("导入会覆盖当前本地数据，建议先执行一次本地备份。")
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "冲突策略：远端备份覆盖本地数据",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
                         text = "当前数据：记录 ${preview.current.records}、分类 ${preview.current.categories}、账户 ${preview.current.accounts}、预算 ${preview.current.budgets}、模板 ${preview.current.templates}、账本 ${preview.current.ledgers}",
@@ -205,20 +211,10 @@ fun DavSettingsScreen(
                 description = "自动备份状态和手动导入导出集中在这里。"
             )
 
-            // Last sync status
-            SettingsSurfaceCard {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
-                        text = if (uiState.lastSyncTime != null) {
-                            "上次同步: ${uiState.lastSyncTime!!.format(DateTimeFormatter.ofPattern("yyyy年MM月dd日 HH:mm"))}"
-                        } else {
-                            "尚未同步"
-                        },
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
+            LastDavSyncDetailsCard(
+                lastSyncTime = uiState.lastSyncTime,
+                operation = uiState.lastOperation
+            )
 
             // Auto-backup toggle
             SettingsSwitchRowCard(
@@ -308,9 +304,97 @@ fun DavSettingsScreen(
                                 "2. 支持 Nextcloud、群晖等 WebDAV 服务\n" +
                                 "3. 开启\"打开 App 自动备份\"后，每天首次进入前台自动备份\n" +
                                 "4. 点击\"导出到DAV\"可自定义文件名，留空使用默认文件名\n" +
-                                "5. 点击\"从DAV导入\"可手动选择服务器上的备份恢复数据",
+                                "5. 点击\"从DAV导入\"可手动选择服务器上的备份恢复数据\n" +
+                                "6. 同步概览会显示最近操作、文件名、备份数量和冲突提示",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onTertiaryContainer
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun LastDavSyncDetailsCard(
+    lastSyncTime: java.time.LocalDateTime?,
+    operation: DavSyncOperationSummary?
+) {
+    val formatter = remember { DateTimeFormatter.ofPattern("yyyy年MM月dd日 HH:mm") }
+    SettingsSurfaceCard {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = "同步概览",
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = if (lastSyncTime != null) {
+                    "最近成功同步：${lastSyncTime.format(formatter)}"
+                } else {
+                    "最近成功同步：尚未同步"
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            if (operation == null) {
+                Text(
+                    text = "完成连接测试、导出、导入或备份列表加载后，这里会显示最近操作结果。",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            } else {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "最近操作：${operation.title} · ${operation.status}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = if (operation.isError) {
+                        MaterialTheme.colorScheme.error
+                    } else {
+                        MaterialTheme.colorScheme.primary
+                    }
+                )
+                Text(
+                    text = "操作时间：${operation.time.format(formatter)}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                operation.fileName?.let { fileName ->
+                    Text(
+                        text = "文件：$fileName",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                operation.remoteBackupCount?.let { count ->
+                    Text(
+                        text = "远程备份：${count} 个可用文件",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                operation.conflictCount?.let { count ->
+                    Text(
+                        text = "可能冲突：${count} 项",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (count > 0) {
+                            MaterialTheme.colorScheme.error
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        }
+                    )
+                }
+                operation.detail?.takeIf { it.isNotBlank() }?.let { detail ->
+                    Text(
+                        text = detail,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (operation.isError) {
+                            MaterialTheme.colorScheme.error
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        }
                     )
                 }
             }

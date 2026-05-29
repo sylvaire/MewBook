@@ -3,7 +3,7 @@
 **Defined:** 2026-05-26
 **Core Value:** 本地记账应用，核心操作（记账、分类、设置）交互流畅无阻碍
 
-## v1.1.0 Requirements
+## v1.1.0 Requirements (Archived)
 
 Requirements for milestone v1.1.0: 发布打磨、分类管理一致性、设置入口收敛与触感反馈扩展。
 
@@ -63,4 +63,4 @@ Requirements for milestone v1.1.0: 发布打磨、分类管理一致性、设置
 
 ---
 *Requirements defined: 2026-05-26*
-*Last updated: 2026-05-29 after local v1.1.0 release prep*
+*Last updated: 2026-05-29 after v1.1.0 milestone archive*

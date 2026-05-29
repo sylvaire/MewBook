@@ -1,6 +1,6 @@
 # Roadmap
 
-**Milestone:** v1.1.0 -- 发布打磨与交互优化
+**Milestone:** v1.1.0 -- 发布打磨与交互优化 (archived 2026-05-29)
 
 ## Phases
 
@@ -85,3 +85,8 @@ Plans:
 | 5. 分类清理与拖拽排序 | 2/2 | Complete | 2026-05-26 |
 | 6. 输入与设置收尾 | 1/1 | Complete   | 2026-05-26 |
 | 7. v1.1.0 发布打磨 | ad hoc polish | Complete | 2026-05-29 |
+
+## Archive
+
+- Milestone archive: `.planning/archive/milestones/v1.1.0.md`
+- Status: implementation complete, locally verified, locally tagged, remote publication pending valid GitHub credentials or SSH host-key access.

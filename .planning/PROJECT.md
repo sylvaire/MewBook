@@ -4,7 +4,9 @@
 
 MewBook：Android 本地记账应用（Kotlin、Jetpack Compose、Room、Hilt）。核心能力包括流水、单层分类、账本、资产、预算、周期模板、统计下钻、删除找回、WebDAV 同步、自动备份、备份导出、智能导入与应用内更新。
 
-## 当前里程碑：v1.1.0 发布打磨与交互优化
+## 当前里程碑：无活动里程碑
+
+最近完成并归档：v1.1.0 发布打磨与交互优化（归档见 `.planning/archive/milestones/v1.1.0.md`）。
 
 **Goal:** 提升记账、分类管理和设置等核心操作的交互体验
 
@@ -17,7 +19,7 @@ MewBook：Android 本地记账应用（Kotlin、Jetpack Compose、Room、Hilt）
 
 ## 当前状态（2026-05-29）
 
-v1.1.0 发布打磨已完成本地实现、验证、知识库收尾提交与本地 tag。标准验证通过：`testDebugUnitTest :app:lintDebug :app:assembleDebug :app:assembleRelease`。
+v1.1.0 发布打磨已完成本地实现、验证、知识库收尾、GSD 归档与本地 tag。标准验证通过：`testDebugUnitTest :app:lintDebug :app:assembleDebug :app:assembleRelease`。
 
 本地 `v1.1.0` tag 当前指向最新本地 HEAD；应用实现验证提交为：`06c7556`，其后追加了知识库收尾提交。远端发布尚未完成，因为当前环境的 GitHub token 无效且 sandbox 内 SSH 访问 `known_hosts` 被拒绝，需要在可用凭据/SSH 环境中推送分支和 tag。
 
@@ -58,4 +60,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-05-29 after local v1.1.0 release prep*
+*Last updated: 2026-05-29 after v1.1.0 milestone archive*

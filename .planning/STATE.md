@@ -2,14 +2,16 @@
 
 ## Current Position
 
-Phase: Phase 7 — v1.1.0 发布打磨
-Plan: ad hoc polish and release prep complete
-Status: 本地实现、验证、知识库收尾提交与 tag 已完成；远端推送/发布待可用 GitHub 凭据或 SSH 环境
-Last activity: 2026-05-29 — 分类管理、版本详情、触感反馈与 1.1.0 发布资料完成验证
+Phase: None — v1.1.0 milestone archived
+Plan: No active plan
+Status: v1.1.0 本地实现、验证、知识库收尾、GSD 归档与 tag 已完成；远端推送/发布待可用 GitHub 凭据或 SSH 环境
+Last activity: 2026-05-29 — v1.1.0 milestone archived at `.planning/archive/milestones/v1.1.0.md`
 
 ## 当前里程碑
 
-v1.1.0: 发布打磨与交互优化
+无活动里程碑。
+
+最近归档：v1.1.0 发布打磨与交互优化（`.planning/archive/milestones/v1.1.0.md`）
 
 **Phases:**
 - [x] Phase 4: 震动反馈 (HAPT-01, HAPT-02)
@@ -27,6 +29,7 @@ v1.1.0: 发布打磨与交互优化
 - [x] “按键震动”升级为“触感反馈”，覆盖数字键盘、设置行/开关/弹窗、周期选择、首页快捷入口等合适点击事件，并新增 `HapticFeedbackPolicyTest`。
 - [x] 版本升级为 `versionName = "1.1.0"`、`versionCode = 13`，README 与 `.github/workflows/release.yml` release body 已同步。
 - [x] 本地应用实现验证提交 `06c7556` 已创建；其后追加知识库收尾提交，且本地 `v1.1.0` tag 指向最新本地 HEAD。
+- [x] GSD 里程碑归档已写入 `.planning/archive/milestones/v1.1.0.md`。
 
 ## 验证
 

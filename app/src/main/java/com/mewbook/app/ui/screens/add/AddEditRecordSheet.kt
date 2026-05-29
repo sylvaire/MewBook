@@ -173,6 +173,7 @@ fun AddEditRecordSheet(
     val showKeyboard = isKeyboardVisible && selectedCategory != null
     val actionTint = if (selectedType == RecordType.EXPENSE) ExpenseRed else IncomeGreen
     val keyboardSurfaceColor = if (selectedType == RecordType.EXPENSE) Color(0xFF4B2B1F) else Color(0xFF1F4332)
+    val hapticFeedback = rememberMewHapticFeedback(keyPressHapticEnabled)
     val density = LocalDensity.current
     val collapseKeyboardInteraction = remember { MutableInteractionSource() }
 
@@ -213,7 +214,12 @@ fun AddEditRecordSheet(
             )
         ) {
             Column(modifier = Modifier.fillMaxSize().statusBarsPadding()) {
-                AddRecordHeader(editingRecord != null, onDismiss, editingRecord?.let { { onDelete(it.id) } })
+                AddRecordHeader(
+                    isEditing = editingRecord != null,
+                    hapticFeedbackEnabled = keyPressHapticEnabled,
+                    onDismiss = onDismiss,
+                    onDelete = editingRecord?.let { { onDelete(it.id) } }
+                )
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -232,13 +238,28 @@ fun AddEditRecordSheet(
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                        SegmentedButton(selectedType == RecordType.EXPENSE, { selectedTypeName = RecordType.EXPENSE.name }, SegmentedButtonDefaults.itemShape(0, 2)) { Text("支出") }
-                        SegmentedButton(selectedType == RecordType.INCOME, { selectedTypeName = RecordType.INCOME.name }, SegmentedButtonDefaults.itemShape(1, 2)) { Text("收入") }
+                        SegmentedButton(
+                            selected = selectedType == RecordType.EXPENSE,
+                            onClick = {
+                                hapticFeedback.perform(HapticFeedbackPolicy.Interaction.Selection)
+                                selectedTypeName = RecordType.EXPENSE.name
+                            },
+                            shape = SegmentedButtonDefaults.itemShape(0, 2)
+                        ) { Text("支出") }
+                        SegmentedButton(
+                            selected = selectedType == RecordType.INCOME,
+                            onClick = {
+                                hapticFeedback.perform(HapticFeedbackPolicy.Interaction.Selection)
+                                selectedTypeName = RecordType.INCOME.name
+                            },
+                            shape = SegmentedButtonDefaults.itemShape(1, 2)
+                        ) { Text("收入") }
                     }
                     CategoryPanel(
                         categories = displayCategories,
                         selectedCategory = selectedCategory,
                         selectedCategoryId = selectedCategoryId,
+                        hapticFeedbackEnabled = keyPressHapticEnabled,
                         modifier = Modifier.weight(1f),
                         onCategorySelected = {
                             selectedCategoryId = it.id
@@ -295,13 +316,21 @@ fun AddEditRecordSheet(
             onDismissRequest = { showDatePicker = false },
             confirmButton = {
                 TextButton(onClick = {
+                    hapticFeedback.perform(HapticFeedbackPolicy.Interaction.DialogAction)
                     datePickerState.selectedDateMillis?.let { millis ->
                         selectedDateEpochDay = Instant.ofEpochMilli(millis).atZone(ZoneId.systemDefault()).toLocalDate().toEpochDay()
                     }
                     showDatePicker = false
                 }) { Text("确定") }
             },
-            dismissButton = { TextButton(onClick = { showDatePicker = false }) { Text("取消") } }
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        hapticFeedback.perform(HapticFeedbackPolicy.Interaction.DialogAction)
+                        showDatePicker = false
+                    }
+                ) { Text("取消") }
+            }
         ) { DatePicker(state = datePickerState) }
     }
 
@@ -309,6 +338,7 @@ fun AddEditRecordSheet(
         NoteEditorDialog(
             value = noteDraft,
             onValueChange = { noteDraft = it },
+            hapticFeedbackEnabled = keyPressHapticEnabled,
             onDismiss = { showNoteDialog = false },
             onConfirm = { note = noteDraft.trim(); showNoteDialog = false }
         )
@@ -371,15 +401,22 @@ private fun AddRecordScreenSystemBarsEffect(
 @Composable
 private fun AddRecordHeader(
     isEditing: Boolean,
+    hapticFeedbackEnabled: Boolean,
     onDismiss: () -> Unit,
     onDelete: (() -> Unit)?
 ) {
+    val hapticFeedback = rememberMewHapticFeedback(hapticFeedbackEnabled)
     Row(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        IconButton(onClick = onDismiss) {
+        IconButton(
+            onClick = {
+                hapticFeedback.perform(HapticFeedbackPolicy.Interaction.DialogAction)
+                onDismiss()
+            }
+        ) {
             Icon(Icons.Filled.Close, contentDescription = "关闭")
         }
         Text(
@@ -388,7 +425,12 @@ private fun AddRecordHeader(
             fontWeight = FontWeight.Bold
         )
         if (onDelete != null) {
-            IconButton(onClick = onDelete) {
+            IconButton(
+                onClick = {
+                    hapticFeedback.perform(HapticFeedbackPolicy.Interaction.LongPressAction)
+                    onDelete()
+                }
+            ) {
                 Icon(Icons.Filled.Delete, contentDescription = "删除记录", tint = MaterialTheme.colorScheme.error)
             }
         } else {
@@ -501,9 +543,11 @@ private fun CategoryPanel(
     categories: List<Category>,
     selectedCategory: Category?,
     selectedCategoryId: Long,
+    hapticFeedbackEnabled: Boolean,
     modifier: Modifier = Modifier,
     onCategorySelected: (Category) -> Unit,
 ) {
+    val hapticFeedback = rememberMewHapticFeedback(hapticFeedbackEnabled)
     Surface(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(26.dp),
@@ -539,7 +583,10 @@ private fun CategoryPanel(
                     CategoryChip(
                         category = category,
                         isSelected = selectedCategoryId == category.id,
-                        onClick = { onCategorySelected(category) }
+                        onClick = {
+                            hapticFeedback.perform(HapticFeedbackPolicy.Interaction.Selection)
+                            onCategorySelected(category)
+                        }
                     )
                 }
             }
@@ -572,6 +619,7 @@ private fun KeyboardPanel(
     keyPressHapticEnabled: Boolean = true
 ) {
     var dragOffset by remember { mutableStateOf(0f) }
+    val hapticFeedback = rememberMewHapticFeedback(keyPressHapticEnabled)
     Surface(
         modifier = Modifier
             .fillMaxWidth()
@@ -614,12 +662,18 @@ private fun KeyboardPanel(
                 CompactInfoPill(
                     icon = Icons.Filled.CalendarMonth,
                     text = selectedDate.format(HeaderDateFormatter),
-                    onClick = onDateClick
+                    onClick = {
+                        hapticFeedback.perform(HapticFeedbackPolicy.Interaction.Selection)
+                        onDateClick()
+                    }
                 )
                 CompactInfoPill(
                     icon = Icons.Filled.EditNote,
                     text = note.ifBlank { "添加备注" },
-                    onClick = onNoteClick
+                    onClick = {
+                        hapticFeedback.perform(HapticFeedbackPolicy.Interaction.RowClick)
+                        onNoteClick()
+                    }
                 )
             }
             if (recentNotes.isNotEmpty()) {
@@ -627,7 +681,10 @@ private fun KeyboardPanel(
                     items(recentNotes, key = { it }, contentType = { "recent-note" }) { recentNote ->
                         FilterChip(
                             selected = note.trim() == recentNote,
-                            onClick = { onRecentNoteSelected(recentNote) },
+                            onClick = {
+                                hapticFeedback.perform(HapticFeedbackPolicy.Interaction.Selection)
+                                onRecentNoteSelected(recentNote)
+                            },
                             label = {
                                 Text(
                                     text = recentNote,
@@ -654,7 +711,10 @@ private fun KeyboardPanel(
                     items(accounts, key = { it.id }, contentType = { "account" }) { account ->
                         FilterChip(
                             selected = selectedAccountId == account.id,
-                            onClick = { onAccountSelected(account) },
+                            onClick = {
+                                hapticFeedback.perform(HapticFeedbackPolicy.Interaction.Selection)
+                                onAccountSelected(account)
+                            },
                             label = {
                                 Text(
                                     text = account.name,
@@ -760,10 +820,12 @@ private fun RowScope.KeyboardKey(
 private fun NoteEditorDialog(
     value: String,
     onValueChange: (String) -> Unit,
+    hapticFeedbackEnabled: Boolean,
     onDismiss: () -> Unit,
     onConfirm: () -> Unit
 ) {
     val focusRequester = remember { FocusRequester() }
+    val hapticFeedback = rememberMewHapticFeedback(hapticFeedbackEnabled)
     LaunchedEffect(Unit) { focusRequester.requestFocus() }
 
     AlertDialog(
@@ -781,10 +843,23 @@ private fun NoteEditorDialog(
             )
         },
         confirmButton = {
-            Button(onClick = onConfirm, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)) {
+            Button(
+                onClick = {
+                    hapticFeedback.perform(HapticFeedbackPolicy.Interaction.DialogAction)
+                    onConfirm()
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+            ) {
                 Text("保存")
             }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } }
+        dismissButton = {
+            TextButton(
+                onClick = {
+                    hapticFeedback.perform(HapticFeedbackPolicy.Interaction.DialogAction)
+                    onDismiss()
+                }
+            ) { Text("取消") }
+        }
     )
 }

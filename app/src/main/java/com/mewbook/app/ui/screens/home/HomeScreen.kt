@@ -81,6 +81,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -90,6 +91,7 @@ import com.mewbook.app.domain.model.Record
 import com.mewbook.app.domain.model.Category
 import com.mewbook.app.domain.policy.HapticFeedbackPolicy
 import com.mewbook.app.domain.policy.HomeScreenLayoutPolicy
+import com.mewbook.app.domain.policy.QuickEntryFabGesturePolicy
 import com.mewbook.app.ui.components.BudgetPeriodNavigator
 import com.mewbook.app.ui.components.MewSnackbarHost
 import com.mewbook.app.ui.components.RecordItem
@@ -107,6 +109,9 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.ZoneOffset
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 // ============================================
 // Warm Claymorphism Home Screen
@@ -218,6 +223,10 @@ fun HomeScreen(
                         viewModel.showAddSheet()
                     },
                     onLongPress = { showQuickFabMenu = true },
+                    onQuickDefaultClick = {
+                        showQuickFabMenu = false
+                        viewModel.showQuickAddSheet()
+                    },
                     onQuickExpenseClick = {
                         showQuickFabMenu = false
                         viewModel.showQuickAddSheet(RecordType.EXPENSE)
@@ -332,6 +341,7 @@ fun HomeScreen(
                                     null
                                 },
                                 scrollToDate = scrollToDate,
+                                hapticFeedbackEnabled = uiState.keyPressHapticEnabled,
                                 onRecordClick = { record -> viewModel.showRecordDetail(record) }
                             )
                         }
@@ -345,7 +355,8 @@ fun HomeScreen(
                 category = uiState.categories[browsingRecord.categoryId],
                 account = uiState.accounts.firstOrNull { account -> account.id == browsingRecord.accountId },
                 onDismiss = { viewModel.hideRecordDetail() },
-                onEdit = { record -> viewModel.editRecordFromDetail(record) }
+                onEdit = { record -> viewModel.editRecordFromDetail(record) },
+                hapticFeedbackEnabled = uiState.keyPressHapticEnabled
             )
         }
 
@@ -356,6 +367,11 @@ fun HomeScreen(
                 accounts = uiState.accounts,
                 defaultAccountId = uiState.defaultAccountId,
                 defaultDate = uiState.anchorDate,
+                quickAmountSuggestions = uiState.quickAmountSuggestions,
+                defaultCategoryId = uiState.quickDefaultCategoryId,
+                defaultAccountIdOverride = uiState.quickDefaultAccountId,
+                defaultAmount = uiState.quickDefaultAmount,
+                keyPressHapticEnabled = uiState.keyPressHapticEnabled,
                 onDismiss = { viewModel.hideAddEditSheet() },
                 onOpenFullEditor = { viewModel.expandQuickAddSheet() },
                 onSave = { amount, type, categoryId, note, date, accountId ->
@@ -597,10 +613,14 @@ private fun HomeFloatingAddButton(
     hapticFeedbackEnabled: Boolean,
     onAddClick: () -> Unit,
     onLongPress: () -> Unit,
+    onQuickDefaultClick: () -> Unit,
     onQuickExpenseClick: () -> Unit,
     onQuickIncomeClick: () -> Unit
 ) {
     val hapticFeedback = rememberMewHapticFeedback(hapticFeedbackEnabled)
+    val coroutineScope = rememberCoroutineScope()
+    var pendingTapAtMillis by remember { mutableStateOf<Long?>(null) }
+    var pendingSingleTapJob by remember { mutableStateOf<Job?>(null) }
     val iconRotation by animateFloatAsState(
         targetValue = if (isMenuExpanded) 45f else 0f,
         label = "homeFabIconRotation"
@@ -655,12 +675,39 @@ private fun HomeFloatingAddButton(
                     onClickLabel = "添加记录",
                     onLongClickLabel = "显示快速记账",
                     onLongClick = {
+                        pendingSingleTapJob?.cancel()
+                        pendingSingleTapJob = null
+                        pendingTapAtMillis = null
                         hapticFeedback.perform(HapticFeedbackPolicy.Interaction.LongPressAction)
                         onLongPress()
                     },
                     onClick = {
-                        hapticFeedback.perform(HapticFeedbackPolicy.Interaction.RowClick)
-                        onAddClick()
+                        val now = System.currentTimeMillis()
+                        when (QuickEntryFabGesturePolicy.resolveTap(pendingTapAtMillis, now)) {
+                            QuickEntryFabGesturePolicy.Result.DoubleTap -> {
+                                pendingSingleTapJob?.cancel()
+                                pendingSingleTapJob = null
+                                pendingTapAtMillis = null
+                                hapticFeedback.perform(HapticFeedbackPolicy.Interaction.RowClick)
+                                onQuickDefaultClick()
+                            }
+
+                            QuickEntryFabGesturePolicy.Result.SingleTap -> {
+                                pendingTapAtMillis = now
+                                pendingSingleTapJob?.cancel()
+                                pendingSingleTapJob = coroutineScope.launch {
+                                    delay(QuickEntryFabGesturePolicy.DOUBLE_TAP_WINDOW_MILLIS)
+                                    if (QuickEntryFabGesturePolicy.shouldRunPendingSingleTap(now, System.currentTimeMillis())) {
+                                        pendingTapAtMillis = null
+                                        pendingSingleTapJob = null
+                                        hapticFeedback.perform(HapticFeedbackPolicy.Interaction.RowClick)
+                                        onAddClick()
+                                    }
+                                }
+                            }
+
+                            QuickEntryFabGesturePolicy.Result.LongPress -> Unit
+                        }
                     }
                 ),
             shape = CircleShape,
@@ -851,6 +898,7 @@ private fun HomeRecordList(
     modifier: Modifier = Modifier,
     headerContent: (@Composable () -> Unit)? = null,
     scrollToDate: LocalDate? = null,
+    hapticFeedbackEnabled: Boolean,
     onRecordClick: (com.mewbook.app.domain.model.Record) -> Unit
 ) {
     val listState = rememberLazyListState()
@@ -894,7 +942,8 @@ private fun HomeRecordList(
                 categoryIcon = category?.icon ?: "more_horiz",
                 categoryColor = category?.color ?: 0xFF808080,
                 onClick = { onRecordClick(record) },
-                modifier = Modifier.padding(horizontal = 16.dp)
+                modifier = Modifier.padding(horizontal = 16.dp),
+                hapticFeedbackEnabled = hapticFeedbackEnabled
             )
         }
     }

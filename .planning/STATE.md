@@ -2,22 +2,40 @@
 
 ## Current Position
 
-Phase: None — v1.1.0 milestone archived
-Plan: No active plan
-Status: v1.1.0 本地实现、验证、知识库收尾、GSD 归档与 tag 已完成；远端推送/发布待可用 GitHub 凭据或 SSH 环境
-Last activity: 2026-05-29 — v1.1.0 milestone archived at `.planning/archive/milestones/v1.1.0.md`
+Phase: Phase 9 complete — 预算预警系统
+Plan: `.planning/phases/09-budget-alerts/09-01-PLAN.md`
+Status: v1.2.0 Phase 8 与 Phase 9 已完成本地实现；完整本地回归在最终边角修复前通过，最后修复后的复跑被沙箱 C 盘空间不足阻塞
+Last activity: 2026-05-29 — quick-entry acceleration and budget alert system implemented; final rerun pending environment cleanup
 
 ## 当前里程碑
 
-无活动里程碑。
+v1.2.0 快速记账与预算预警（active）
 
 最近归档：v1.1.0 发布打磨与交互优化（`.planning/archive/milestones/v1.1.0.md`）
 
 **Phases:**
+- [x] Phase 8: 快速记账提速 (QE-01, QE-02, QE-03, QE-04, QE-05)
+- [x] Phase 9: 预算预警系统 (BWA-01, BWA-02, BWA-03, BWA-04, BWA-05)
 - [x] Phase 4: 震动反馈 (HAPT-01, HAPT-02)
 - [x] Phase 5: 分类清理与拖拽排序 (CAT-01, CAT-02)
 - [x] Phase 6: 输入与设置收尾 (INPT-01, SETT-01)
 - [x] Phase 7: v1.1.0 发布打磨 (HAPT-03, CAT-03/04/05, SETT-02/03)
+
+## 已创建（2026-05-29 会话 — v1.2.0 里程碑）
+
+- [x] 新活动里程碑文档：`.planning/milestones/v1.2.0.md`
+- [x] 快速记账增强需求：常用金额、常用场景/分类、时间段输入记忆、双击 FAB、仅本地记忆
+- [x] 预算预警需求：50%/80%/100% 阈值、月末超支预测、分类异常波动、可解释摘要、数据不足降级
+- [x] `PROJECT.md`、`REQUIREMENTS.md`、`ROADMAP.md` 已同步 v1.2.0 当前范围
+- [x] Phase 8 执行计划：`.planning/phases/08-quick-entry-acceleration/08-01-PLAN.md`
+- [x] Phase 8 快速记账实现：常用金额、常用场景、时间段记忆、双击 FAB、清除数据联动
+- [x] Phase 9 执行计划：`.planning/phases/09-budget-alerts/09-01-PLAN.md`
+- [x] Phase 9 预算预警实现：50%/80%/100% 阈值、月末超支预测、分类异常波动、预算页 inline 提醒
+
+## 下一步
+
+- [ ] 清理沙箱 Gradle 缓存或切换到可写 Gradle user home 后复跑完整回归
+- [ ] 做一轮代码审查，确认 v1.2.0 是否需要版本号与发布文案更新
 
 ## 已完成（2026-05-29 会话 — v1.1.0 发布打磨）
 
@@ -35,8 +53,11 @@ Last activity: 2026-05-29 — v1.1.0 milestone archived at `.planning/archive/mi
 
 - [x] `git diff --check`
 - [x] `testDebugUnitTest :app:lintDebug :app:assembleDebug :app:assembleRelease -Dandroid.enableJetifier=false`
+- [x] `testDebugUnitTest --tests com.mewbook.app.domain.policy.QuickEntryDefaultsPolicyTest --tests com.mewbook.app.domain.policy.QuickEntryAmountSuggestionsPolicyTest --tests com.mewbook.app.domain.policy.QuickEntryFabGesturePolicyTest --tests com.mewbook.app.data.preferences.QuickEntryMemorySerializerTest :app:assembleDebug -Dkotlin.compiler.execution.strategy=in-process`
+- [x] `testDebugUnitTest --tests com.mewbook.app.domain.policy.BudgetAlertPolicyTest :app:assembleDebug -Dkotlin.compiler.execution.strategy=in-process`
+- [x] `testDebugUnitTest :app:assembleDebug :app:lintDebug -Dkotlin.compiler.execution.strategy=in-process`
 
-验证结果：Gradle `BUILD SUCCESSFUL`。日志仍会出现 Kotlin daemon `AccessDeniedException` 与 SDK XML warning，但 Gradle 已回退并成功完成构建。
+验证结果：已运行的目标单测、Debug 构建和一次完整回归均为 Gradle `BUILD SUCCESSFUL`。随后发现并修复“记忆分类不在常用候选中时无法预选”的边角问题；该修复后的复跑被 `C:\Users\CodexSandboxOffline\.gradle` 写缓存时的“磁盘空间不足”阻塞。日志仍会出现 Kotlin daemon `AccessDeniedException` 与 SDK XML warning，但此前 Gradle 可回退并成功完成构建。
 
 ## 发布状态
 

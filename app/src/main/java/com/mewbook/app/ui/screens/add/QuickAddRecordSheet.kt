@@ -42,7 +42,11 @@ import androidx.compose.ui.window.Dialog
 import com.mewbook.app.domain.model.Account
 import com.mewbook.app.domain.model.Category
 import com.mewbook.app.domain.model.RecordType
+import com.mewbook.app.domain.policy.HapticFeedbackPolicy
+import com.mewbook.app.ui.components.rememberMewHapticFeedback
+import java.math.BigDecimal
 import java.time.LocalDate
+import kotlin.math.roundToLong
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -52,17 +56,31 @@ fun QuickAddRecordSheet(
     accounts: List<Account>,
     defaultAccountId: Long?,
     defaultDate: LocalDate,
+    quickAmountSuggestions: List<Double> = emptyList(),
+    defaultCategoryId: Long? = null,
+    defaultAccountIdOverride: Long? = null,
+    defaultAmount: Double? = null,
+    keyPressHapticEnabled: Boolean = true,
     onDismiss: () -> Unit,
     onOpenFullEditor: () -> Unit,
     onSave: (Double, RecordType, Long, String?, LocalDate, Long?) -> Unit
 ) {
     val focusRequester = remember { FocusRequester() }
-    val defaultCategoryId = categories.firstOrNull()?.id ?: 0L
-    val resolvedDefaultAccountId = defaultAccountId ?: accounts.firstOrNull()?.id
+    val hapticFeedback = rememberMewHapticFeedback(keyPressHapticEnabled)
+    val resolvedDefaultCategoryId = defaultCategoryId
+        ?.takeIf { categoryId -> categories.any { it.id == categoryId } }
+        ?: categories.firstOrNull()?.id
+        ?: 0L
+    val resolvedDefaultAccountId = defaultAccountIdOverride
+        ?.takeIf { accountId -> accounts.any { it.id == accountId } }
+        ?: defaultAccountId
+        ?: accounts.firstOrNull()?.id
 
-    var amountExpression by rememberSaveable(type.name) { mutableStateOf("") }
-    var selectedCategoryId by rememberSaveable(type.name, defaultCategoryId) {
-        mutableLongStateOf(defaultCategoryId)
+    var amountExpression by rememberSaveable(type.name, defaultAmount) {
+        mutableStateOf(defaultAmount?.let(::formatQuickAmount) ?: "")
+    }
+    var selectedCategoryId by rememberSaveable(type.name, resolvedDefaultCategoryId) {
+        mutableLongStateOf(resolvedDefaultCategoryId)
     }
     var selectedAccountId by rememberSaveable(type.name, resolvedDefaultAccountId) {
         mutableStateOf(resolvedDefaultAccountId)
@@ -73,9 +91,9 @@ fun QuickAddRecordSheet(
     val canSave = amount != null && amount > 0.0 && selectedCategoryId > 0L
     val title = if (type == RecordType.EXPENSE) "快速记支出" else "快速记收入"
 
-    LaunchedEffect(type, defaultCategoryId, resolvedDefaultAccountId, categories, accounts) {
-        if ((selectedCategoryId == 0L || categories.none { it.id == selectedCategoryId }) && defaultCategoryId > 0L) {
-            selectedCategoryId = defaultCategoryId
+    LaunchedEffect(type, resolvedDefaultCategoryId, resolvedDefaultAccountId, categories, accounts) {
+        if ((selectedCategoryId == 0L || categories.none { it.id == selectedCategoryId }) && resolvedDefaultCategoryId > 0L) {
+            selectedCategoryId = resolvedDefaultCategoryId
         }
         if ((selectedAccountId == null || accounts.none { it.id == selectedAccountId }) && resolvedDefaultAccountId != null) {
             selectedAccountId = resolvedDefaultAccountId
@@ -124,9 +142,33 @@ fun QuickAddRecordSheet(
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
                 )
 
+                if (quickAmountSuggestions.isNotEmpty()) {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            text = "常用金额",
+                            style = MaterialTheme.typography.labelLarge
+                        )
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            quickAmountSuggestions.forEach { suggestion ->
+                                FilterChip(
+                                    selected = amount?.let { isSameAmount(it, suggestion) } == true,
+                                    onClick = {
+                                        hapticFeedback.perform(HapticFeedbackPolicy.Interaction.Selection)
+                                        amountExpression = formatQuickAmount(suggestion)
+                                    },
+                                    label = { Text(formatQuickAmount(suggestion)) }
+                                )
+                            }
+                        }
+                    }
+                }
+
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
-                        text = "常用分类",
+                        text = "常用场景",
                         style = MaterialTheme.typography.labelLarge
                     )
                     if (categories.isEmpty()) {
@@ -143,7 +185,10 @@ fun QuickAddRecordSheet(
                             categories.take(6).forEach { category ->
                                 FilterChip(
                                     selected = selectedCategoryId == category.id,
-                                    onClick = { selectedCategoryId = category.id },
+                                    onClick = {
+                                        hapticFeedback.perform(HapticFeedbackPolicy.Interaction.Selection)
+                                        selectedCategoryId = category.id
+                                    },
                                     label = { Text(category.name) }
                                 )
                             }
@@ -164,7 +209,10 @@ fun QuickAddRecordSheet(
                             accounts.take(4).forEach { account ->
                                 FilterChip(
                                     selected = selectedAccountId == account.id,
-                                    onClick = { selectedAccountId = account.id },
+                                    onClick = {
+                                        hapticFeedback.perform(HapticFeedbackPolicy.Interaction.Selection)
+                                        selectedAccountId = account.id
+                                    },
                                     label = { Text(account.name) }
                                 )
                             }
@@ -186,7 +234,10 @@ fun QuickAddRecordSheet(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     TextButton(
-                        onClick = onDismiss,
+                        onClick = {
+                            hapticFeedback.perform(HapticFeedbackPolicy.Interaction.DialogAction)
+                            onDismiss()
+                        },
                         modifier = Modifier
                             .weight(1f)
                             .heightIn(min = 48.dp),
@@ -195,7 +246,10 @@ fun QuickAddRecordSheet(
                         QuickAddActionText("取消")
                     }
                     OutlinedButton(
-                        onClick = onOpenFullEditor,
+                        onClick = {
+                            hapticFeedback.perform(HapticFeedbackPolicy.Interaction.RowClick)
+                            onOpenFullEditor()
+                        },
                         modifier = Modifier
                             .weight(1f)
                             .heightIn(min = 48.dp),
@@ -205,6 +259,7 @@ fun QuickAddRecordSheet(
                     }
                     Button(
                         onClick = {
+                            hapticFeedback.perform(HapticFeedbackPolicy.Interaction.DialogAction)
                             val resolvedAmount = amount ?: return@Button
                             onSave(
                                 resolvedAmount,
@@ -227,6 +282,16 @@ fun QuickAddRecordSheet(
             }
         }
     }
+}
+
+private fun formatQuickAmount(amount: Double): String {
+    return BigDecimal.valueOf(amount)
+        .stripTrailingZeros()
+        .toPlainString()
+}
+
+private fun isSameAmount(first: Double, second: Double): Boolean {
+    return (first * 100).roundToLong() == (second * 100).roundToLong()
 }
 
 @Composable

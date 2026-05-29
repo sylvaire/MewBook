@@ -1,15 +1,55 @@
 # Roadmap
 
-**Milestone:** v1.1.0 -- 发布打磨与交互优化 (archived 2026-05-29)
+**Milestone:** v1.2.0 -- 快速记账与预算预警 (active, created 2026-05-29)
 
 ## Phases
 
+- [x] **Phase 8: 快速记账提速** -- 常用金额/场景一键入口、上次输入记忆、双击 FAB 快捷记账 (completed 2026-05-29)
+- [x] **Phase 9: 预算预警系统** -- 阈值提醒、月末超支预测、分类异常波动提示 (completed 2026-05-29)
 - [x] **Phase 4: 震动反馈** -- 数字键盘按键震动反馈与设置开关
 - [x] **Phase 5: 分类清理与拖拽排序** -- 删除旧二级分类残留代码，分类列表支持长按拖拽排序
 - [x] **Phase 6: 输入与设置收尾** -- 备注自动弹输入法，版本号入口可点击 (completed 2026-05-26)
 - [x] **Phase 7: v1.1.0 发布打磨** -- 分类管理 UI/图标/一致性、版本详情弹窗、触感反馈扩展、版本与 release 文案 (completed 2026-05-29)
 
 ## Phase Details
+
+### Phase 8: 快速记账提速
+**Goal:** 用户在首页通过更少点击完成日常高频记账，快捷记账能记住常用账户、分类、金额和场景
+
+**Depends on:** v1.1.0 发布打磨完成
+
+**Requirements:** QE-01, QE-02, QE-03, QE-04, QE-05
+
+**Success Criteria** (what must be TRUE):
+  1. 快速记账面板展示常用金额按钮，用户点击后金额立即填入并保留触感反馈
+  2. 快速记账面板展示常用场景/分类候选，候选与当前账本可见分类兼容
+  3. 用户在相近时间段再次打开快速记账时，账户和分类能按最近成功记录自动预填
+  4. 双击首页 FAB 直接进入快捷记账，不破坏单击完整记账和长按快捷菜单
+  5. 快速记账记忆策略有可单元测试的 policy 层，清除数据时不会留下孤立偏好
+
+**Plans:** 1/1 plans complete
+
+Plans:
+- [x] 08-01-PLAN.md -- Design and implement quick-entry acceleration policy, UI, FAB gesture handling, and tests
+
+### Phase 9: 预算预警系统
+**Goal:** 用户在超预算前看到可解释、克制的风险提示，并能定位到具体预算或分类
+
+**Depends on:** Phase 8
+
+**Requirements:** BWA-01, BWA-02, BWA-03, BWA-04, BWA-05
+
+**Success Criteria** (what must be TRUE):
+  1. 总预算和分类预算能产生 50%、80%、100% 使用率状态，且同一周期不重复刷屏
+  2. 月度预算能根据当前日均支出预测月底是否超支，并展示预测依据
+  3. 分类支出能与上周或上月同类数据比较，识别明显异常波动
+  4. 预算页展示可解释的预警摘要，避免重复弹窗刷屏
+  5. 无预算或历史样本不足时，预警系统稳定降级为不提示
+
+**Plans:** 1/1 plans complete
+
+Plans:
+- [x] 09-01-PLAN.md -- Design and implement budget alert calculators, UI surfaces, and tests
 
 ### Phase 4: 震动反馈
 **Goal:** 用户在数字键盘每次按键时获得触觉确认，并可在设置中控制该行为；v1.1.0 进一步扩展为“触感反馈”总开关
@@ -81,6 +121,8 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
+| 8. 快速记账提速 | 1/1 | Complete | 2026-05-29 |
+| 9. 预算预警系统 | 1/1 | Complete | 2026-05-29 |
 | 4. 震动反馈 | 1/1 | Complete   | 2026-05-26 |
 | 5. 分类清理与拖拽排序 | 2/2 | Complete | 2026-05-26 |
 | 6. 输入与设置收尾 | 1/1 | Complete   | 2026-05-26 |
@@ -90,3 +132,7 @@ Plans:
 
 - Milestone archive: `.planning/archive/milestones/v1.1.0.md`
 - Status: implementation complete, locally verified, locally tagged, remote publication pending valid GitHub credentials or SSH host-key access.
+
+## Active Milestone Document
+
+- v1.2.0 milestone: `.planning/milestones/v1.2.0.md`

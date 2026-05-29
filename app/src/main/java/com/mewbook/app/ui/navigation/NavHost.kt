@@ -49,7 +49,9 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.mewbook.app.domain.policy.HapticFeedbackPolicy
 import com.mewbook.app.domain.policy.HomeScreenLayoutPolicy
+import com.mewbook.app.ui.components.rememberMewHapticFeedback
 import com.mewbook.app.ui.screens.asset.AccountEditScreen
 import com.mewbook.app.ui.screens.asset.AddAccountScreen
 import com.mewbook.app.ui.screens.asset.AssetScreen
@@ -89,10 +91,12 @@ val bottomNavItems = listOf(
 @Composable
 fun MewBookNavHost(
     updateUiState: AppUpdateUiState,
+    keyPressHapticEnabled: Boolean = true,
     onCheckForUpdates: () -> Unit
 ) {
     val isDarkTheme = LocalIsDarkTheme.current
     val navController = rememberNavController()
+    val hapticFeedback = rememberMewHapticFeedback(keyPressHapticEnabled)
     val topLevelRoutes = remember {
         setOf(
             Screen.Home.route,
@@ -181,6 +185,7 @@ fun MewBookNavHost(
                                     },
                                     selected = selected,
                                     onClick = {
+                                        hapticFeedback.perform(HapticFeedbackPolicy.Interaction.Selection)
                                         navController.navigate(item.screen.route) {
                                             popUpTo(navController.graph.findStartDestination().id) {
                                                 saveState = true

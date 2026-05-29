@@ -35,6 +35,7 @@ import com.mewbook.app.data.local.entity.DavConfigEntity
 import com.mewbook.app.data.local.entity.LedgerEntity
 import com.mewbook.app.data.local.entity.RecurringTemplateEntity
 import com.mewbook.app.data.local.entity.RecordEntity
+import com.mewbook.app.data.preferences.QuickEntryPreferencesRepository
 import com.mewbook.app.data.preferences.ThemePreferencesRepository
 import androidx.room.withTransaction
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -57,7 +58,8 @@ class BackupRepository @Inject constructor(
     private val ledgerDao: LedgerDao,
     private val davConfigDao: DavConfigDao,
     private val deletedRecordDao: DeletedRecordDao,
-    private val themePreferencesRepository: ThemePreferencesRepository
+    private val themePreferencesRepository: ThemePreferencesRepository,
+    private val quickEntryPreferencesRepository: QuickEntryPreferencesRepository
 ) : BackupSnapshotDataSource {
 
     override suspend fun exportToJsonString(): String = withContext(Dispatchers.IO) {
@@ -219,6 +221,7 @@ class BackupRepository @Inject constructor(
             davConfigDao.deleteDavConfig()
             deletedRecordDao.deleteAllDeletedRecords()
         }
+        quickEntryPreferencesRepository.clearQuickEntryMemory()
     }
 
     private suspend fun restoreEnvelope(envelope: BackupEnvelope) {

@@ -41,6 +41,7 @@ import com.mewbook.app.ui.update.AppUpdateViewModel
 import dagger.hilt.android.AndroidEntryPoint
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
+import com.mewbook.app.data.preferences.HapticPreferencesRepository
 import kotlinx.coroutines.launch
 import java.io.File
 import javax.inject.Inject
@@ -50,6 +51,7 @@ class MainActivity : ComponentActivity() {
     private val themeViewModel: ThemeViewModel by viewModels()
     private val appUpdateViewModel: AppUpdateViewModel by viewModels()
     @Inject lateinit var davAutoBackupCoordinator: DavAutoBackupCoordinator
+    @Inject lateinit var hapticPreferencesRepository: HapticPreferencesRepository
     private lateinit var installApkLauncher: ActivityResultLauncher<Intent>
     private var pendingInstallAfterPermissionPath: String? = null
 
@@ -63,6 +65,9 @@ class MainActivity : ComponentActivity() {
             val systemDarkTheme = isSystemInDarkTheme()
             val themeMode by themeViewModel.themeMode.collectAsStateWithLifecycle()
             val updateUiState by appUpdateViewModel.uiState.collectAsStateWithLifecycle()
+            val keyPressHapticEnabled by hapticPreferencesRepository.keyPressHapticEnabled.collectAsStateWithLifecycle(
+                initialValue = true
+            )
             val isDarkTheme = when (themeMode) {
                 AppThemeMode.SYSTEM -> systemDarkTheme
                 AppThemeMode.LIGHT -> false
@@ -84,6 +89,7 @@ class MainActivity : ComponentActivity() {
                     ) {
                         MewBookNavHost(
                             updateUiState = updateUiState,
+                            keyPressHapticEnabled = keyPressHapticEnabled,
                             onCheckForUpdates = {
                                 appUpdateViewModel.checkForUpdates(silent = false)
                             }

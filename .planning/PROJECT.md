@@ -4,20 +4,25 @@
 
 MewBook：Android 本地记账应用（Kotlin、Jetpack Compose、Room、Hilt）。核心能力包括流水、单层分类、账本、资产、预算、周期模板、统计下钻、删除找回、WebDAV 同步、自动备份、备份导出、智能导入与应用内更新。
 
-## 当前里程碑：无活动里程碑
+## 当前里程碑：v1.2.0 快速记账与预算预警
+
+里程碑文档：`.planning/milestones/v1.2.0.md`
 
 最近完成并归档：v1.1.0 发布打磨与交互优化（归档见 `.planning/archive/milestones/v1.1.0.md`）。
 
-**Goal:** 提升记账、分类管理和设置等核心操作的交互体验
+**Goal:** 让高频记账路径更少点击，并把预算从事后查看升级为提前预警
 
 **Target features:**
-- 触感反馈覆盖记账键盘、设置、周期选择和快捷入口，设置中保留总开关
-- 打开备注编辑时自动弹出输入法
-- 删除分类管理中残留的旧二级默认分类，分类管理与记账页新增记录的分类选择保持一致
-- 分类管理补充常用图标并优化 Clay 风格 UI，移除颜色圆点和右侧编辑图标
-- 点击版本号打开应用详情弹窗，弹窗中提供项目 GitHub 仓库链接和手动检查更新
+- 快速记账面板提供常用金额和常用场景/分类一键入口
+- 根据最近成功记录和时间段自动预填快速记账的账户、分类和金额建议
+- 首页 FAB 支持双击直达快捷记账，同时保留单击完整记账和长按快捷菜单
+- 总预算和分类预算提供 50%、80%、100% 使用率预警
+- 基于当前日均支出预测月末是否超支
+- 对分类预算或分类支出的异常波动给出可解释提示
 
 ## 当前状态（2026-05-29）
+
+v1.2.0 已完成本地实现：Phase 8 快速记账提速新增常用金额、常用场景、时间段记忆和双击 FAB；Phase 9 预算预警新增阈值提醒、月末预测和分类异常波动提示。完整回归曾在最终边角修复前通过；最后修复“记忆分类不在常用候选中仍应预选”的改动后，复跑被沙箱 C 盘空间不足阻塞。后续发布前需清理环境后复跑验证，并按版本策略决定是否升级版本号、提交并推送。
 
 v1.1.0 发布打磨已完成本地实现、验证、知识库收尾、GSD 归档与本地 tag。标准验证通过：`testDebugUnitTest :app:lintDebug :app:assembleDebug :app:assembleRelease`。
 
@@ -60,4 +65,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-05-29 after v1.1.0 milestone archive*
+*Last updated: 2026-05-29 after v1.2.0 Phase 8 and Phase 9 implementation*

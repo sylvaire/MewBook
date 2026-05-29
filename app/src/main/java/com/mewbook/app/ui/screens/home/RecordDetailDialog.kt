@@ -39,7 +39,9 @@ import com.mewbook.app.domain.model.Account
 import com.mewbook.app.domain.model.Category
 import com.mewbook.app.domain.model.Record
 import com.mewbook.app.domain.model.RecordType
+import com.mewbook.app.domain.policy.HapticFeedbackPolicy
 import com.mewbook.app.ui.components.CategoryIconBadge
+import com.mewbook.app.ui.components.rememberMewHapticFeedback
 import com.mewbook.app.ui.theme.ClayDesign
 import com.mewbook.app.ui.theme.ExpenseRed
 import com.mewbook.app.ui.theme.IncomeGreen
@@ -52,8 +54,10 @@ fun RecordDetailDialog(
     category: Category?,
     account: Account?,
     onDismiss: () -> Unit,
-    onEdit: (Record) -> Unit
+    onEdit: (Record) -> Unit,
+    hapticFeedbackEnabled: Boolean = true
 ) {
+    val hapticFeedback = rememberMewHapticFeedback(hapticFeedbackEnabled)
     val displayCategory = remember(record.categoryId, record.type, category) {
         category ?: Category(
             id = record.categoryId,
@@ -204,14 +208,20 @@ fun RecordDetailDialog(
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     OutlinedButton(
-                        onClick = onDismiss,
+                        onClick = {
+                            hapticFeedback.perform(HapticFeedbackPolicy.Interaction.DialogAction)
+                            onDismiss()
+                        },
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(ClayDesign.ButtonRadius)
                     ) {
                         Text("关闭")
                     }
                     Button(
-                        onClick = { onEdit(record) },
+                        onClick = {
+                            hapticFeedback.perform(HapticFeedbackPolicy.Interaction.RowClick)
+                            onEdit(record)
+                        },
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(ClayDesign.ButtonRadius),
                         colors = ButtonDefaults.buttonColors(

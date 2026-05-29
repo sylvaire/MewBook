@@ -70,8 +70,10 @@ import com.mewbook.app.ui.components.MewCompactTopAppBar
 import com.mewbook.app.domain.model.Category
 import com.mewbook.app.domain.model.RecordType
 import com.mewbook.app.domain.policy.CategorySelectionPolicy
+import com.mewbook.app.domain.policy.HapticFeedbackPolicy
 import com.mewbook.app.ui.components.CategoryIconBadge
 import com.mewbook.app.ui.components.getIconForCategory
+import com.mewbook.app.ui.components.rememberMewHapticFeedback
 import com.mewbook.app.ui.components.SettingsSectionHeader
 import com.mewbook.app.ui.theme.ClayDesign
 import com.mewbook.app.ui.theme.ExpenseRed
@@ -129,8 +131,17 @@ fun CategoriesScreen(
     viewModel: CategoriesViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val hapticFeedback = rememberMewHapticFeedback(uiState.keyPressHapticEnabled)
     var selectedTabIndex by remember { mutableIntStateOf(0) }
     val currentType = if (selectedTabIndex == 0) RecordType.EXPENSE else RecordType.INCOME
+
+    fun performWithHaptic(
+        interaction: HapticFeedbackPolicy.Interaction,
+        action: () -> Unit
+    ) {
+        hapticFeedback.perform(interaction)
+        action()
+    }
 
     val expenseCategories = CategorySelectionPolicy.visibleCategories(
         categories = uiState.categories,
@@ -145,6 +156,7 @@ fun CategoriesScreen(
     if (uiState.showAddDialog) {
         AddCategoryDialog(
             type = uiState.selectedType,
+            hapticFeedbackEnabled = uiState.keyPressHapticEnabled,
             onDismiss = { viewModel.hideAddDialog() },
             onConfirm = { name, icon, color ->
                 viewModel.addCategory(name, icon, color, uiState.selectedType)
@@ -156,6 +168,7 @@ fun CategoriesScreen(
     if (uiState.showEditDialog && uiState.editingCategory != null) {
         EditCategoryDialog(
             category = uiState.editingCategory!!,
+            hapticFeedbackEnabled = uiState.keyPressHapticEnabled,
             onDismiss = { viewModel.hideEditDialog() },
             onConfirm = { name, icon, color ->
                 viewModel.updateCategory(uiState.editingCategory!!, name, icon, color)
@@ -173,7 +186,11 @@ fun CategoriesScreen(
             MewCompactTopAppBar(
                 title = "分类管理",
                 navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
+                    IconButton(
+                        onClick = {
+                            performWithHaptic(HapticFeedbackPolicy.Interaction.RowClick, onNavigateBack)
+                        }
+                    ) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
                     }
                 }
@@ -182,7 +199,9 @@ fun CategoriesScreen(
         floatingActionButton = {
             FloatingActionButton(
                 onClick = {
-                    viewModel.showAddDialog(if (selectedTabIndex == 0) RecordType.EXPENSE else RecordType.INCOME)
+                    performWithHaptic(HapticFeedbackPolicy.Interaction.RowClick) {
+                        viewModel.showAddDialog(if (selectedTabIndex == 0) RecordType.EXPENSE else RecordType.INCOME)
+                    }
                 },
                 containerColor = MaterialTheme.colorScheme.primary
             ) {
@@ -239,7 +258,11 @@ fun CategoriesScreen(
                     selectedTabIndex = selectedTabIndex,
                     expenseCount = expenseCategories.size,
                     incomeCount = incomeCategories.size,
-                    onSelect = { selectedTabIndex = it }
+                    onSelect = {
+                        performWithHaptic(HapticFeedbackPolicy.Interaction.Selection) {
+                            selectedTabIndex = it
+                        }
+                    }
                 )
             }
 
@@ -264,11 +287,22 @@ fun CategoriesScreen(
                 ReorderableItem(reorderableState, key = category.id) { isDragging ->
                     CategoryItemCard(
                         category = category,
-                        onEditClick = { viewModel.showEditDialog(category) },
+                        onEditClick = {
+                            performWithHaptic(HapticFeedbackPolicy.Interaction.RowClick) {
+                                viewModel.showEditDialog(category)
+                            }
+                        },
                         isDragging = isDragging,
                         dragHandleModifier = Modifier
-                            .size(44.dp)
-                            .longPressDraggableHandle()
+                            .size(48.dp)
+                            .longPressDraggableHandle(
+                                onDragStarted = {
+                                    hapticFeedback.perform(HapticFeedbackPolicy.Interaction.LongPressAction)
+                                },
+                                onDragStopped = {
+                                    hapticFeedback.perform(HapticFeedbackPolicy.Interaction.Selection)
+                                }
+                            )
                     )
                 }
             }
@@ -501,59 +535,92 @@ private fun CategoryItemCard(
 ) {
     val accentColor = Color(category.color)
     Card(
-        onClick = onEditClick,
         modifier = Modifier
             .fillMaxWidth()
             .clayCardShadow(),
         shape = RoundedCornerShape(ClayDesign.CardRadius),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        border = if (isDragging) {
+            BorderStroke(1.dp, accentColor.copy(alpha = 0.28f))
+        } else {
+            null
+        },
         colors = CardDefaults.cardColors(
-            containerColor = if (isDragging) {
-                accentColor.copy(alpha = 0.16f)
-            } else {
-                MaterialTheme.colorScheme.surface
-            }
+            containerColor = MaterialTheme.colorScheme.surface
         )
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(min = 76.dp)
-                .padding(start = 6.dp, end = 16.dp, top = 12.dp, bottom = 12.dp),
+                .padding(start = 16.dp, end = 8.dp, top = 12.dp, bottom = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            Row(
+                modifier = Modifier
+                    .weight(1f)
+                    .heightIn(min = 52.dp)
+                    .clip(RoundedCornerShape(ClayDesign.ButtonRadius))
+                    .clickable(onClick = onEditClick)
+                    .padding(vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                CategoryIconBadge(
+                    category = category,
+                    emphasized = true,
+                    containerSize = 44.dp,
+                    iconSize = 23.dp
+                )
+
+                Spacer(modifier = Modifier.width(12.dp))
+
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = category.name,
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    CategoryKindBadge(isDefault = category.isDefault)
+                }
+            }
+
+            Spacer(modifier = Modifier.width(8.dp))
+
             Box(
-                modifier = dragHandleModifier,
+                modifier = dragHandleModifier
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(
+                        if (isDragging) {
+                            accentColor.copy(alpha = 0.12f)
+                        } else {
+                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.52f)
+                        }
+                    )
+                    .border(
+                        width = 1.dp,
+                        color = if (isDragging) {
+                            accentColor.copy(alpha = 0.34f)
+                        } else {
+                            MaterialTheme.colorScheme.outline.copy(alpha = 0.12f)
+                        },
+                        shape = RoundedCornerShape(14.dp)
+                    ),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = Icons.Filled.DragHandle,
                     contentDescription = "长按拖拽排序",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
+                    tint = if (isDragging) {
+                        accentColor
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f)
+                    },
                     modifier = Modifier.size(22.dp)
                 )
-            }
-
-            CategoryIconBadge(
-                category = category,
-                emphasized = true,
-                containerSize = 44.dp,
-                iconSize = 23.dp
-            )
-
-            Spacer(modifier = Modifier.width(12.dp))
-
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = category.name,
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Spacer(modifier = Modifier.height(6.dp))
-                CategoryKindBadge(isDefault = category.isDefault)
             }
         }
     }
@@ -618,12 +685,14 @@ private fun EmptyCategoriesState(typeLabel: String) {
 @Composable
 fun AddCategoryDialog(
     type: RecordType,
+    hapticFeedbackEnabled: Boolean,
     onDismiss: () -> Unit,
     onConfirm: (String, String, Long) -> Unit
 ) {
     var name by remember { mutableStateOf("") }
     var selectedIcon by remember { mutableStateOf(availableIcons.first()) }
     var selectedColor by remember { mutableStateOf(availableColors.first()) }
+    val hapticFeedback = rememberMewHapticFeedback(hapticFeedbackEnabled)
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -635,20 +704,34 @@ fun AddCategoryDialog(
                 selectedIcon = selectedIcon,
                 selectedColor = selectedColor,
                 onNameChange = { name = it },
-                onIconSelect = { selectedIcon = it },
-                onColorSelect = { selectedColor = it }
+                onIconSelect = {
+                    hapticFeedback.perform(HapticFeedbackPolicy.Interaction.Selection)
+                    selectedIcon = it
+                },
+                onColorSelect = {
+                    hapticFeedback.perform(HapticFeedbackPolicy.Interaction.Selection)
+                    selectedColor = it
+                }
             )
         },
         confirmButton = {
             TextButton(
-                onClick = { onConfirm(name, selectedIcon, selectedColor) },
+                onClick = {
+                    hapticFeedback.perform(HapticFeedbackPolicy.Interaction.DialogAction)
+                    onConfirm(name, selectedIcon, selectedColor)
+                },
                 enabled = name.isNotBlank()
             ) {
                 Text("添加")
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
+            TextButton(
+                onClick = {
+                    hapticFeedback.perform(HapticFeedbackPolicy.Interaction.DialogAction)
+                    onDismiss()
+                }
+            ) {
                 Text("取消")
             }
         }
@@ -659,6 +742,7 @@ fun AddCategoryDialog(
 @Composable
 fun EditCategoryDialog(
     category: Category,
+    hapticFeedbackEnabled: Boolean,
     onDismiss: () -> Unit,
     onConfirm: (String, String, Long) -> Unit,
     onDelete: () -> Unit
@@ -667,6 +751,7 @@ fun EditCategoryDialog(
     var selectedIcon by remember { mutableStateOf(category.icon) }
     var selectedColor by remember { mutableStateOf(category.color) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
+    val hapticFeedback = rememberMewHapticFeedback(hapticFeedbackEnabled)
 
     if (showDeleteConfirm) {
         AlertDialog(
@@ -676,6 +761,7 @@ fun EditCategoryDialog(
             confirmButton = {
                 TextButton(
                     onClick = {
+                        hapticFeedback.perform(HapticFeedbackPolicy.Interaction.DialogAction)
                         onDelete()
                         showDeleteConfirm = false
                     }
@@ -684,7 +770,12 @@ fun EditCategoryDialog(
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showDeleteConfirm = false }) {
+                TextButton(
+                    onClick = {
+                        hapticFeedback.perform(HapticFeedbackPolicy.Interaction.DialogAction)
+                        showDeleteConfirm = false
+                    }
+                ) {
                     Text("取消")
                 }
             }
@@ -701,19 +792,31 @@ fun EditCategoryDialog(
                 selectedIcon = selectedIcon,
                 selectedColor = selectedColor,
                 onNameChange = { name = it },
-                onIconSelect = { selectedIcon = it },
-                onColorSelect = { selectedColor = it }
+                onIconSelect = {
+                    hapticFeedback.perform(HapticFeedbackPolicy.Interaction.Selection)
+                    selectedIcon = it
+                },
+                onColorSelect = {
+                    hapticFeedback.perform(HapticFeedbackPolicy.Interaction.Selection)
+                    selectedColor = it
+                }
             )
         },
         confirmButton = {
             Row {
                 TextButton(
-                    onClick = { showDeleteConfirm = true }
+                    onClick = {
+                        hapticFeedback.perform(HapticFeedbackPolicy.Interaction.LongPressAction)
+                        showDeleteConfirm = true
+                    }
                 ) {
                     Text("删除", color = MaterialTheme.colorScheme.error)
                 }
                 TextButton(
-                    onClick = { onConfirm(name, selectedIcon, selectedColor) },
+                    onClick = {
+                        hapticFeedback.perform(HapticFeedbackPolicy.Interaction.DialogAction)
+                        onConfirm(name, selectedIcon, selectedColor)
+                    },
                     enabled = name.isNotBlank()
                 ) {
                     Text("保存")
@@ -721,7 +824,12 @@ fun EditCategoryDialog(
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
+            TextButton(
+                onClick = {
+                    hapticFeedback.perform(HapticFeedbackPolicy.Interaction.DialogAction)
+                    onDismiss()
+                }
+            ) {
                 Text("取消")
             }
         }

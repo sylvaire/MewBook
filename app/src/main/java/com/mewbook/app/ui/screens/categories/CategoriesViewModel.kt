@@ -2,6 +2,7 @@ package com.mewbook.app.ui.screens.categories
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.mewbook.app.data.preferences.HapticPreferencesRepository
 import com.mewbook.app.domain.model.Category
 import com.mewbook.app.domain.model.RecordType
 import com.mewbook.app.domain.policy.CategorySelectionPolicy
@@ -24,7 +25,8 @@ data class CategoriesUiState(
     val showAddDialog: Boolean = false,
     val showEditDialog: Boolean = false,
     val editingCategory: Category? = null,
-    val selectedType: RecordType = RecordType.EXPENSE
+    val selectedType: RecordType = RecordType.EXPENSE,
+    val keyPressHapticEnabled: Boolean = true
 )
 
 @HiltViewModel
@@ -33,7 +35,8 @@ class CategoriesViewModel @Inject constructor(
     private val addCategoryUseCase: AddCategoryUseCase,
     private val updateCategoryUseCase: UpdateCategoryUseCase,
     private val deleteCategoryUseCase: DeleteCategoryUseCase,
-    private val reorderCategoriesUseCase: ReorderCategoriesUseCase
+    private val reorderCategoriesUseCase: ReorderCategoriesUseCase,
+    private val hapticPreferencesRepository: HapticPreferencesRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(CategoriesUiState())
@@ -48,6 +51,11 @@ class CategoriesViewModel @Inject constructor(
                         isLoading = false
                     )
                 }
+            }
+        }
+        viewModelScope.launch {
+            hapticPreferencesRepository.keyPressHapticEnabled.collect { enabled ->
+                _uiState.update { it.copy(keyPressHapticEnabled = enabled) }
             }
         }
     }

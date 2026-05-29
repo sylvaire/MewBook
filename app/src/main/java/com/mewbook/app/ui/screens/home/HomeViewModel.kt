@@ -6,6 +6,7 @@ import androidx.room.withTransaction
 import com.mewbook.app.data.local.database.MewBookDatabase
 import com.mewbook.app.data.preferences.HapticPreferencesRepository
 import com.mewbook.app.data.preferences.HomePreferencesRepository
+import com.mewbook.app.data.preferences.QuickEntryPreferencesRepository
 import com.mewbook.app.domain.model.Account
 import com.mewbook.app.domain.model.Budget
 import com.mewbook.app.domain.model.BudgetPeriodType
@@ -14,9 +15,14 @@ import com.mewbook.app.domain.model.Ledger
 import com.mewbook.app.domain.model.Record
 import com.mewbook.app.domain.model.RecordType
 import com.mewbook.app.domain.policy.AccountDefaultsPolicy
+import com.mewbook.app.domain.policy.CategorySelectionPolicy
 import com.mewbook.app.domain.policy.HomeQuickEntryCategoryPolicy
 import com.mewbook.app.domain.policy.HomeRecordSearchPolicy
 import com.mewbook.app.domain.policy.HomeRecordOrderingPolicy
+import com.mewbook.app.domain.policy.QuickEntryAmountSuggestionsPolicy
+import com.mewbook.app.domain.policy.QuickEntryDefaultsPolicy
+import com.mewbook.app.domain.policy.QuickEntryMemory
+import com.mewbook.app.domain.policy.QuickEntryTimeSlot
 import com.mewbook.app.domain.policy.RecentNoteHistory
 import com.mewbook.app.domain.repository.AccountRepository
 import com.mewbook.app.domain.repository.BudgetRepository
@@ -128,6 +134,10 @@ data class HomeUiState(
     val showHomeOverviewCards: Boolean = true,
     val keyPressHapticEnabled: Boolean = true,
     val quickCategories: List<Category> = emptyList(),
+    val quickAmountSuggestions: List<Double> = emptyList(),
+    val quickDefaultCategoryId: Long? = null,
+    val quickDefaultAccountId: Long? = null,
+    val quickDefaultAmount: Double? = null,
     val message: String? = null
 )
 
@@ -153,6 +163,7 @@ class HomeViewModel @Inject constructor(
     private val recurringTemplateRepository: RecurringTemplateRepository,
     private val homePreferencesRepository: HomePreferencesRepository,
     private val hapticPreferencesRepository: HapticPreferencesRepository,
+    private val quickEntryPreferencesRepository: QuickEntryPreferencesRepository,
     private val database: MewBookDatabase
 ) : ViewModel() {
 
@@ -176,6 +187,7 @@ class HomeViewModel @Inject constructor(
     private val _showHomeOverviewCards = MutableStateFlow(true)
     private val _keyPressHapticEnabled = MutableStateFlow(true)
     private val _message = MutableStateFlow<String?>(null)
+    private val _quickEntryMemories = MutableStateFlow<List<QuickEntryMemory>>(emptyList())
     private val _calendarMonth = MutableStateFlow(YearMonth.now())
     private val _datesWithRecords = MutableStateFlow<Set<LocalDate>>(emptySet())
     private val periodState = combine(_selectedPeriodType, _anchorDate) { selectedPeriodType, anchorDate ->
@@ -243,8 +255,9 @@ class HomeViewModel @Inject constructor(
         },
         _datesWithRecords,
         _message,
-        _keyPressHapticEnabled
-    ) { (period, triple), datesWithRecords, message, keyPressHapticEnabled ->
+        _keyPressHapticEnabled,
+        _quickEntryMemories
+    ) { (period, triple), datesWithRecords, message, keyPressHapticEnabled, quickEntryMemories ->
         val (summary, context, interaction) = triple
         val overlay = interaction.overlay
         val search = interaction.search
@@ -252,6 +265,11 @@ class HomeViewModel @Inject constructor(
         val categoriesById = context.categories.associateBy { it.id }
         val accountsById = context.accounts.associateBy { it.id }
         val ledgerAccounts = context.accounts.filter { it.ledgerId == activeLedgerId }
+        val fallbackAccountId = AccountDefaultsPolicy.resolveDefaultAccountId(ledgerAccounts)
+        val quickEntryType = overlay.newRecordType
+            ?: _lastRecordType.value
+            ?: quickEntryMemories.firstOrNull { it.ledgerId == activeLedgerId }?.type
+            ?: RecordType.EXPENSE
         val (periodStart, periodEnd) = PeriodDateRange.dateRange(period.selectedPeriodType, period.anchorDate)
         val canGoNext = PeriodDateRange.canGoToNextPeriod(period.selectedPeriodType, period.anchorDate)
         val browsingRecord = overlay.browsingRecord?.let { selected ->
@@ -269,6 +287,36 @@ class HomeViewModel @Inject constructor(
             search.isSearchMode -> HomeRecordOrderingPolicy.newestFirst(searchResults)
             else -> HomeRecordOrderingPolicy.newestFirst(summary.records)
         }
+
+        val quickCategories = HomeQuickEntryCategoryPolicy.suggest(
+            categories = context.categories,
+            records = context.allRecords,
+            ledgerId = activeLedgerId,
+            type = quickEntryType
+        )
+        val availableQuickCategories = CategorySelectionPolicy.recordSelectionCandidates(
+            categories = context.categories,
+            type = quickEntryType
+        )
+        val quickEntryTimeSlot = QuickEntryTimeSlot.fromHour(LocalDateTime.now().hour)
+        val quickDefaults = QuickEntryDefaultsPolicy.resolve(
+            ledgerId = activeLedgerId,
+            type = quickEntryType,
+            timeSlot = quickEntryTimeSlot,
+            memories = quickEntryMemories,
+            quickCategories = quickCategories,
+            availableCategories = availableQuickCategories,
+            accounts = ledgerAccounts,
+            fallbackAccountId = fallbackAccountId
+        )
+        val quickDisplayCategories = quickDefaults.categoryId
+            ?.let { categoryId -> availableQuickCategories.firstOrNull { it.id == categoryId } }
+            ?.let { rememberedCategory ->
+                (listOf(rememberedCategory) + quickCategories)
+                    .distinctBy(Category::id)
+                    .take(6)
+            }
+            ?: quickCategories
 
         HomeUiState(
             records = displayedRecords,
@@ -298,15 +346,19 @@ class HomeViewModel @Inject constructor(
                 records = context.allRecords,
                 ledgerId = activeLedgerId
             ),
-            defaultAccountId = AccountDefaultsPolicy.resolveDefaultAccountId(ledgerAccounts),
+            defaultAccountId = fallbackAccountId,
             showHomeOverviewCards = interaction.showHomeOverviewCards,
             keyPressHapticEnabled = keyPressHapticEnabled,
-            quickCategories = HomeQuickEntryCategoryPolicy.suggest(
-                categories = context.categories,
-                records = context.allRecords,
+            quickCategories = quickDisplayCategories,
+            quickAmountSuggestions = QuickEntryAmountSuggestionsPolicy.suggest(
                 ledgerId = activeLedgerId,
-                type = overlay.newRecordType ?: RecordType.EXPENSE
+                type = quickEntryType,
+                timeSlot = quickEntryTimeSlot,
+                memories = quickEntryMemories
             ),
+            quickDefaultCategoryId = quickDefaults.categoryId,
+            quickDefaultAccountId = quickDefaults.accountId,
+            quickDefaultAmount = quickDefaults.amount,
             calendarMonth = _calendarMonth.value,
             datesWithRecords = datesWithRecords,
             message = message
@@ -322,6 +374,7 @@ class HomeViewModel @Inject constructor(
         restoreSelectedPeriodType()
         restoreHomeOverviewVisibility()
         restoreHapticPreference()
+        restoreQuickEntryMemories()
         observePeriodData()
         observeCalendarMonthData()
     }
@@ -357,6 +410,14 @@ class HomeViewModel @Inject constructor(
         viewModelScope.launch {
             hapticPreferencesRepository.keyPressHapticEnabled.collectLatest { enabled ->
                 _keyPressHapticEnabled.update { enabled }
+            }
+        }
+    }
+
+    private fun restoreQuickEntryMemories() {
+        viewModelScope.launch {
+            quickEntryPreferencesRepository.memories.collectLatest { memories ->
+                _quickEntryMemories.update { memories }
             }
         }
     }
@@ -442,10 +503,15 @@ class HomeViewModel @Inject constructor(
         _showAddEditSheet.update { true }
     }
 
-    fun showQuickAddSheet(initialType: RecordType) {
+    fun showQuickAddSheet(initialType: RecordType? = null) {
         _browsingRecord.update { null }
         _editingRecord.update { null }
-        _newRecordType.update { initialType }
+        _newRecordType.update {
+            initialType
+                ?: _lastRecordType.value
+                ?: _quickEntryMemories.value.firstOrNull()?.type
+                ?: RecordType.EXPENSE
+        }
         _addEntryMode.update { HomeAddEntryMode.QUICK }
         _showAddEditSheet.update { true }
     }
@@ -510,10 +576,12 @@ class HomeViewModel @Inject constructor(
         accountId: Long?
     ) {
         viewModelScope.launch {
+            var quickEntryMemory: QuickEntryMemory? = null
             database.withTransaction {
                 val now = LocalDateTime.now()
                 val editing = _editingRecord.value
                 val activeLedgerId = uiState.value.activeLedger?.id ?: 1L
+                val isNewQuickEntry = editing == null && _addEntryMode.value == HomeAddEntryMode.QUICK
 
                 if (editing != null) {
                     val oldAccountId = editing.accountId
@@ -558,6 +626,18 @@ class HomeViewModel @Inject constructor(
                         accountId = accountId
                     )
                     addRecordUseCase(newRecord)
+                    if (isNewQuickEntry) {
+                        quickEntryMemory = QuickEntryMemory(
+                            ledgerId = activeLedgerId,
+                            type = type,
+                            timeSlot = QuickEntryTimeSlot.fromHour(now.hour),
+                            categoryId = categoryId,
+                            accountId = accountId,
+                            amount = amount,
+                            note = note,
+                            savedAtEpochMillis = System.currentTimeMillis()
+                        )
+                    }
 
                     if (accountId != null) {
                         val account = accountRepository.getAccountById(accountId)
@@ -568,6 +648,7 @@ class HomeViewModel @Inject constructor(
                     }
                 }
             }
+            quickEntryMemory?.let { quickEntryPreferencesRepository.rememberQuickEntry(it) }
             _lastRecordType.update { type }
             hideAddEditSheet()
         }

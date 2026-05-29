@@ -52,8 +52,10 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mewbook.app.domain.model.BudgetWithSpending
-import com.mewbook.app.domain.model.Category
 import com.mewbook.app.domain.model.BudgetPeriodType
+import com.mewbook.app.domain.model.Category
+import com.mewbook.app.domain.policy.BudgetAlert
+import com.mewbook.app.domain.policy.BudgetAlertLevel
 import com.mewbook.app.ui.components.MewCompactTopAppBar
 import com.mewbook.app.ui.components.BudgetPeriodNavigator
 import com.mewbook.app.ui.components.BudgetPeriodTypeSelector
@@ -102,6 +104,12 @@ fun BudgetScreen(
                         title = "预算总览",
                         subtitle = "${uiState.periodLabel} · 已花 ${formatCurrency(uiState.totalSpent)}，按周期管理总预算和分类预算。"
                     )
+                }
+
+                if (uiState.budgetAlerts.isNotEmpty()) {
+                    item {
+                        BudgetAlertsCard(alerts = uiState.budgetAlerts)
+                    }
                 }
 
                 item {
@@ -187,6 +195,67 @@ fun BudgetScreen(
                 onCategorySelected = { categoryId -> viewModel.updateDialogCategory(categoryId) },
                 onSave = { amount -> viewModel.saveBudget(amount) }
             )
+        }
+    }
+}
+
+@Composable
+fun BudgetAlertsCard(
+    alerts: List<BudgetAlert>
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clayCardShadow(),
+        shape = RoundedCornerShape(ClayDesign.CardRadius),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        )
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(
+                text = "预算提醒",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+
+            alerts.forEach { alert ->
+                val accentColor = alert.level.alertColor()
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .width(4.dp)
+                            .height(42.dp)
+                            .background(accentColor, RoundedCornerShape(2.dp))
+                    )
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(2.dp)
+                    ) {
+                        Text(
+                            text = alert.title,
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = accentColor
+                        )
+                        Text(
+                            text = alert.description,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
         }
     }
 }
@@ -495,4 +564,13 @@ fun BudgetDialog(
             }
         }
     )
+}
+
+@Composable
+private fun BudgetAlertLevel.alertColor(): Color {
+    return when (this) {
+        BudgetAlertLevel.DANGER -> BudgetDanger
+        BudgetAlertLevel.CAUTION -> BudgetWarning
+        BudgetAlertLevel.INFO -> MaterialTheme.colorScheme.primary
+    }
 }

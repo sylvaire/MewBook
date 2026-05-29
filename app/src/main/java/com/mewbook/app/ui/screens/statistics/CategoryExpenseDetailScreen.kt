@@ -260,7 +260,8 @@ fun CategoryExpenseDetailScreen(
                             categoryIcon = uiState.categoryIcon,
                             categoryColor = uiState.categoryColor,
                             onClick = { viewModel.showRecordDetail(record) },
-                            modifier = Modifier.padding(horizontal = 16.dp)
+                            modifier = Modifier.padding(horizontal = 16.dp),
+                            hapticFeedbackEnabled = uiState.keyPressHapticEnabled
                         )
                     }
                 }
@@ -281,7 +282,8 @@ fun CategoryExpenseDetailScreen(
                 ),
                 account = uiState.accounts.firstOrNull { it.id == browsingRecord.accountId },
                 onDismiss = { viewModel.hideRecordDetail() },
-                onEdit = { record -> viewModel.editRecordFromDetail(record) }
+                onEdit = { record -> viewModel.editRecordFromDetail(record) },
+                hapticFeedbackEnabled = uiState.keyPressHapticEnabled
             )
         }
 

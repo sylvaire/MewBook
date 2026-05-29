@@ -163,6 +163,7 @@ import androidx.compose.ui.unit.dp
 import com.mewbook.app.R
 import com.mewbook.app.domain.model.Record
 import com.mewbook.app.domain.model.RecordType
+import com.mewbook.app.domain.policy.HapticFeedbackPolicy
 import com.mewbook.app.ui.theme.ClayDesign
 import com.mewbook.app.ui.theme.ExpenseRed
 import com.mewbook.app.ui.theme.IncomeGreen
@@ -183,11 +184,17 @@ fun RecordItem(
     categoryIcon: String,
     categoryColor: Long,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    hapticFeedbackEnabled: Boolean = true
 ) {
+    val hapticFeedback = rememberMewHapticFeedback(hapticFeedbackEnabled)
+
     // Claymorphism 卡片 - 多层柔和阴影
     Card(
-        onClick = onClick,
+        onClick = {
+            hapticFeedback.perform(HapticFeedbackPolicy.Interaction.RowClick)
+            onClick()
+        },
         modifier = modifier
             .fillMaxWidth()
             .clayCardShadow(),

@@ -6,6 +6,9 @@ import com.mewbook.app.domain.model.Budget
 import com.mewbook.app.domain.model.BudgetPeriodType
 import com.mewbook.app.domain.model.BudgetWithSpending
 import com.mewbook.app.domain.model.Category
+import com.mewbook.app.domain.model.RecordType
+import com.mewbook.app.domain.policy.BudgetAlert
+import com.mewbook.app.domain.policy.BudgetAlertPolicy
 import com.mewbook.app.domain.policy.BudgetCategoryBudgetPolicy
 import com.mewbook.app.domain.repository.BudgetRepository
 import com.mewbook.app.domain.repository.CategoryRepository
@@ -36,6 +39,7 @@ data class BudgetUiState(
     val totalBudget: Budget? = null,
     val totalSpent: Double = 0.0,
     val categoryBudgets: List<BudgetWithSpending> = emptyList(),
+    val budgetAlerts: List<BudgetAlert> = emptyList(),
     val categories: Map<Long, Category> = emptyMap(),
     val availableCategoryOptions: List<Category> = emptyList(),
     val isLoading: Boolean = false,
@@ -73,17 +77,24 @@ class BudgetViewModel @Inject constructor(
             }.collectLatest { (ledgerId, periodType, anchorDate) ->
                 _uiState.value = _uiState.value.copy(isLoading = true)
                 val (periodStart, periodEnd) = PeriodDateRange.dateRange(periodType, anchorDate)
+                val previousAnchorDate = PeriodDateRange.shiftAnchor(periodType, anchorDate, -1)
+                val (previousPeriodStart, previousPeriodEnd) = PeriodDateRange.dateRange(periodType, previousAnchorDate)
                 val periodKey = PeriodDateRange.periodKey(periodType, anchorDate)
 
                 combine(
                     budgetRepository.getBudgetsByPeriod(ledgerId, periodType, periodKey),
                     categoryRepository.getAllCategories(),
-                    recordRepository.getRecordsByLedgerAndDateRange(ledgerId, periodStart, periodEnd)
-                ) { budgets, categories, records ->
+                    recordRepository.getRecordsByLedgerAndDateRange(ledgerId, periodStart, periodEnd),
+                    recordRepository.getRecordsByLedgerAndDateRange(ledgerId, previousPeriodStart, previousPeriodEnd)
+                ) { budgets, categories, records, previousRecords ->
                     val categoryMap = categories.associateBy { it.id }
-                    val totalSpent = records.filter { it.type.name == "EXPENSE" }.sumOf { it.amount }
+                    val totalSpent = records.filter { it.type == RecordType.EXPENSE }.sumOf { it.amount }
                     val categorySpending = records
-                        .filter { it.type.name == "EXPENSE" }
+                        .filter { it.type == RecordType.EXPENSE }
+                        .groupBy { it.categoryId }
+                        .mapValues { entry -> entry.value.sumOf { it.amount } }
+                    val previousCategorySpending = previousRecords
+                        .filter { it.type == RecordType.EXPENSE }
                         .groupBy { it.categoryId }
                         .mapValues { entry -> entry.value.sumOf { it.amount } }
 
@@ -101,15 +112,28 @@ class BudgetViewModel @Inject constructor(
                         .sortedBy { budgetWithSpending ->
                             budgetWithSpending.budget.categoryId?.let { categoryMap[it]?.sortOrder } ?: Int.MIN_VALUE
                         }
+                    val totalBudget = budgets.find { it.categoryId == null }
+                    val categoryBudgetSpending = budgetsWithSpending.filter { it.budget.categoryId != null }
+                    val budgetAlerts = BudgetAlertPolicy.createAlerts(
+                        periodType = periodType,
+                        periodStart = periodStart,
+                        periodEnd = periodEnd,
+                        today = LocalDate.now(),
+                        totalBudget = totalBudget?.let { BudgetWithSpending(it, totalSpent) },
+                        categoryBudgets = categoryBudgetSpending,
+                        categories = categoryMap,
+                        previousCategorySpending = previousCategorySpending
+                    )
 
                     BudgetUiState(
                         selectedPeriodType = periodType,
                         anchorDate = anchorDate,
                         periodLabel = PeriodDateRange.formatPeriodLabel(periodType, periodStart, periodEnd),
                         canGoNext = PeriodDateRange.canGoToNextPeriod(periodType, anchorDate),
-                        totalBudget = budgets.find { it.categoryId == null },
+                        totalBudget = totalBudget,
                         totalSpent = totalSpent,
-                        categoryBudgets = budgetsWithSpending,
+                        categoryBudgets = categoryBudgetSpending,
+                        budgetAlerts = budgetAlerts,
                         categories = categoryMap,
                         isLoading = false
                     )
@@ -122,7 +146,8 @@ class BudgetViewModel @Inject constructor(
                             canGoNext = state.canGoNext,
                             totalBudget = state.totalBudget,
                             totalSpent = state.totalSpent,
-                            categoryBudgets = state.categoryBudgets.filter { it.budget.categoryId != null },
+                            categoryBudgets = state.categoryBudgets,
+                            budgetAlerts = state.budgetAlerts,
                             categories = state.categories,
                             isLoading = false,
                             availableCategoryOptions = resolveAvailableCategoryOptions(

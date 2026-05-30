@@ -11,8 +11,9 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.layout.aspectRatio
 import com.mewbook.app.ui.theme.LocalIsDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -85,12 +86,19 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.mewbook.app.domain.model.BudgetPeriodType
+import com.mewbook.app.domain.model.Category
 import com.mewbook.app.domain.model.RecordType
 import com.mewbook.app.domain.model.Record
-import com.mewbook.app.domain.model.Category
 import com.mewbook.app.domain.policy.HapticFeedbackPolicy
+import com.mewbook.app.domain.policy.HomeRecordListEntry
+import com.mewbook.app.domain.policy.HomeRecordListGroupingPolicy
 import com.mewbook.app.domain.policy.HomeScreenLayoutPolicy
+import com.mewbook.app.domain.policy.HomePeriodSwipeAction
+import com.mewbook.app.domain.policy.HomePeriodSwipePolicy
 import com.mewbook.app.domain.policy.QuickEntryFabGesturePolicy
 import com.mewbook.app.ui.components.BudgetPeriodNavigator
 import com.mewbook.app.ui.components.MewSnackbarHost
@@ -109,6 +117,8 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -117,6 +127,9 @@ import kotlinx.coroutines.launch
 // Warm Claymorphism Home Screen
 // 温暖黏土风首页
 // ============================================
+
+private val HomeRecordDateHeaderFormatter: DateTimeFormatter =
+    DateTimeFormatter.ofPattern("MM月dd日 EEEE", Locale.CHINA)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -134,6 +147,7 @@ fun HomeScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val hapticFeedback = rememberMewHapticFeedback(uiState.keyPressHapticEnabled)
+    val swipeThresholdPx = with(LocalDensity.current) { 72.dp.toPx() }
 
     LaunchedEffect(uiState.showAddEditSheet) {
         onAddSheetVisibilityChanged(uiState.showAddEditSheet)
@@ -243,6 +257,52 @@ fun HomeScreen(
                         .fillMaxSize()
                         .padding(paddingValues)
                         .background(MaterialTheme.colorScheme.background)
+                        .then(
+                            if (uiState.isSearchMode || uiState.isLoading) {
+                                Modifier
+                            } else {
+                                Modifier.pointerInput(
+                                    uiState.canGoNext,
+                                    uiState.keyPressHapticEnabled,
+                                    swipeThresholdPx
+                                ) {
+                                    var totalDragX = 0f
+                                    detectHorizontalDragGestures(
+                                        onDragStart = { totalDragX = 0f },
+                                        onHorizontalDrag = { change, dragAmount ->
+                                            totalDragX += dragAmount
+                                            change.consume()
+                                        },
+                                        onDragEnd = {
+                                            when (
+                                                HomePeriodSwipePolicy.resolve(
+                                                    totalDragX = totalDragX,
+                                                    thresholdPx = swipeThresholdPx,
+                                                    canGoNext = uiState.canGoNext
+                                                )
+                                            ) {
+                                                HomePeriodSwipeAction.Previous -> {
+                                                    scrollToDate = null
+                                                    hapticFeedback.perform(HapticFeedbackPolicy.Interaction.Selection)
+                                                    viewModel.previousPeriod()
+                                                }
+                                                HomePeriodSwipeAction.Next -> {
+                                                    scrollToDate = null
+                                                    hapticFeedback.perform(
+                                                        HapticFeedbackPolicy.Interaction.Selection,
+                                                        controlEnabled = uiState.canGoNext
+                                                    )
+                                                    viewModel.nextPeriod()
+                                                }
+                                                HomePeriodSwipeAction.None -> Unit
+                                            }
+                                            totalDragX = 0f
+                                        },
+                                        onDragCancel = { totalDragX = 0f }
+                                    )
+                                }
+                            }
+                        )
                 ) {
                     if (uiState.isSearchMode) {
                         HomeSearchField(
@@ -327,6 +387,11 @@ fun HomeScreen(
                                 modifier = Modifier.weight(1f),
                                 records = uiState.records,
                                 categories = uiState.categories,
+                                periodType = if (uiState.isSearchMode) {
+                                    BudgetPeriodType.DAY
+                                } else {
+                                    uiState.selectedPeriodType
+                                },
                                 headerContent = if (showScrollableHomeHeader && uiState.showHomeOverviewCards) {
                                     {
                                         SummaryCard(
@@ -895,6 +960,7 @@ private fun SearchStateMessage(
 private fun HomeRecordList(
     records: List<Record>,
     categories: Map<Long, Category>,
+    periodType: BudgetPeriodType,
     modifier: Modifier = Modifier,
     headerContent: (@Composable () -> Unit)? = null,
     scrollToDate: LocalDate? = null,
@@ -902,10 +968,15 @@ private fun HomeRecordList(
     onRecordClick: (com.mewbook.app.domain.model.Record) -> Unit
 ) {
     val listState = rememberLazyListState()
+    val entries = remember(records, periodType) {
+        HomeRecordListGroupingPolicy.buildEntries(records, periodType)
+    }
 
-    LaunchedEffect(scrollToDate, records) {
+    LaunchedEffect(scrollToDate, entries) {
         if (scrollToDate != null) {
-            val index = records.indexOfFirst { it.date == scrollToDate }
+            val index = entries.indexOfFirst { entry ->
+                entry is HomeRecordListEntry.RecordEntry && entry.record.date == scrollToDate
+            }
             if (index >= 0) {
                 val offset = if (headerContent != null) 1 else 0
                 listState.animateScrollToItem(index + offset)
@@ -931,22 +1002,78 @@ private fun HomeRecordList(
             }
         }
         items(
-            items = records,
-            key = { it.id },
-            contentType = { "record" }
-        ) { record ->
-            val category = categories[record.categoryId]
-            RecordItem(
-                record = record,
-                categoryName = category?.name ?: "未知",
-                categoryIcon = category?.icon ?: "more_horiz",
-                categoryColor = category?.color ?: 0xFF808080,
-                onClick = { onRecordClick(record) },
-                modifier = Modifier.padding(horizontal = 16.dp),
-                hapticFeedbackEnabled = hapticFeedbackEnabled
-            )
+            items = entries,
+            key = { entry ->
+                when (entry) {
+                    is HomeRecordListEntry.DateHeader -> "date-${entry.date}"
+                    is HomeRecordListEntry.RecordEntry -> "record-${entry.record.id}"
+                }
+            },
+            contentType = { entry ->
+                when (entry) {
+                    is HomeRecordListEntry.DateHeader -> "date-header"
+                    is HomeRecordListEntry.RecordEntry -> "record"
+                }
+            }
+        ) { entry ->
+            when (entry) {
+                is HomeRecordListEntry.DateHeader -> {
+                    HomeRecordDateHeader(
+                        date = entry.date,
+                        modifier = Modifier.padding(horizontal = 18.dp)
+                    )
+                }
+                is HomeRecordListEntry.RecordEntry -> {
+                    val record = entry.record
+                    val category = categories[record.categoryId]
+                    RecordItem(
+                        record = record,
+                        categoryName = category?.name ?: "未知",
+                        categoryIcon = category?.icon ?: "more_horiz",
+                        categoryColor = category?.color ?: 0xFF808080,
+                        onClick = { onRecordClick(record) },
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                        hapticFeedbackEnabled = hapticFeedbackEnabled
+                    )
+                }
+            }
         }
     }
+}
+
+@Composable
+private fun HomeRecordDateHeader(
+    date: LocalDate,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = formatHomeRecordDateHeader(date),
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .height(1.dp)
+                .background(MaterialTheme.colorScheme.outline.copy(alpha = 0.14f))
+        )
+    }
+}
+
+private fun formatHomeRecordDateHeader(date: LocalDate): String {
+    val today = LocalDate.now()
+    val prefix = when (date) {
+        today -> "今天 · "
+        today.minusDays(1) -> "昨天 · "
+        else -> ""
+    }
+    return prefix + date.format(HomeRecordDateHeaderFormatter)
 }
 
 @Composable

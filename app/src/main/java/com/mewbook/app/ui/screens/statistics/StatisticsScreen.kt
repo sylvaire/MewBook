@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -426,26 +427,34 @@ fun CategoryBreakdown(
                 }
 
                 if (hasMore) {
-                    Row(
+                    Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clickable { expanded = !expanded }
                             .padding(top = 4.dp),
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically
+                        contentAlignment = Alignment.Center
                     ) {
-                        Text(
-                            text = if (expanded) "收起" else "展开全部",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = accentColor,
-                            fontWeight = FontWeight.Medium
-                        )
-                        Icon(
-                            imageVector = if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
-                            contentDescription = if (expanded) "收起" else "展开全部",
-                            tint = accentColor,
-                            modifier = Modifier.size(18.dp)
-                        )
+                        Row(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(999.dp))
+                                .clickable { expanded = !expanded }
+                                .heightIn(min = 40.dp)
+                                .padding(horizontal = 12.dp),
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = if (expanded) "收起" else "展开全部",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = accentColor,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Icon(
+                                imageVector = if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                                contentDescription = if (expanded) "收起" else "展开全部",
+                                tint = accentColor,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
                     }
                 }
             }

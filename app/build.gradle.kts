@@ -24,8 +24,8 @@ android {
         applicationId = "com.mewbook.app"
         minSdk = 26
         targetSdk = 34
-        versionCode = 14
-        versionName = "1.2.0"
+        versionCode = 15
+        versionName = "1.2.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {

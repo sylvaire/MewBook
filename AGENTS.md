@@ -4,7 +4,7 @@
 
 - MewBook（喵喵记账）是单模块 Android 应用，模块名为 `app`。
 - 技术栈：Kotlin、Jetpack Compose、Material 3、Navigation Compose、Room、Hilt、DataStore、OkHttp、kotlinx-serialization。
-- 当前构建事实来自 `app/build.gradle.kts`：`minSdk = 26`、`targetSdk = 34`、`versionCode = 13`、`versionName = "1.1.0"`。
+- 当前构建事实来自 `app/build.gradle.kts`：`minSdk = 26`、`targetSdk = 34`、`versionCode = 15`、`versionName = "1.2.1"`。
 - 当前 Room 数据库事实来自 `MewBookDatabase.kt`：数据库名 `mewbook.db`，版本 `6`，`exportSchema = false`。
 
 ## Standard Commands

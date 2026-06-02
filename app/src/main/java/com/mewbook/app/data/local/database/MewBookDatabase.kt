@@ -31,7 +31,7 @@ import com.mewbook.app.data.local.entity.RecordEntity
         RecurringTemplateEntity::class,
         DeletedRecordEntity::class
     ],
-    version = 6,
+    version = 7,
     exportSchema = false
 )
 @TypeConverters(Converters::class)

@@ -24,4 +24,8 @@ object RecordTrashPolicy {
         val hasPartialDay = remaining.minusDays(wholeDays).seconds > 0 || remaining.minusDays(wholeDays).nano > 0
         return (wholeDays + if (hasPartialDay) 1 else 0).toInt()
     }
+
+    fun isExpiringSoon(deletedAt: LocalDateTime, now: LocalDateTime): Boolean {
+        return !isExpired(deletedAt, now) && remainingDays(deletedAt, now) <= 1
+    }
 }

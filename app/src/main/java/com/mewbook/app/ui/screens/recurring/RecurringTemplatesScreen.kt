@@ -1,9 +1,6 @@
 package com.mewbook.app.ui.screens.recurring
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateContentSize
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -25,8 +22,6 @@ import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.ExpandLess
-import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material3.AlertDialog
@@ -62,7 +57,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -83,8 +77,7 @@ import com.mewbook.app.ui.components.MewCompactTopAppBar
 import com.mewbook.app.ui.components.SettingsSectionHeader
 import com.mewbook.app.ui.components.SettingsSummaryCard
 import com.mewbook.app.ui.components.SettingsSurfaceCard
-import com.mewbook.app.ui.theme.ExpenseRed
-import com.mewbook.app.ui.theme.IncomeGreen
+import com.mewbook.app.ui.theme.LocalMewBookSemanticColors
 import com.mewbook.app.util.formatCurrency
 import java.time.Instant
 import java.time.LocalDate
@@ -156,12 +149,9 @@ fun RecurringTemplatesScreen(
                     TemplatesSummaryCard(templates = uiState.templates)
                 }
                 item {
-                    RecurringTemplateGuideCard()
-                }
-                item {
                     SettingsSectionHeader(
                         title = "模板列表",
-                        description = "启用中的模板可以生成本期记录或跳过本期。"
+                        description = "${RecurringTemplateUsageGuide.summary} 启用中的模板可以生成本期记录或跳过本期。"
                     )
                 }
 
@@ -218,84 +208,6 @@ fun RecurringTemplatesScreen(
                 onUpdate = viewModel::updateEditor,
                 onSave = { viewModel.saveEditor() }
             )
-        }
-    }
-}
-
-@Composable
-private fun RecurringTemplateGuideCard() {
-    var isExpanded by rememberSaveable { mutableStateOf(RecurringTemplateUsageGuide.defaultExpanded) }
-
-    SettingsSurfaceCard(
-        modifier = Modifier
-            .fillMaxWidth()
-            .animateContentSize()
-            .clickable { isExpanded = !isExpanded },
-        containerColor = MaterialTheme.colorScheme.tertiaryContainer
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = RecurringTemplateUsageGuide.title,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onTertiaryContainer
-                )
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = if (isExpanded) {
-                            RecurringTemplateUsageGuide.collapseLabel
-                        } else {
-                            RecurringTemplateUsageGuide.expandLabel
-                        },
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onTertiaryContainer
-                    )
-                    Icon(
-                        imageVector = if (isExpanded) {
-                            Icons.Filled.ExpandLess
-                        } else {
-                            Icons.Filled.ExpandMore
-                        },
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onTertiaryContainer
-                    )
-                }
-            }
-            Text(
-                text = RecurringTemplateUsageGuide.summary,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onTertiaryContainer
-            )
-            AnimatedVisibility(visible = isExpanded) {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    RecurringTemplateUsageGuide.visibleSteps(isExpanded).forEach { step ->
-                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Text(
-                                text = step.title,
-                                style = MaterialTheme.typography.labelLarge,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.onTertiaryContainer
-                            )
-                            Text(
-                                text = step.detail,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onTertiaryContainer
-                            )
-                        }
-                    }
-                }
-            }
         }
     }
 }
@@ -359,7 +271,8 @@ private fun RecurringTemplateCard(
     onSkip: () -> Unit,
     onDelete: () -> Unit
 ) {
-    val accentColor = if (template.type == RecordType.EXPENSE) ExpenseRed else IncomeGreen
+    val semanticColors = LocalMewBookSemanticColors.current
+    val accentColor = if (template.type == RecordType.EXPENSE) semanticColors.expense else semanticColors.income
     val statusText = remember(template) { templateStatusText(template) }
     val canProcessOccurrence = remember(template) {
         RecurringTemplateSchedulePolicy.canProcessCurrentOccurrence(template)

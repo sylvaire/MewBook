@@ -30,6 +30,7 @@ import androidx.compose.material.icons.filled.CardGiftcard
 import androidx.compose.material.icons.filled.Calculate
 import androidx.compose.material.icons.filled.CarRental
 import androidx.compose.material.icons.filled.CarRepair
+import androidx.compose.material.icons.filled.Checkroom
 import androidx.compose.material.icons.filled.Chair
 import androidx.compose.material.icons.filled.ChildCare
 import androidx.compose.material.icons.filled.CleaningServices
@@ -165,8 +166,7 @@ import com.mewbook.app.domain.model.Record
 import com.mewbook.app.domain.model.RecordType
 import com.mewbook.app.domain.policy.HapticFeedbackPolicy
 import com.mewbook.app.ui.theme.ClayDesign
-import com.mewbook.app.ui.theme.ExpenseRed
-import com.mewbook.app.ui.theme.IncomeGreen
+import com.mewbook.app.ui.theme.LocalMewBookSemanticColors
 import com.mewbook.app.ui.theme.clayCardShadow
 import java.text.NumberFormat
 import java.time.format.DateTimeFormatter
@@ -188,6 +188,7 @@ fun RecordItem(
     hapticFeedbackEnabled: Boolean = true
 ) {
     val hapticFeedback = rememberMewHapticFeedback(hapticFeedbackEnabled)
+    val semanticColors = LocalMewBookSemanticColors.current
 
     // Claymorphism 卡片 - 多层柔和阴影
     Card(
@@ -252,7 +253,7 @@ fun RecordItem(
                 text = "${if (record.type == RecordType.INCOME) "+" else "-"}${formatCurrency(record.amount)}",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
-                color = if (record.type == RecordType.INCOME) IncomeGreen else ExpenseRed
+                color = if (record.type == RecordType.INCOME) semanticColors.income else semanticColors.expense
             )
         }
     }
@@ -361,14 +362,14 @@ fun getIconForCategory(iconName: String): ImageVector {
         "toys" -> Icons.Filled.Toys
         "baby_changing_station" -> Icons.Filled.BabyChangingStation
         "boy" -> Icons.Filled.Boy
-        "checkroom" -> Icons.Filled.ShoppingBag
+        "checkroom" -> Icons.Filled.Checkroom
         "cleaning_services" -> Icons.Filled.CleaningServices
         "child_care" -> Icons.Filled.ChildCare
         "kitchen" -> Icons.Filled.Kitchen
 
         // 居住相关
         "water_drop" -> Icons.Filled.WaterDrop
-        "manage_accounts" -> Icons.Filled.MeetingRoom
+        "meeting_room", "manage_accounts" -> Icons.Filled.MeetingRoom
         "local_fire_department" -> Icons.Filled.LocalFireDepartment
         "phone_android" -> Icons.Filled.PhoneAndroid
 

@@ -29,6 +29,53 @@ import androidx.core.view.WindowCompat
 
 val LocalIsDarkTheme = staticCompositionLocalOf { false }
 
+data class MewBookSemanticColors(
+    val income: Color,
+    val incomeContainer: Color,
+    val onIncomeContainer: Color,
+    val expense: Color,
+    val expenseContainer: Color,
+    val onExpenseContainer: Color,
+    val budgetSafe: Color,
+    val budgetSafeContainer: Color,
+    val budgetWarning: Color,
+    val budgetWarningContainer: Color,
+    val budgetDanger: Color,
+    val budgetDangerContainer: Color
+)
+
+private val LightSemanticColors = MewBookSemanticColors(
+    income = IncomeGreen,
+    incomeContainer = IncomeGreenContainer,
+    onIncomeContainer = OnIncomeContainer,
+    expense = ExpenseRed,
+    expenseContainer = ExpenseRedContainer,
+    onExpenseContainer = OnExpenseContainer,
+    budgetSafe = BudgetSafe,
+    budgetSafeContainer = BudgetSafeContainer,
+    budgetWarning = BudgetWarning,
+    budgetWarningContainer = BudgetWarningContainer,
+    budgetDanger = BudgetDanger,
+    budgetDangerContainer = BudgetDangerContainer
+)
+
+private val DarkSemanticColors = MewBookSemanticColors(
+    income = IncomeGreenDark,
+    incomeContainer = IncomeGreenDarkContainer,
+    onIncomeContainer = OnIncomeDarkContainer,
+    expense = ExpenseRedDark,
+    expenseContainer = ExpenseRedDarkContainer,
+    onExpenseContainer = OnExpenseDarkContainer,
+    budgetSafe = BudgetSafeDark,
+    budgetSafeContainer = BudgetSafeDarkContainer,
+    budgetWarning = BudgetWarningDark,
+    budgetWarningContainer = BudgetWarningDarkContainer,
+    budgetDanger = BudgetDangerDark,
+    budgetDangerContainer = BudgetDangerDarkContainer
+)
+
+val LocalMewBookSemanticColors = staticCompositionLocalOf { LightSemanticColors }
+
 private val WarmLightColorScheme = lightColorScheme(
     primary = Primary,
     onPrimary = OnPrimary,
@@ -62,15 +109,17 @@ private val WarmDarkColorScheme = darkColorScheme(
     primaryContainer = PrimaryContainerDark,
     onPrimaryContainer = OnPrimaryContainerDark,
     secondary = SecondaryDark,
+    onSecondary = OnSecondaryDark,
     secondaryContainer = SecondaryContainerDark,
     onSecondaryContainer = OnSecondaryContainerDark,
     tertiary = TertiaryDark,
+    onTertiary = OnTertiaryDark,
     tertiaryContainer = TertiaryContainerDark,
     onTertiaryContainer = OnTertiaryContainerDark,
-    error = Error,
-    onError = OnError,
-    errorContainer = ErrorContainer,
-    onErrorContainer = OnErrorContainer,
+    error = ErrorDark,
+    onError = OnErrorDark,
+    errorContainer = ErrorContainerDark,
+    onErrorContainer = OnErrorContainerDark,
     background = BackgroundDark,
     onBackground = OnBackgroundDark,
     surface = SurfaceDark,
@@ -98,6 +147,7 @@ fun MewBookTheme(
         darkTheme -> WarmDarkColorScheme
         else -> WarmLightColorScheme
     }
+    val semanticColors = if (darkTheme) DarkSemanticColors else LightSemanticColors
 
     val view = LocalView.current
     if (!view.isInEditMode) {
@@ -130,7 +180,10 @@ fun MewBookTheme(
         typography = Typography,
         shapes = MewBookShapes,
         content = {
-            CompositionLocalProvider(LocalIsDarkTheme provides darkTheme) {
+            CompositionLocalProvider(
+                LocalIsDarkTheme provides darkTheme,
+                LocalMewBookSemanticColors provides semanticColors
+            ) {
                 content()
             }
         }

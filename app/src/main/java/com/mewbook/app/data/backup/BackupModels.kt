@@ -113,7 +113,11 @@ data class BackupDavConfig(
     val password: String,
     val remotePath: String,
     val isEnabled: Boolean,
-    val lastSyncTime: Long? = null
+    val lastSyncTime: Long? = null,
+    val lastSyncFileName: String? = null,
+    val lastSyncFileSizeBytes: Long? = null,
+    val lastSyncDurationMillis: Long? = null,
+    val lastSyncDirection: String? = null
 )
 
 data class BackupSnapshotSummary(
@@ -141,10 +145,33 @@ data class BackupConflictSummary(
     val totalConflicts: Int = records + categories + accounts + budgets + templates + ledgers
 }
 
+data class BackupChangeCount(
+    val added: Int = 0,
+    val modified: Int = 0,
+    val deleted: Int = 0
+) {
+    val totalChanges: Int = added + modified + deleted
+}
+
+data class BackupChangeSummary(
+    val records: BackupChangeCount = BackupChangeCount(),
+    val categories: BackupChangeCount = BackupChangeCount(),
+    val accounts: BackupChangeCount = BackupChangeCount(),
+    val budgets: BackupChangeCount = BackupChangeCount(),
+    val templates: BackupChangeCount = BackupChangeCount(),
+    val ledgers: BackupChangeCount = BackupChangeCount()
+) {
+    val added: Int = records.added + categories.added + accounts.added + budgets.added + templates.added + ledgers.added
+    val modified: Int = records.modified + categories.modified + accounts.modified + budgets.modified + templates.modified + ledgers.modified
+    val deleted: Int = records.deleted + categories.deleted + accounts.deleted + budgets.deleted + templates.deleted + ledgers.deleted
+    val totalChanges: Int = added + modified + deleted
+}
+
 data class BackupRestorePreview(
     val current: BackupSnapshotSummary,
     val incoming: BackupSnapshotSummary,
-    val conflicts: BackupConflictSummary
+    val conflicts: BackupConflictSummary,
+    val changes: BackupChangeSummary = BackupChangeSummary()
 ) {
     val hasExistingData: Boolean = current.hasExistingData
 }

@@ -12,5 +12,9 @@ data class DavConfigEntity(
     val password: String,
     val remotePath: String,
     val isEnabled: Boolean,
-    val lastSyncTime: Long?
+    val lastSyncTime: Long?,
+    val lastSyncFileName: String? = null,
+    val lastSyncFileSizeBytes: Long? = null,
+    val lastSyncDurationMillis: Long? = null,
+    val lastSyncDirection: String? = null
 )

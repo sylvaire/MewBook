@@ -28,4 +28,23 @@ interface DavConfigDao {
 
     @Query("UPDATE dav_config SET lastSyncTime = :syncTime WHERE id = 1")
     suspend fun updateLastSyncTime(syncTime: Long)
+
+    @Query(
+        """
+            UPDATE dav_config
+            SET lastSyncTime = :syncTime,
+                lastSyncFileName = :fileName,
+                lastSyncFileSizeBytes = :fileSizeBytes,
+                lastSyncDurationMillis = :durationMillis,
+                lastSyncDirection = :direction
+            WHERE id = 1
+        """
+    )
+    suspend fun updateLastSyncDetails(
+        syncTime: Long,
+        fileName: String?,
+        fileSizeBytes: Long?,
+        durationMillis: Long?,
+        direction: String?
+    )
 }

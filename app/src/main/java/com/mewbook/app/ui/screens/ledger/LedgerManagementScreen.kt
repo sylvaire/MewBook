@@ -70,7 +70,6 @@ import com.mewbook.app.domain.repository.LedgerRepository
 import com.mewbook.app.ui.components.AccountTypeIconBadge
 import com.mewbook.app.ui.components.MewCompactTopAppBar
 import com.mewbook.app.ui.components.SettingsSectionHeader
-import com.mewbook.app.ui.components.SettingsSummaryCard
 import com.mewbook.app.ui.components.SettingsSurfaceCard
 import com.mewbook.app.ui.components.toDisplayName
 import com.mewbook.app.ui.theme.ClayDesign
@@ -360,16 +359,9 @@ fun LedgerManagementScreen(
                 .padding(paddingValues)
                 .padding(horizontal = 16.dp)
         ) {
-            SettingsSummaryCard(
-                icon = Icons.Filled.Groups,
-                title = "账本管理",
-                subtitle = "共 ${displayLedgers.size} 个账本。点击进入默认账本/账户设置，长按删除非默认账本。",
-                modifier = Modifier.padding(top = 16.dp)
-            )
-
             SettingsSectionHeader(
                 title = "账本列表",
-                description = "使用右侧箭头调整显示顺序。",
+                description = "共 ${displayLedgers.size} 个账本。点击设置默认账本/账户，长按删除非默认账本，右侧箭头调整顺序。",
                 modifier = Modifier.padding(top = 16.dp, bottom = 8.dp)
             )
 

@@ -704,7 +704,7 @@ object BackupImportPolicy {
             normalized.contains("alipay") || normalized.contains("支付宝") -> AccountMeta("ALIPAY", "alipay", 0xFF1890FF)
             normalized.contains("wechat") || normalized.contains("微信") -> AccountMeta("WECHAT", "wechat", 0xFF07C160)
             normalized.contains("信用") || normalized.contains("credit") -> AccountMeta("CREDIT_CARD", "credit_card", 0xFFE57373)
-            normalized.contains("bank") || normalized.contains("银行卡") || normalized.contains("银行") || normalized.contains("储蓄") -> AccountMeta("BANK", "account_balance", 0xFF2196F3)
+            normalized.contains("bank") || normalized.contains("银行卡") || normalized.contains("银行") || normalized.contains("储蓄") -> AccountMeta("BANK", "bank_card", 0xFF2196F3)
             normalized.contains("现金") || normalized.contains("cash") -> AccountMeta("CASH", "account_balance_wallet", 0xFF4CAF50)
             normalized.contains("投资") || normalized.contains("基金") || normalized.contains("stock") -> AccountMeta("INVESTMENT", "trending_up", 0xFF8E24AA)
             else -> AccountMeta("OTHER", "account_balance_wallet", 0xFF90A4AE)

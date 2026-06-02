@@ -9,12 +9,33 @@ data class DavConfig(
     val password: String = "",
     val remotePath: String = "/MewBook",
     val isEnabled: Boolean = false,
-    val lastSyncTime: LocalDateTime? = null
+    val lastSyncTime: LocalDateTime? = null,
+    val lastSyncDetails: DavSyncSuccessDetails? = null
 ) {
     fun isConfigured(): Boolean = serverUrl.isNotBlank() && username.isNotBlank() && password.isNotBlank()
 
     fun isInsecure(): Boolean = serverUrl.startsWith("http://", ignoreCase = true) &&
         !serverUrl.startsWith("http://localhost")
+}
+
+enum class DavSyncDirection {
+    EXPORT,
+    IMPORT,
+    AUTO_BACKUP
+}
+
+data class DavSyncSuccessDetails(
+    val syncedAt: LocalDateTime,
+    val direction: DavSyncDirection,
+    val fileName: String,
+    val fileSizeBytes: Long,
+    val durationMillis: Long
+)
+
+enum class DavConflictStrategy {
+    LOCAL_FIRST,
+    REMOTE_FIRST,
+    MANUAL
 }
 
 data class DavBackupPruneResult(

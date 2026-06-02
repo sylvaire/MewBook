@@ -16,8 +16,10 @@ import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -39,18 +41,23 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.mewbook.app.data.backup.BackupRestorePreview
+import com.mewbook.app.data.backup.BackupSnapshotSummary
 import com.mewbook.app.domain.model.DavAutoBackupStatus
 import com.mewbook.app.domain.model.DavBackupFile
+import com.mewbook.app.domain.model.DavConflictStrategy
+import com.mewbook.app.domain.model.DavSyncDirection
+import com.mewbook.app.domain.model.DavSyncSuccessDetails
 import com.mewbook.app.ui.components.MewCompactTopAppBar
 import com.mewbook.app.ui.components.SettingsPageScaffold
 import com.mewbook.app.ui.components.SettingsRowCard
 import com.mewbook.app.ui.components.SettingsSectionHeader
-import com.mewbook.app.ui.components.SettingsSummaryCard
 import com.mewbook.app.ui.components.SettingsSurfaceCard
 import com.mewbook.app.ui.components.SettingsSwitchRowCard
 import androidx.compose.material.icons.filled.CloudSync
 import androidx.compose.material.icons.filled.Refresh
 import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -100,52 +107,15 @@ fun DavSettingsScreen(
     }
 
     uiState.importPreview?.let { preview ->
-        AlertDialog(
-            onDismissRequest = { viewModel.clearImportPreview() },
-            title = { Text("确认 DAV 导入") },
-            text = {
-                Column {
-                    uiState.selectedImportBackupFile?.let { backupFile ->
-                        Text(
-                            text = "备份文件：${backupFile.displayName}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                    }
-                    Text("导入会覆盖当前本地数据，建议先执行一次本地备份。")
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = "当前数据：记录 ${preview.current.records}、分类 ${preview.current.categories}、账户 ${preview.current.accounts}、预算 ${preview.current.budgets}、模板 ${preview.current.templates}、账本 ${preview.current.ledgers}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Text(
-                        text = "导入数据：记录 ${preview.incoming.records}、分类 ${preview.incoming.categories}、账户 ${preview.incoming.accounts}、预算 ${preview.incoming.budgets}、模板 ${preview.incoming.templates}、账本 ${preview.incoming.ledgers}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Text(
-                        text = "可能冲突：记录 ${preview.conflicts.records}、分类 ${preview.conflicts.categories}、账户 ${preview.conflicts.accounts}、预算 ${preview.conflicts.budgets}、模板 ${preview.conflicts.templates}、账本 ${preview.conflicts.ledgers}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        viewModel.confirmImportData()
-                    }
-                ) {
-                    Text("继续导入")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { viewModel.clearImportPreview() }) {
-                    Text("取消")
-                }
-            }
+        ImportPreviewDialog(
+            preview = preview,
+            backupFile = uiState.selectedImportBackupFile,
+            conflictStrategy = uiState.conflictStrategy,
+            onStrategyChange = viewModel::updateConflictStrategy,
+            onConfirmByStrategy = viewModel::confirmImportData,
+            onRemoteImport = viewModel::confirmRemoteImport,
+            onKeepLocal = viewModel::keepLocalImport,
+            onDismiss = viewModel::clearImportPreview
         )
     }
 
@@ -170,15 +140,9 @@ fun DavSettingsScreen(
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { paddingValues ->
         SettingsPageScaffold(paddingValues = paddingValues) {
-            SettingsSummaryCard(
-                icon = Icons.Filled.CloudUpload,
-                title = "云端备份与恢复",
-                subtitle = "配置 WebDAV 后，可以手动导出、自选备份导入，也可以每天首次打开 App 自动备份。"
-            )
-
             SettingsSectionHeader(
                 title = "服务器",
-                description = "先保存配置，再执行连接测试或同步操作。"
+                description = "配置 WebDAV 地址和远程路径，保存后即可连接测试或同步。"
             )
 
             ConfigSummaryCard(
@@ -202,23 +166,18 @@ fun DavSettingsScreen(
 
             SettingsSectionHeader(
                 title = "同步操作",
-                description = "自动备份状态和手动导入导出集中在这里。"
+                description = "查看最近成功详情，选择冲突策略，或手动导入导出。"
             )
 
-            // Last sync status
-            SettingsSurfaceCard {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
-                        text = if (uiState.lastSyncTime != null) {
-                            "上次同步: ${uiState.lastSyncTime!!.format(DateTimeFormatter.ofPattern("yyyy年MM月dd日 HH:mm"))}"
-                        } else {
-                            "尚未同步"
-                        },
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
+            LastSyncDetailsCard(
+                details = uiState.lastSyncDetails,
+                fallbackTime = uiState.lastSyncTime
+            )
+
+            ConflictStrategyCard(
+                selectedStrategy = uiState.conflictStrategy,
+                onStrategyChange = viewModel::updateConflictStrategy
+            )
 
             // Auto-backup toggle
             SettingsSwitchRowCard(
@@ -241,80 +200,320 @@ fun DavSettingsScreen(
                 }
             }
 
-            // Export / Import actions
-            SettingsSurfaceCard {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    OutlinedButton(
-                        onClick = { viewModel.showExportFileNameDialog() },
-                        enabled = !uiState.isExporting && !uiState.isImporting && !uiState.isPreviewingImport,
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        if (uiState.isExporting) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.height(16.dp).width(16.dp),
-                                strokeWidth = 2.dp
-                            )
-                        } else {
-                            Icon(Icons.Filled.CloudUpload, contentDescription = null)
-                        }
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("导出到DAV")
-                    }
+            DavTransferActionsCard(
+                exportBusy = uiState.isExporting,
+                importBusy = uiState.isPreviewingImport || uiState.isImporting || uiState.isLoadingBackupFiles,
+                exportEnabled = !uiState.isExporting && !uiState.isImporting && !uiState.isPreviewingImport,
+                importEnabled = !uiState.isExporting &&
+                    !uiState.isImporting &&
+                    !uiState.isPreviewingImport &&
+                    !uiState.isLoadingBackupFiles,
+                importLabel = when {
+                    uiState.isLoadingBackupFiles -> "加载中"
+                    uiState.isPreviewingImport -> "预览中"
+                    else -> "从 DAV 导入"
+                },
+                onExport = { viewModel.showExportFileNameDialog() },
+                onImport = { viewModel.previewImportData() }
+            )
 
-                    OutlinedButton(
-                        onClick = { viewModel.previewImportData() },
-                        enabled = !uiState.isExporting &&
-                            !uiState.isImporting &&
-                            !uiState.isPreviewingImport &&
-                            !uiState.isLoadingBackupFiles,
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        if (uiState.isPreviewingImport || uiState.isImporting || uiState.isLoadingBackupFiles) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.height(16.dp).width(16.dp),
-                                strokeWidth = 2.dp
-                            )
-                        } else {
-                            Icon(Icons.Filled.CloudDownload, contentDescription = null)
-                        }
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            when {
-                                uiState.isLoadingBackupFiles -> "加载中"
-                                uiState.isPreviewingImport -> "预览中"
-                                else -> "从DAV导入"
-                            }
-                        )
-                    }
+        }
+    }
+}
+
+@Composable
+private fun DavTransferActionsCard(
+    exportBusy: Boolean,
+    importBusy: Boolean,
+    exportEnabled: Boolean,
+    importEnabled: Boolean,
+    importLabel: String,
+    onExport: () -> Unit,
+    onImport: () -> Unit
+) {
+    SettingsSurfaceCard {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Button(
+                onClick = onExport,
+                enabled = exportEnabled,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                if (exportBusy) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.height(16.dp).width(16.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.onPrimary
+                    )
+                } else {
+                    Icon(Icons.Filled.CloudUpload, contentDescription = null)
                 }
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("导出到 DAV")
             }
 
-            // Usage instructions
-            SettingsSurfaceCard(containerColor = MaterialTheme.colorScheme.tertiaryContainer) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
-                        text = "使用说明",
-                        style = MaterialTheme.typography.titleSmall,
-                        color = MaterialTheme.colorScheme.onTertiaryContainer
+            OutlinedButton(
+                onClick = onImport,
+                enabled = importEnabled,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                if (importBusy) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.height(16.dp).width(16.dp),
+                        strokeWidth = 2.dp
                     )
-                    Spacer(modifier = Modifier.height(8.dp))
+                } else {
+                    Icon(Icons.Filled.CloudDownload, contentDescription = null)
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(importLabel)
+            }
+        }
+    }
+}
+
+@Composable
+private fun LastSyncDetailsCard(
+    details: DavSyncSuccessDetails?,
+    fallbackTime: java.time.LocalDateTime?
+) {
+    val formatter = remember { DateTimeFormatter.ofPattern("yyyy年MM月dd日 HH:mm") }
+    SettingsSurfaceCard {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = "最后成功同步",
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            when {
+                details != null -> {
+                    SyncDetailRow("时间", details.syncedAt.format(formatter))
+                    SyncDetailRow("类型", details.direction.label())
+                    SyncDetailRow("文件", details.fileName)
+                    SyncDetailRow("大小", formatFileSize(details.fileSizeBytes))
+                    SyncDetailRow("耗时", formatDuration(details.durationMillis))
+                }
+
+                fallbackTime != null -> {
+                    SyncDetailRow("时间", fallbackTime.format(formatter))
                     Text(
-                        text = "1. 点击上方配置卡片设置 WebDAV 服务器信息\n" +
-                                "2. 支持 Nextcloud、群晖等 WebDAV 服务\n" +
-                                "3. 开启\"打开 App 自动备份\"后，每天首次进入前台自动备份\n" +
-                                "4. 点击\"导出到DAV\"可自定义文件名，留空使用默认文件名\n" +
-                                "5. 点击\"从DAV导入\"可手动选择服务器上的备份恢复数据",
+                        text = "文件详情会在下一次成功同步后记录",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onTertiaryContainer
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                else -> {
+                    Text(
+                        text = "尚未同步",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun SyncDetailRow(label: String, value: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.width(44.dp)
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.weight(1f)
+        )
+    }
+}
+
+@Composable
+private fun ConflictStrategyCard(
+    selectedStrategy: DavConflictStrategy,
+    onStrategyChange: (DavConflictStrategy) -> Unit
+) {
+    SettingsSurfaceCard {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = "冲突策略",
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            ConflictStrategySelector(
+                selectedStrategy = selectedStrategy,
+                onStrategyChange = onStrategyChange
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = selectedStrategy.description(),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+@Composable
+private fun ConflictStrategySelector(
+    selectedStrategy: DavConflictStrategy,
+    onStrategyChange: (DavConflictStrategy) -> Unit
+) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        listOf(
+            DavConflictStrategy.LOCAL_FIRST,
+            DavConflictStrategy.REMOTE_FIRST,
+            DavConflictStrategy.MANUAL
+        ).forEach { strategy ->
+            FilterChip(
+                selected = selectedStrategy == strategy,
+                onClick = { onStrategyChange(strategy) },
+                label = { Text(strategy.label()) }
+            )
+        }
+    }
+}
+
+@Composable
+private fun ImportPreviewDialog(
+    preview: BackupRestorePreview,
+    backupFile: DavBackupFile?,
+    conflictStrategy: DavConflictStrategy,
+    onStrategyChange: (DavConflictStrategy) -> Unit,
+    onConfirmByStrategy: () -> Unit,
+    onRemoteImport: () -> Unit,
+    onKeepLocal: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val hasOverwriteRisk = preview.changes.modified > 0 ||
+        preview.changes.deleted > 0 ||
+        preview.conflicts.totalConflicts > 0
+    val confirmLabel = when {
+        conflictStrategy == DavConflictStrategy.REMOTE_FIRST -> "远端覆盖"
+        conflictStrategy == DavConflictStrategy.LOCAL_FIRST && hasOverwriteRisk -> "保留本地"
+        conflictStrategy == DavConflictStrategy.MANUAL && hasOverwriteRisk -> "远端覆盖"
+        else -> "继续导入"
+    }
+    val confirmAction = when {
+        conflictStrategy == DavConflictStrategy.REMOTE_FIRST -> onRemoteImport
+        conflictStrategy == DavConflictStrategy.LOCAL_FIRST && hasOverwriteRisk -> onKeepLocal
+        conflictStrategy == DavConflictStrategy.MANUAL && hasOverwriteRisk -> onRemoteImport
+        else -> onConfirmByStrategy
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("确认 DAV 导入") },
+        text = {
+            Column {
+                backupFile?.let {
+                    Text(
+                        text = "备份文件：${it.displayName}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+                Text(
+                    text = "同步前差异",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    PreviewMetric("新增", preview.changes.added, Modifier.weight(1f))
+                    PreviewMetric("修改", preview.changes.modified, Modifier.weight(1f))
+                    PreviewMetric("删除", preview.changes.deleted, Modifier.weight(1f))
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    text = "当前数据：${preview.current.formatSummary()}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    text = "远端数据：${preview.incoming.formatSummary()}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    text = "冲突：${preview.conflicts.totalConflicts} 项",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (preview.conflicts.totalConflicts > 0) {
+                        MaterialTheme.colorScheme.error
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    }
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                ConflictStrategySelector(
+                    selectedStrategy = conflictStrategy,
+                    onStrategyChange = onStrategyChange
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = conflictStrategy.description(),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = confirmAction) {
+                Text(confirmLabel)
+            }
+        },
+        dismissButton = {
+            Row {
+                if (conflictStrategy == DavConflictStrategy.MANUAL && hasOverwriteRisk) {
+                    TextButton(onClick = onKeepLocal) {
+                        Text("保留本地")
+                    }
+                }
+                TextButton(onClick = onDismiss) {
+                    Text("取消")
+                }
+            }
+        }
+    )
+}
+
+@Composable
+private fun PreviewMetric(
+    label: String,
+    value: Int,
+    modifier: Modifier = Modifier
+) {
+    Column(modifier = modifier) {
+        Text(
+            text = value.toString(),
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.primary
+        )
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }
 
@@ -484,6 +683,50 @@ private fun BackupFilePickerDialog(
             }
         }
     )
+}
+
+private fun BackupSnapshotSummary.formatSummary(): String {
+    return "记录 $records、分类 $categories、账户 $accounts、预算 $budgets、模板 $templates、账本 $ledgers"
+}
+
+private fun DavConflictStrategy.label(): String {
+    return when (this) {
+        DavConflictStrategy.LOCAL_FIRST -> "本地优先"
+        DavConflictStrategy.REMOTE_FIRST -> "远端优先"
+        DavConflictStrategy.MANUAL -> "手动选择"
+    }
+}
+
+private fun DavConflictStrategy.description(): String {
+    return when (this) {
+        DavConflictStrategy.LOCAL_FIRST -> "有修改或删除风险时保留本地数据。"
+        DavConflictStrategy.REMOTE_FIRST -> "确认后用远端备份覆盖本地数据。"
+        DavConflictStrategy.MANUAL -> "预览后再选择保留本地或远端覆盖。"
+    }
+}
+
+private fun DavSyncDirection.label(): String {
+    return when (this) {
+        DavSyncDirection.EXPORT -> "手动导出"
+        DavSyncDirection.IMPORT -> "手动导入"
+        DavSyncDirection.AUTO_BACKUP -> "自动备份"
+    }
+}
+
+private fun formatFileSize(bytes: Long): String {
+    return when {
+        bytes < 1024L -> "$bytes B"
+        bytes < 1024L * 1024L -> String.format(Locale.getDefault(), "%.1f KB", bytes / 1024.0)
+        else -> String.format(Locale.getDefault(), "%.1f MB", bytes / 1024.0 / 1024.0)
+    }
+}
+
+private fun formatDuration(durationMillis: Long): String {
+    return if (durationMillis < 1000L) {
+        "${durationMillis}ms"
+    } else {
+        String.format(Locale.getDefault(), "%.1fs", durationMillis / 1000.0)
+    }
 }
 
 @Composable

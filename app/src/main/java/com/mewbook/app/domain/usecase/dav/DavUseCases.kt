@@ -2,6 +2,7 @@ package com.mewbook.app.domain.usecase.dav
 
 import com.mewbook.app.domain.model.DavBackupFile
 import com.mewbook.app.domain.model.DavConfig
+import com.mewbook.app.domain.model.DavSyncSuccessDetails
 import com.mewbook.app.domain.repository.DavRepository
 import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
@@ -44,6 +45,10 @@ class ExportDataUseCase @Inject constructor(
     suspend fun autoBackup(config: DavConfig): Result<Boolean> {
         return davRepository.exportAutoBackupData(config)
     }
+
+    suspend fun withDetails(config: DavConfig, fileName: String? = null): Result<DavSyncSuccessDetails> {
+        return davRepository.exportDataWithDetails(config, fileName)
+    }
 }
 
 class PreviewImportDataUseCase @Inject constructor(
@@ -70,6 +75,14 @@ class ImportDataUseCase @Inject constructor(
 
     suspend operator fun invoke(config: DavConfig, backupFile: DavBackupFile): Result<Boolean> {
         return davRepository.importData(config, backupFile)
+    }
+
+    suspend fun withDetails(config: DavConfig): Result<DavSyncSuccessDetails> {
+        return davRepository.importDataWithDetails(config)
+    }
+
+    suspend fun withDetails(config: DavConfig, backupFile: DavBackupFile): Result<DavSyncSuccessDetails> {
+        return davRepository.importDataWithDetails(config, backupFile)
     }
 }
 

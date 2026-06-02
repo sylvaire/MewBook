@@ -6,7 +6,6 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -18,7 +17,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.UploadFile
@@ -43,7 +41,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -58,7 +55,6 @@ import com.mewbook.app.data.backup.BackupRecordImportPreview
 import com.mewbook.app.ui.components.MewCompactTopAppBar
 import com.mewbook.app.ui.components.SettingsPageScaffold
 import com.mewbook.app.ui.components.SettingsSectionHeader
-import com.mewbook.app.ui.components.SettingsSummaryCard
 import com.mewbook.app.ui.components.SettingsSurfaceCard
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -148,7 +144,6 @@ fun SmartImportScreen(
         }
     ) { paddingValues ->
         SettingsPageScaffold(paddingValues = paddingValues) {
-            IntroCard()
             SettingsSectionHeader(
                 title = "接口配置",
                 description = "配置会保存在本机；API Key 可用时走加密存储。"
@@ -162,7 +157,7 @@ fun SmartImportScreen(
             )
             SettingsSectionHeader(
                 title = "导入内容",
-                description = "粘贴文本或选择文件，转换完成后仍需确认预览。"
+                description = "粘贴文本或选择 TXT/CSV/JSON 文件，AI 只转换结构，最终仍需本地预览确认。"
             )
             InputCard(
                 uiState = uiState,
@@ -184,15 +179,6 @@ fun SmartImportScreen(
             }
         }
     }
-}
-
-@Composable
-private fun IntroCard() {
-    SettingsSummaryCard(
-        icon = Icons.Filled.AutoAwesome,
-        title = "把杂乱账单变成可预览导入",
-        subtitle = "粘贴账单文本，或选择 TXT/CSV/JSON 文件直接上传转换。AI 只负责转换结构，最终仍会经过本地分类映射、重复检测和确认导入。"
-    )
 }
 
 @Composable
@@ -320,17 +306,19 @@ private fun InputCard(
                     }
                 }
             }
-            Row(
+            Column(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 OutlinedButton(
                     onClick = onChooseFile,
                     enabled = !uiState.isReadingFile && !uiState.isConverting,
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.fillMaxWidth()
                 ) {
                     if (uiState.isReadingFile) {
                         ButtonLoadingIndicator(color = MaterialTheme.colorScheme.primary)
+                        Spacer(modifier = Modifier.size(8.dp))
+                        Text("读取中")
                     } else {
                         Icon(Icons.Filled.UploadFile, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.size(8.dp))
@@ -340,7 +328,7 @@ private fun InputCard(
                 Button(
                     onClick = onConvert,
                     enabled = uiState.canStartConvert && uiState.hasSavedApiKey,
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.fillMaxWidth()
                 ) {
                     if (uiState.isConverting) {
                         ButtonLoadingIndicator(color = MaterialTheme.colorScheme.onPrimary)

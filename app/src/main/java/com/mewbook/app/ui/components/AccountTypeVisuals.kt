@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AccountBalance
 import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.CreditCard
 import androidx.compose.material.icons.filled.MoreHoriz
@@ -28,7 +27,7 @@ import com.mewbook.app.domain.model.AccountType
 fun AccountType.toIcon(): ImageVector {
     return when (this) {
         AccountType.CASH -> Icons.Filled.AccountBalanceWallet
-        AccountType.BANK -> Icons.Filled.AccountBalance
+        AccountType.BANK -> ImageVector.vectorResource(id = R.drawable.ic_bank_card)
         AccountType.ALIPAY -> ImageVector.vectorResource(id = R.drawable.ic_alipay)
         AccountType.WECHAT -> ImageVector.vectorResource(id = R.drawable.ic_wechat)
         AccountType.CREDIT_CARD -> Icons.Filled.CreditCard
@@ -50,6 +49,18 @@ fun AccountType.defaultColorValue(): Long {
         AccountType.CREDIT_CARD -> 0xFFFF9800
         AccountType.INVESTMENT -> 0xFF7E57C2
         AccountType.OTHER -> 0xFF78909C
+    }
+}
+
+fun AccountType.defaultIconName(): String {
+    return when (this) {
+        AccountType.CASH -> "account_balance_wallet"
+        AccountType.BANK -> "bank_card"
+        AccountType.ALIPAY -> "alipay"
+        AccountType.WECHAT -> "wechat"
+        AccountType.CREDIT_CARD -> "credit_card"
+        AccountType.INVESTMENT -> "savings"
+        AccountType.OTHER -> "more_horiz"
     }
 }
 

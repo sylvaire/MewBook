@@ -136,7 +136,7 @@ fun QuickAddRecordSheet(
                     modifier = Modifier
                         .fillMaxWidth()
                         .focusRequester(focusRequester),
-                    label = { Text("金额（支持 20+3 ）") },
+                    label = { Text("金额") },
                     placeholder = { Text("0.00") },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)

@@ -107,11 +107,9 @@ import com.mewbook.app.ui.components.MewCompactTopAppBar
 import com.mewbook.app.ui.components.rememberMewHapticFeedback
 import com.mewbook.app.ui.screens.add.AddEditRecordSheet
 import com.mewbook.app.ui.screens.add.QuickAddRecordSheet
-import com.mewbook.app.ui.theme.BudgetWarning
 import com.mewbook.app.ui.theme.ClayDesign
-import com.mewbook.app.ui.theme.ExpenseRed
-import com.mewbook.app.ui.theme.IncomeGreen
 import com.mewbook.app.ui.theme.clayCardShadow
+import com.mewbook.app.ui.theme.LocalMewBookSemanticColors
 import com.mewbook.app.util.formatCurrency
 import java.time.Instant
 import java.time.LocalDate
@@ -683,6 +681,7 @@ private fun HomeFloatingAddButton(
     onQuickIncomeClick: () -> Unit
 ) {
     val hapticFeedback = rememberMewHapticFeedback(hapticFeedbackEnabled)
+    val semanticColors = LocalMewBookSemanticColors.current
     val coroutineScope = rememberCoroutineScope()
     var pendingTapAtMillis by remember { mutableStateOf<Long?>(null) }
     var pendingSingleTapJob by remember { mutableStateOf<Job?>(null) }
@@ -708,14 +707,14 @@ private fun HomeFloatingAddButton(
                 QuickFabAction(
                     label = "快速收入",
                     icon = Icons.AutoMirrored.Filled.TrendingUp,
-                    tint = IncomeGreen,
+                    tint = semanticColors.income,
                     hapticFeedbackEnabled = hapticFeedbackEnabled,
                     onClick = onQuickIncomeClick
                 )
                 QuickFabAction(
                     label = "快速支出",
                     icon = Icons.AutoMirrored.Filled.TrendingDown,
-                    tint = ExpenseRed,
+                    tint = semanticColors.expense,
                     hapticFeedbackEnabled = hapticFeedbackEnabled,
                     onClick = onQuickExpenseClick
                 )
@@ -1085,6 +1084,7 @@ fun SummaryCard(
     budgetRemaining: Double = 0.0
 ) {
     val isDarkTheme = LocalIsDarkTheme.current
+    val semanticColors = LocalMewBookSemanticColors.current
     val progressShadow = MaterialTheme.colorScheme.onSurface.copy(alpha = if (isDarkTheme) 0.18f else 0.10f)
 
     // Claymorphism 卡片 - 多层阴影
@@ -1130,9 +1130,9 @@ fun SummaryCard(
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = when {
-                            budgetRemaining < 0 -> ExpenseRed
-                            budgetRemaining < totalBudget * 0.2 -> BudgetWarning
-                            else -> IncomeGreen
+                            budgetRemaining < 0 -> semanticColors.budgetDanger
+                            budgetRemaining < totalBudget * 0.2 -> semanticColors.budgetWarning
+                            else -> semanticColors.budgetSafe
                         }
                     )
                 }
@@ -1157,9 +1157,9 @@ fun SummaryCard(
                             .background(
                                 brush = Brush.horizontalGradient(
                                     colors = when {
-                                        progress >= 0.9f -> listOf(ExpenseRed, ExpenseRed)
-                                        progress >= 0.7f -> listOf(BudgetWarning, BudgetWarning)
-                                        else -> listOf(IncomeGreen, IncomeGreen)
+                                        progress >= 0.9f -> listOf(semanticColors.budgetDanger, semanticColors.budgetDanger)
+                                        progress >= 0.7f -> listOf(semanticColors.budgetWarning, semanticColors.budgetWarning)
+                                        else -> listOf(semanticColors.budgetSafe, semanticColors.budgetSafe)
                                     }
                                 ),
                                 shape = RoundedCornerShape(6.dp)
@@ -1184,7 +1184,7 @@ fun SummaryCard(
                     label = "收入",
                     value = "+${formatCurrency(totalIncome)}",
                     icon = Icons.AutoMirrored.Filled.TrendingUp,
-                    tint = IncomeGreen,
+                    tint = semanticColors.income,
                     modifier = Modifier.weight(1f)
                 )
 
@@ -1194,7 +1194,7 @@ fun SummaryCard(
                     label = "支出",
                     value = "-${formatCurrency(totalExpense)}",
                     icon = Icons.AutoMirrored.Filled.TrendingDown,
-                    tint = ExpenseRed,
+                    tint = semanticColors.expense,
                     modifier = Modifier.weight(1f)
                 )
 
@@ -1206,7 +1206,7 @@ fun SummaryCard(
                     label = "结余",
                     value = formatCurrency(balance),
                     icon = Icons.Filled.AccountBalanceWallet,
-                    tint = if (balance >= 0) IncomeGreen else ExpenseRed,
+                    tint = if (balance >= 0) semanticColors.income else semanticColors.expense,
                     modifier = Modifier.weight(1f)
                 )
             }

@@ -60,11 +60,8 @@ import com.mewbook.app.ui.components.MewCompactTopAppBar
 import com.mewbook.app.ui.components.BudgetPeriodNavigator
 import com.mewbook.app.ui.components.BudgetPeriodTypeSelector
 import com.mewbook.app.ui.components.SettingsSectionHeader
-import com.mewbook.app.ui.components.SettingsSummaryCard
-import com.mewbook.app.ui.theme.BudgetDanger
-import com.mewbook.app.ui.theme.BudgetSafe
-import com.mewbook.app.ui.theme.BudgetWarning
 import com.mewbook.app.ui.theme.ClayDesign
+import com.mewbook.app.ui.theme.LocalMewBookSemanticColors
 import com.mewbook.app.ui.theme.clayCardShadow
 import com.mewbook.app.util.formatCurrency
 
@@ -99,10 +96,9 @@ fun BudgetScreen(
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 item {
-                    SettingsSummaryCard(
-                        icon = Icons.Filled.Add,
+                    SettingsSectionHeader(
                         title = "预算总览",
-                        subtitle = "${uiState.periodLabel} · 已花 ${formatCurrency(uiState.totalSpent)}，按周期管理总预算和分类预算。"
+                        description = "${uiState.periodLabel} · 已花 ${formatCurrency(uiState.totalSpent)}"
                     )
                 }
 
@@ -270,12 +266,13 @@ fun TotalBudgetCard(
     val budgetAmount = totalBudget?.amount ?: 0.0
     val remaining = budgetAmount - totalSpent
     val progress = if (budgetAmount > 0) (totalSpent / budgetAmount).toFloat().coerceIn(0f, 1f) else 0f
+    val semanticColors = LocalMewBookSemanticColors.current
 
     val progressColor by animateColorAsState(
         targetValue = when {
-            progress >= 0.9f -> BudgetDanger
-            progress >= 0.7f -> BudgetWarning
-            else -> BudgetSafe
+            progress >= 0.9f -> semanticColors.budgetDanger
+            progress >= 0.7f -> semanticColors.budgetWarning
+            else -> semanticColors.budgetSafe
         },
         label = "progressColor"
     )
@@ -347,7 +344,7 @@ fun TotalBudgetCard(
                 Text(
                     text = "剩余 ${formatCurrency(remaining)}",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = if (remaining >= 0) BudgetSafe else BudgetDanger
+                    color = if (remaining >= 0) semanticColors.budgetSafe else semanticColors.budgetDanger
                 )
             }
         }
@@ -363,11 +360,12 @@ fun CategoryBudgetItem(
     onDeleteClick: () -> Unit
 ) {
     val progress = budgetWithSpending.progress
+    val semanticColors = LocalMewBookSemanticColors.current
     val progressColor by animateColorAsState(
         targetValue = when {
-            progress >= 0.9f -> BudgetDanger
-            progress >= 0.7f -> BudgetWarning
-            else -> BudgetSafe
+            progress >= 0.9f -> semanticColors.budgetDanger
+            progress >= 0.7f -> semanticColors.budgetWarning
+            else -> semanticColors.budgetSafe
         },
         label = "progressColor"
     )
@@ -448,7 +446,7 @@ fun CategoryBudgetItem(
             Text(
                 text = "剩余 ${formatCurrency(budgetWithSpending.remaining)}",
                 style = MaterialTheme.typography.bodySmall,
-                color = if (budgetWithSpending.remaining >= 0) BudgetSafe else BudgetDanger
+                color = if (budgetWithSpending.remaining >= 0) semanticColors.budgetSafe else semanticColors.budgetDanger
             )
         }
     }
@@ -568,9 +566,10 @@ fun BudgetDialog(
 
 @Composable
 private fun BudgetAlertLevel.alertColor(): Color {
+    val semanticColors = LocalMewBookSemanticColors.current
     return when (this) {
-        BudgetAlertLevel.DANGER -> BudgetDanger
-        BudgetAlertLevel.CAUTION -> BudgetWarning
+        BudgetAlertLevel.DANGER -> semanticColors.budgetDanger
+        BudgetAlertLevel.CAUTION -> semanticColors.budgetWarning
         BudgetAlertLevel.INFO -> MaterialTheme.colorScheme.primary
     }
 }

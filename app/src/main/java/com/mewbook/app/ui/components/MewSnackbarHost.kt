@@ -36,8 +36,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.mewbook.app.ui.theme.ClayDesign
-import com.mewbook.app.ui.theme.ExpenseRed
-import com.mewbook.app.ui.theme.IncomeGreen
+import com.mewbook.app.ui.theme.LocalMewBookSemanticColors
 import com.mewbook.app.ui.theme.clayShadow
 
 @Composable
@@ -142,6 +141,7 @@ private fun MewSnackbar(
 
 @Composable
 private fun snackbarStyleFor(message: String): SnackbarStyle {
+    val semanticColors = LocalMewBookSemanticColors.current
     return when {
         message.contains("失败") || message.contains("不存在") || message.contains("过期") -> SnackbarStyle(
             icon = Icons.Filled.ErrorOutline,
@@ -150,7 +150,7 @@ private fun snackbarStyleFor(message: String): SnackbarStyle {
 
         message.contains("永久删除") -> SnackbarStyle(
             icon = Icons.Filled.DeleteForever,
-            accentColor = ExpenseRed
+            accentColor = semanticColors.expense
         )
 
         message.contains("回收站") || message.contains("恢复") -> SnackbarStyle(
@@ -160,7 +160,7 @@ private fun snackbarStyleFor(message: String): SnackbarStyle {
 
         else -> SnackbarStyle(
             icon = Icons.Filled.CheckCircle,
-            accentColor = IncomeGreen
+            accentColor = semanticColors.income
         )
     }
 }

@@ -76,8 +76,7 @@ import com.mewbook.app.ui.components.getIconForCategory
 import com.mewbook.app.ui.components.rememberMewHapticFeedback
 import com.mewbook.app.ui.components.SettingsSectionHeader
 import com.mewbook.app.ui.theme.ClayDesign
-import com.mewbook.app.ui.theme.ExpenseRed
-import com.mewbook.app.ui.theme.IncomeGreen
+import com.mewbook.app.ui.theme.LocalMewBookSemanticColors
 import com.mewbook.app.ui.theme.clayCardShadow
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
@@ -86,7 +85,7 @@ import sh.calvin.reorderable.rememberReorderableLazyListState
 val availableIcons = listOf(
     "restaurant", "free_breakfast", "lunch_dining", "dinner_dining", "local_cafe",
     "coffee", "local_drink", "takeout_dining", "bakery_dining", "ramen_dining",
-    "restaurant_menu", "emoji_food_beverage", "nutrition", "emoji_nature", "apple",
+    "restaurant_menu", "emoji_food_beverage", "emoji_nature", "apple",
     "cookie", "local_bar",
     "directions_car", "directions_bus", "commute", "train", "directions_subway",
     "tram", "flight", "airport_shuttle", "directions_boat", "local_taxi",
@@ -132,6 +131,7 @@ fun CategoriesScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val hapticFeedback = rememberMewHapticFeedback(uiState.keyPressHapticEnabled)
+    val semanticColors = LocalMewBookSemanticColors.current
     var selectedTabIndex by remember { mutableIntStateOf(0) }
     val currentType = if (selectedTabIndex == 0) RecordType.EXPENSE else RecordType.INCOME
 
@@ -211,7 +211,7 @@ fun CategoriesScreen(
     ) { paddingValues ->
         val displayedCategories = if (selectedTabIndex == 0) expenseCategories else incomeCategories
         val typeLabel = if (selectedTabIndex == 0) "支出" else "收入"
-        val accentColor = if (selectedTabIndex == 0) ExpenseRed else IncomeGreen
+        val accentColor = if (selectedTabIndex == 0) semanticColors.expense else semanticColors.income
         val lazyListState = rememberLazyListState()
 
         val reorderableState = rememberReorderableLazyListState(
@@ -436,6 +436,8 @@ private fun CategoryTypeSwitcher(
     incomeCount: Int,
     onSelect: (Int) -> Unit
 ) {
+    val semanticColors = LocalMewBookSemanticColors.current
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -455,7 +457,7 @@ private fun CategoryTypeSwitcher(
                 label = "支出",
                 count = expenseCount,
                 icon = Icons.Filled.Restaurant,
-                accentColor = ExpenseRed,
+                accentColor = semanticColors.expense,
                 onClick = { onSelect(0) },
                 modifier = Modifier.weight(1f)
             )
@@ -464,7 +466,7 @@ private fun CategoryTypeSwitcher(
                 label = "收入",
                 count = incomeCount,
                 icon = Icons.Filled.Payments,
-                accentColor = IncomeGreen,
+                accentColor = semanticColors.income,
                 onClick = { onSelect(1) },
                 modifier = Modifier.weight(1f)
             )

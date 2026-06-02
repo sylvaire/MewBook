@@ -506,7 +506,7 @@ class BackupMigrationTest {
                 "ledgers": [
                   {
                     "id": 5,
-                    "name": "我的账本",
+                    "name": "家庭账本",
                     "type": "PERSONAL",
                     "icon": "person",
                     "color": 4283215696,
@@ -529,6 +529,145 @@ class BackupMigrationTest {
         assertEquals(1, preview.conflicts.templates)
         assertEquals(1, preview.conflicts.ledgers)
         assertTrue(preview.hasExistingData)
+    }
+
+    @Test
+    fun compareEnvelopes_reportsAddedModifiedAndDeletedCounts() {
+        val currentJson = """
+            {
+              "schemaVersion": 4,
+              "appVersion": "1.0.3",
+              "exportedAt": "2026-04-18T12:00:00",
+              "payload": {
+                "records": [
+                  {
+                    "id": 1,
+                    "amount": 20.0,
+                    "type": "EXPENSE",
+                    "categoryId": 2,
+                    "note": "早餐",
+                    "date": 19831,
+                    "createdAt": 1713400000,
+                    "updatedAt": 1713400100,
+                    "syncId": "sync-1",
+                    "ledgerId": 1,
+                    "accountId": null
+                  },
+                  {
+                    "id": 2,
+                    "amount": 30.0,
+                    "type": "EXPENSE",
+                    "categoryId": 2,
+                    "note": "午餐",
+                    "date": 19831,
+                    "createdAt": 1713400200,
+                    "updatedAt": 1713400300,
+                    "syncId": "sync-2",
+                    "ledgerId": 1,
+                    "accountId": null
+                  },
+                  {
+                    "id": 3,
+                    "amount": 40.0,
+                    "type": "EXPENSE",
+                    "categoryId": 2,
+                    "note": "晚餐",
+                    "date": 19831,
+                    "createdAt": 1713400400,
+                    "updatedAt": 1713400500,
+                    "syncId": "sync-3",
+                    "ledgerId": 1,
+                    "accountId": null
+                  }
+                ],
+                "ledgers": [
+                  {
+                    "id": 1,
+                    "name": "我的账本",
+                    "type": "PERSONAL",
+                    "icon": "person",
+                    "color": 4283215696,
+                    "createdAt": 1,
+                    "isDefault": true
+                  }
+                ]
+              }
+            }
+        """.trimIndent()
+
+        val incomingJson = """
+            {
+              "schemaVersion": 4,
+              "appVersion": "1.0.3",
+              "exportedAt": "2026-04-19T12:00:00",
+              "payload": {
+                "records": [
+                  {
+                    "id": 1,
+                    "amount": 20.0,
+                    "type": "EXPENSE",
+                    "categoryId": 2,
+                    "note": "早餐",
+                    "date": 19831,
+                    "createdAt": 1713400000,
+                    "updatedAt": 1713400100,
+                    "syncId": "sync-1",
+                    "ledgerId": 1,
+                    "accountId": null
+                  },
+                  {
+                    "id": 2,
+                    "amount": 35.0,
+                    "type": "EXPENSE",
+                    "categoryId": 2,
+                    "note": "午餐加饮料",
+                    "date": 19831,
+                    "createdAt": 1713400200,
+                    "updatedAt": 1713400600,
+                    "syncId": "sync-2",
+                    "ledgerId": 1,
+                    "accountId": null
+                  },
+                  {
+                    "id": 4,
+                    "amount": 50.0,
+                    "type": "EXPENSE",
+                    "categoryId": 2,
+                    "note": "夜宵",
+                    "date": 19831,
+                    "createdAt": 1713400700,
+                    "updatedAt": 1713400800,
+                    "syncId": "sync-4",
+                    "ledgerId": 1,
+                    "accountId": null
+                  }
+                ],
+                "ledgers": [
+                  {
+                    "id": 1,
+                    "name": "我的账本",
+                    "type": "PERSONAL",
+                    "icon": "person",
+                    "color": 4283215696,
+                    "createdAt": 1,
+                    "isDefault": true
+                  }
+                ]
+              }
+            }
+        """.trimIndent()
+
+        val current = BackupMigration.parseToCurrentEnvelope(currentJson)
+        val incoming = BackupMigration.parseToCurrentEnvelope(incomingJson)
+        val preview = BackupMigration.compareEnvelopes(current, incoming)
+
+        assertEquals(1, preview.changes.records.added)
+        assertEquals(1, preview.changes.records.modified)
+        assertEquals(1, preview.changes.records.deleted)
+        assertEquals(1, preview.changes.added)
+        assertEquals(1, preview.changes.modified)
+        assertEquals(1, preview.changes.deleted)
+        assertEquals(1, preview.conflicts.records)
     }
 
     @Test

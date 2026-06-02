@@ -43,8 +43,7 @@ import com.mewbook.app.domain.policy.HapticFeedbackPolicy
 import com.mewbook.app.ui.components.CategoryIconBadge
 import com.mewbook.app.ui.components.rememberMewHapticFeedback
 import com.mewbook.app.ui.theme.ClayDesign
-import com.mewbook.app.ui.theme.ExpenseRed
-import com.mewbook.app.ui.theme.IncomeGreen
+import com.mewbook.app.ui.theme.LocalMewBookSemanticColors
 import com.mewbook.app.ui.theme.clayCardShadow
 import com.mewbook.app.util.formatCurrency
 
@@ -58,6 +57,7 @@ fun RecordDetailDialog(
     hapticFeedbackEnabled: Boolean = true
 ) {
     val hapticFeedback = rememberMewHapticFeedback(hapticFeedbackEnabled)
+    val semanticColors = LocalMewBookSemanticColors.current
     val displayCategory = remember(record.categoryId, record.type, category) {
         category ?: Category(
             id = record.categoryId,
@@ -70,7 +70,7 @@ fun RecordDetailDialog(
         )
     }
     val isIncome = record.type == RecordType.INCOME
-    val amountColor = if (isIncome) IncomeGreen else ExpenseRed
+    val amountColor = if (isIncome) semanticColors.income else semanticColors.expense
     val typeLabel = if (isIncome) "收入" else "支出"
     val signedAmount = "${if (isIncome) "+" else "-"}${formatCurrency(record.amount)}"
     val noteText = record.note?.takeIf { it.isNotBlank() }

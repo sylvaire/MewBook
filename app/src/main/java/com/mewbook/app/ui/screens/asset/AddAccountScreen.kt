@@ -54,6 +54,7 @@ import com.mewbook.app.domain.repository.LedgerRepository
 import com.mewbook.app.ui.components.AccountTypeIconBadge
 import com.mewbook.app.ui.components.MewCompactTopAppBar
 import com.mewbook.app.ui.components.defaultColorValue
+import com.mewbook.app.ui.components.defaultIconName
 import com.mewbook.app.ui.components.toDisplayName
 import com.mewbook.app.ui.theme.ClayDesign
 import com.mewbook.app.ui.theme.clayCardShadow
@@ -157,15 +158,7 @@ class AddAccountViewModel @Inject constructor(
     }
 
     private fun getDefaultIconNameForType(type: AccountType): String {
-        return when (type) {
-            AccountType.CASH -> "account_balance_wallet"
-            AccountType.BANK -> "account_balance"
-            AccountType.ALIPAY -> "alipay"
-            AccountType.WECHAT -> "wechat"
-            AccountType.CREDIT_CARD -> "credit_card"
-            AccountType.INVESTMENT -> "savings"
-            AccountType.OTHER -> "more_horiz"
-        }
+        return type.defaultIconName()
     }
 }
 

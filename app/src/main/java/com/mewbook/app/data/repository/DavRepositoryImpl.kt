@@ -8,6 +8,8 @@ import com.mewbook.app.data.backup.BackupRestorePreview
 import com.mewbook.app.domain.model.DavBackupFile
 import com.mewbook.app.domain.model.DavBackupPruneResult
 import com.mewbook.app.domain.model.DavConfig
+import com.mewbook.app.domain.model.DavSyncDirection
+import com.mewbook.app.domain.model.DavSyncSuccessDetails
 import com.mewbook.app.domain.policy.DavAutoBackupPolicy
 import com.mewbook.app.domain.repository.DavRepository
 import kotlinx.coroutines.flow.Flow
@@ -16,6 +18,7 @@ import java.net.URI
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneId
+import kotlin.math.max
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -44,17 +47,33 @@ class DavRepositoryImpl @Inject constructor(
     }
 
     override suspend fun exportData(config: DavConfig, fileName: String?): Result<Boolean> {
+        return exportDataWithDetails(config, fileName).map { true }
+    }
+
+    override suspend fun exportDataWithDetails(
+        config: DavConfig,
+        fileName: String?
+    ): Result<DavSyncSuccessDetails> {
         val backupFileName = normalizeManualBackupFileName(fileName)
             ?: davRemoteDataSource.generateBackupFileName()
-        return exportBackup(config, backupFileName)
+        return exportBackup(config, backupFileName, DavSyncDirection.EXPORT)
     }
 
     override suspend fun exportAutoBackupData(config: DavConfig): Result<Boolean> {
-        return exportBackup(config, davRemoteDataSource.generateAutoBackupFileName())
+        return exportBackup(
+            config = config,
+            backupFileName = davRemoteDataSource.generateAutoBackupFileName(),
+            direction = DavSyncDirection.AUTO_BACKUP
+        ).map { true }
     }
 
-    private suspend fun exportBackup(config: DavConfig, backupFileName: String): Result<Boolean> {
+    private suspend fun exportBackup(
+        config: DavConfig,
+        backupFileName: String,
+        direction: DavSyncDirection
+    ): Result<DavSyncSuccessDetails> {
         return try {
+            val startedAtMillis = System.currentTimeMillis()
             val jsonString = backupSnapshotDataSource.exportToJsonString()
             val directoryUrl = davRemoteDataSource.buildDirectoryUrl(config.serverUrl, config.remotePath)
             val fileUrl = davRemoteDataSource.buildFileUrl(config.serverUrl, config.remotePath, backupFileName)
@@ -66,9 +85,18 @@ class DavRepositoryImpl @Inject constructor(
 
             val result = davRemoteDataSource.putFile(fileUrl, config.username, config.password, jsonString)
             if (result.isSuccess) {
-                updateLastSyncTime(System.currentTimeMillis())
+                val details = DavSyncSuccessDetails(
+                    syncedAt = LocalDateTime.now(),
+                    direction = direction,
+                    fileName = backupFileName,
+                    fileSizeBytes = jsonString.toByteArray(Charsets.UTF_8).size.toLong(),
+                    durationMillis = max(0L, System.currentTimeMillis() - startedAtMillis)
+                )
+                updateLastSyncDetails(details)
+                Result.success(details)
+            } else {
+                Result.failure(result.exceptionOrNull() ?: Exception("Failed to upload backup"))
             }
-            result
         } catch (e: Exception) {
             Result.failure(e)
         }
@@ -98,24 +126,43 @@ class DavRepositoryImpl @Inject constructor(
     }
 
     override suspend fun importData(config: DavConfig): Result<Boolean> {
+        return importDataWithDetails(config).map { true }
+    }
+
+    override suspend fun importDataWithDetails(config: DavConfig): Result<DavSyncSuccessDetails> {
         return try {
             val latestBackup = latestBackupFile(config).getOrThrow()
-            Result.success(importData(config, latestBackup).getOrThrow())
+            Result.success(importDataWithDetails(config, latestBackup).getOrThrow())
         } catch (e: Exception) {
             Result.failure(e)
         }
     }
 
     override suspend fun importData(config: DavConfig, backupFile: DavBackupFile): Result<Boolean> {
+        return importDataWithDetails(config, backupFile).map { true }
+    }
+
+    override suspend fun importDataWithDetails(
+        config: DavConfig,
+        backupFile: DavBackupFile
+    ): Result<DavSyncSuccessDetails> {
         return try {
+            val startedAtMillis = System.currentTimeMillis()
             val jsonString = downloadBackupFile(config, backupFile).getOrThrow()
             val restoreResult = backupSnapshotDataSource.importFromJsonString(jsonString)
             if (restoreResult.isFailure) {
                 return Result.failure(restoreResult.exceptionOrNull() ?: Exception("Failed to import backup"))
             }
 
-            updateLastSyncTime(System.currentTimeMillis())
-            Result.success(true)
+            val details = DavSyncSuccessDetails(
+                syncedAt = LocalDateTime.now(),
+                direction = DavSyncDirection.IMPORT,
+                fileName = backupFile.displayName,
+                fileSizeBytes = jsonString.toByteArray(Charsets.UTF_8).size.toLong(),
+                durationMillis = max(0L, System.currentTimeMillis() - startedAtMillis)
+            )
+            updateLastSyncDetails(details)
+            Result.success(details)
         } catch (e: Exception) {
             Result.failure(e)
         }
@@ -123,6 +170,16 @@ class DavRepositoryImpl @Inject constructor(
 
     override suspend fun updateLastSyncTime(time: Long) {
         davConfigDao.updateLastSyncTime(time)
+    }
+
+    private suspend fun updateLastSyncDetails(details: DavSyncSuccessDetails) {
+        davConfigDao.updateLastSyncDetails(
+            syncTime = details.syncedAt.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli(),
+            fileName = details.fileName,
+            fileSizeBytes = details.fileSizeBytes,
+            durationMillis = details.durationMillis,
+            direction = details.direction.name
+        )
     }
 
     override suspend fun listBackupFiles(config: DavConfig): Result<List<DavBackupFile>> {
@@ -212,11 +269,13 @@ class DavRepositoryImpl @Inject constructor(
             password = password,
             remotePath = remotePath,
             isEnabled = isEnabled,
-            lastSyncTime = lastSyncTime?.let(::fromStoredEpochTime)
+            lastSyncTime = lastSyncTime?.let(::fromStoredEpochTime),
+            lastSyncDetails = buildLastSyncDetails()
         )
     }
 
     private fun DavConfig.toEntity(): DavConfigEntity {
+        val syncTime = lastSyncDetails?.syncedAt ?: lastSyncTime
         return DavConfigEntity(
             id = id,
             serverUrl = serverUrl,
@@ -224,7 +283,26 @@ class DavRepositoryImpl @Inject constructor(
             password = password,
             remotePath = remotePath,
             isEnabled = isEnabled,
-            lastSyncTime = lastSyncTime?.atZone(ZoneId.systemDefault())?.toInstant()?.toEpochMilli()
+            lastSyncTime = syncTime?.atZone(ZoneId.systemDefault())?.toInstant()?.toEpochMilli(),
+            lastSyncFileName = lastSyncDetails?.fileName,
+            lastSyncFileSizeBytes = lastSyncDetails?.fileSizeBytes,
+            lastSyncDurationMillis = lastSyncDetails?.durationMillis,
+            lastSyncDirection = lastSyncDetails?.direction?.name
+        )
+    }
+
+    private fun DavConfigEntity.buildLastSyncDetails(): DavSyncSuccessDetails? {
+        val syncTime = lastSyncTime?.let(::fromStoredEpochTime) ?: return null
+        val fileName = lastSyncFileName?.takeIf { it.isNotBlank() } ?: return null
+        val direction = runCatching {
+            lastSyncDirection?.let(DavSyncDirection::valueOf)
+        }.getOrNull() ?: return null
+        return DavSyncSuccessDetails(
+            syncedAt = syncTime,
+            direction = direction,
+            fileName = fileName,
+            fileSizeBytes = lastSyncFileSizeBytes ?: 0L,
+            durationMillis = lastSyncDurationMillis ?: 0L
         )
     }
 

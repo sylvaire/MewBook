@@ -61,8 +61,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mewbook.app.domain.model.Category
 import com.mewbook.app.ui.components.MewCompactTopAppBar
 import com.mewbook.app.ui.theme.ClayDesign
-import com.mewbook.app.ui.theme.ExpenseRed
-import com.mewbook.app.ui.theme.IncomeGreen
+import com.mewbook.app.ui.theme.LocalMewBookSemanticColors
 import com.mewbook.app.ui.theme.clayCardShadow
 import com.mewbook.app.util.formatCurrency
 import java.time.LocalDate
@@ -74,6 +73,7 @@ fun StatisticsScreen(
     viewModel: StatisticsViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val semanticColors = LocalMewBookSemanticColors.current
 
     Scaffold(
         topBar = {
@@ -118,7 +118,7 @@ fun StatisticsScreen(
                         amountByCategory = uiState.expenseByCategory,
                         categories = uiState.categories,
                         amountPrefix = "-",
-                        accentColor = ExpenseRed,
+                        accentColor = semanticColors.expense,
                         onCategoryClick = { categoryId ->
                             onNavigateToCategoryExpense(
                                 categoryId,
@@ -135,7 +135,7 @@ fun StatisticsScreen(
                         amountByCategory = uiState.incomeByCategory,
                         categories = uiState.categories,
                         amountPrefix = "+",
-                        accentColor = IncomeGreen
+                        accentColor = semanticColors.income
                     )
                 }
 
@@ -241,6 +241,8 @@ fun SummarySection(
     totalIncome: Double,
     totalExpense: Double
 ) {
+    val semanticColors = LocalMewBookSemanticColors.current
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -268,7 +270,7 @@ fun SummarySection(
                     text = "+${formatCurrency(totalIncome)}",
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
-                    color = IncomeGreen
+                    color = semanticColors.income
                 )
             }
 
@@ -282,7 +284,7 @@ fun SummarySection(
                     text = "-${formatCurrency(totalExpense)}",
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
-                    color = ExpenseRed
+                    color = semanticColors.expense
                 )
             }
 
@@ -297,7 +299,7 @@ fun SummarySection(
                     text = formatCurrency(balance),
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
-                    color = if (balance >= 0) IncomeGreen else ExpenseRed
+                    color = if (balance >= 0) semanticColors.income else semanticColors.expense
                 )
             }
         }
@@ -470,6 +472,8 @@ fun IncomeExpenseTrend(
     observedMask: List<Boolean>,
     timeRange: TimeRange
 ) {
+    val semanticColors = LocalMewBookSemanticColors.current
+
     Column(modifier = Modifier.padding(16.dp)) {
         Text(
             text = "收支趋势",
@@ -529,13 +533,13 @@ fun IncomeExpenseTrend(
                         TrendSeriesPill(
                             label = "收入",
                             value = "+${formatCurrency(totalIncome)}",
-                            color = IncomeGreen,
+                            color = semanticColors.income,
                             modifier = Modifier.weight(1f)
                         )
                         TrendSeriesPill(
                             label = "支出",
                             value = "-${formatCurrency(totalExpense)}",
-                            color = ExpenseRed,
+                            color = semanticColors.expense,
                             modifier = Modifier.weight(1f)
                         )
                     }
@@ -664,10 +668,10 @@ fun IncomeExpenseTrend(
                                     }
                                 }
 
-                                drawSeriesPath(normalizedIncome, IncomeGreen)
-                                drawSeriesPath(normalizedExpense, ExpenseRed)
-                                drawSeriesPoints(normalizedIncome, IncomeGreen)
-                                drawSeriesPoints(normalizedExpense, ExpenseRed)
+                                drawSeriesPath(normalizedIncome, semanticColors.income)
+                                drawSeriesPath(normalizedExpense, semanticColors.expense)
+                                drawSeriesPoints(normalizedIncome, semanticColors.income)
+                                drawSeriesPoints(normalizedExpense, semanticColors.expense)
                             }
                         }
                     }
@@ -705,20 +709,20 @@ fun IncomeExpenseTrend(
                                 TrendFocusValue(
                                     label = "收入",
                                     value = "+${formatCurrency(selectedIncome)}",
-                                    valueColor = IncomeGreen,
+                                    valueColor = semanticColors.income,
                                     modifier = Modifier.weight(1f)
                                 )
                                 TrendFocusValue(
                                     label = "支出",
                                     value = "-${formatCurrency(selectedExpense)}",
-                                    valueColor = ExpenseRed,
+                                    valueColor = semanticColors.expense,
                                     modifier = Modifier.weight(1f)
                                 )
                             }
                             TrendMetricRow(
                                 label = "结余",
                                 value = formatCurrency(selectedBalance),
-                                valueColor = if (selectedBalance >= 0) IncomeGreen else ExpenseRed
+                                valueColor = if (selectedBalance >= 0) semanticColors.income else semanticColors.expense
                             )
                         }
                     }

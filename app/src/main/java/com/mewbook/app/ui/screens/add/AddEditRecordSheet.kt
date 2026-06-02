@@ -36,6 +36,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.activity.compose.BackHandler
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Backspace
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
@@ -80,6 +81,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
@@ -98,8 +100,7 @@ import com.mewbook.app.ui.components.AccountTypeIconBadge
 import com.mewbook.app.ui.components.CategoryIconBadge
 import com.mewbook.app.ui.components.CategoryChip
 import com.mewbook.app.ui.components.rememberMewHapticFeedback
-import com.mewbook.app.ui.theme.ExpenseRed
-import com.mewbook.app.ui.theme.IncomeGreen
+import com.mewbook.app.ui.theme.LocalMewBookSemanticColors
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -171,8 +172,15 @@ fun AddEditRecordSheet(
     }
     val canSave = selectedCategory != null && AmountExpressionHelper.canSave(amountExpression)
     val showKeyboard = isKeyboardVisible && selectedCategory != null
-    val actionTint = if (selectedType == RecordType.EXPENSE) ExpenseRed else IncomeGreen
-    val keyboardSurfaceColor = if (selectedType == RecordType.EXPENSE) Color(0xFF4B2B1F) else Color(0xFF1F4332)
+    val semanticColors = LocalMewBookSemanticColors.current
+    val isDarkTheme = MaterialTheme.colorScheme.background.luminance() < 0.5f
+    val actionTint = if (selectedType == RecordType.EXPENSE) semanticColors.expense else semanticColors.income
+    val keyboardSurfaceColor = when {
+        selectedType == RecordType.EXPENSE && isDarkTheme -> semanticColors.expenseContainer
+        selectedType == RecordType.INCOME && isDarkTheme -> semanticColors.incomeContainer
+        selectedType == RecordType.EXPENSE -> Color(0xFF4B2B1F)
+        else -> Color(0xFF1F4332)
+    }
     val hapticFeedback = rememberMewHapticFeedback(keyPressHapticEnabled)
     val density = LocalDensity.current
     val collapseKeyboardInteraction = remember { MutableInteractionSource() }
@@ -747,7 +755,14 @@ private fun KeyboardPanel(
                 KeyboardKey("7", { onKeyPress('7') }, keyPressHapticEnabled = keyPressHapticEnabled)
                 KeyboardKey("8", { onKeyPress('8') }, keyPressHapticEnabled = keyPressHapticEnabled)
                 KeyboardKey("9", { onKeyPress('9') }, keyPressHapticEnabled = keyPressHapticEnabled)
-                KeyboardKey("删", onDelete, containerColor = Color.White.copy(alpha = 0.12f), keyPressHapticEnabled = keyPressHapticEnabled)
+                KeyboardKey(
+                    label = "",
+                    onClick = onDelete,
+                    icon = Icons.AutoMirrored.Filled.Backspace,
+                    contentDescription = "删除一位",
+                    containerColor = Color.White.copy(alpha = 0.12f),
+                    keyPressHapticEnabled = keyPressHapticEnabled
+                )
             }
             KeyboardRow {
                 KeyboardKey("4", { onKeyPress('4') }, keyPressHapticEnabled = keyPressHapticEnabled)
@@ -791,6 +806,8 @@ private fun RowScope.KeyboardKey(
     label: String,
     onClick: () -> Unit,
     enabled: Boolean = true,
+    icon: ImageVector? = null,
+    contentDescription: String? = null,
     containerColor: Color = Color.White.copy(alpha = 0.10f),
     keyPressHapticEnabled: Boolean = true
 ) {
@@ -807,12 +824,22 @@ private fun RowScope.KeyboardKey(
             },
         contentAlignment = Alignment.Center
     ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.SemiBold,
-            color = Color.White.copy(alpha = if (enabled) 1f else 0.45f)
-        )
+        val contentColor = Color.White.copy(alpha = if (enabled) 1f else 0.45f)
+        if (icon != null) {
+            Icon(
+                imageVector = icon,
+                contentDescription = contentDescription,
+                modifier = Modifier.size(22.dp),
+                tint = contentColor
+            )
+        } else {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = contentColor
+            )
+        }
     }
 }
 
@@ -838,7 +865,7 @@ private fun NoteEditorDialog(
                 modifier = Modifier.fillMaxWidth().focusRequester(focusRequester),
                 minLines = 3,
                 maxLines = 5,
-                placeholder = { Text("比如：工作日咖啡、周末和朋友吃饭") },
+                placeholder = { Text("添加备注...") },
                 colors = OutlinedTextFieldDefaults.colors()
             )
         },

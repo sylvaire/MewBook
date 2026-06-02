@@ -53,9 +53,8 @@ import com.mewbook.app.ui.components.AccountTypeIconBadge
 import com.mewbook.app.ui.components.MewCompactTopAppBar
 import com.mewbook.app.ui.components.toDisplayName
 import com.mewbook.app.ui.theme.ClayDesign
+import com.mewbook.app.ui.theme.LocalMewBookSemanticColors
 import com.mewbook.app.ui.theme.clayCardShadow
-import com.mewbook.app.ui.theme.ExpenseRed
-import com.mewbook.app.ui.theme.IncomeGreen
 import com.mewbook.app.util.formatCurrency
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -115,6 +114,7 @@ fun AccountEditScreen(
     viewModel: AccountEditViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val semanticColors = LocalMewBookSemanticColors.current
     var balanceText by remember { mutableStateOf("") }
     var nameText by remember { mutableStateOf("") }
     var showDeleteDialog by remember { mutableStateOf(false) }
@@ -240,7 +240,7 @@ fun AccountEditScreen(
                                 text = formatCurrency(currentBalance),
                                 style = MaterialTheme.typography.headlineSmall,
                                 fontWeight = FontWeight.Bold,
-                                color = if (currentBalance >= 0) IncomeGreen else ExpenseRed
+                                color = if (currentBalance >= 0) semanticColors.income else semanticColors.expense
                             )
                         }
                     }

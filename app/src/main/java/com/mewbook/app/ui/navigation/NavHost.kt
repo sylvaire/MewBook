@@ -6,6 +6,7 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -138,6 +139,7 @@ fun MewBookNavHost(
     Scaffold(
         bottomBar = {
             if (showBottomBar) {
+                val navShape = RoundedCornerShape(24.dp)
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -150,17 +152,46 @@ fun MewBookNavHost(
                             .padding(horizontal = 16.dp, vertical = 8.dp)
                             .shadow(
                                 elevation = 8.dp,
-                                shape = RoundedCornerShape(24.dp),
-                                spotColor = MaterialTheme.colorScheme.primary.copy(alpha = if (isDarkTheme) 0.08f else 0.15f)
+                                shape = navShape,
+                                ambientColor = if (isDarkTheme) {
+                                    Color.Black.copy(alpha = 0.22f)
+                                } else {
+                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)
+                                },
+                                spotColor = if (isDarkTheme) {
+                                    Color.Black.copy(alpha = 0.44f)
+                                } else {
+                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+                                }
                             )
                             .shadow(
                                 elevation = 4.dp,
-                                shape = RoundedCornerShape(24.dp),
-                                spotColor = MaterialTheme.colorScheme.primary.copy(alpha = if (isDarkTheme) 0.04f else 0.10f)
+                                shape = navShape,
+                                ambientColor = if (isDarkTheme) {
+                                    Color.Black.copy(alpha = 0.22f)
+                                } else {
+                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)
+                                },
+                                spotColor = if (isDarkTheme) {
+                                    Color.Black.copy(alpha = 0.22f)
+                                } else {
+                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)
+                                }
                             )
                             .background(
                                 MaterialTheme.colorScheme.surface,
-                                RoundedCornerShape(24.dp)
+                                navShape
+                            )
+                            .then(
+                                if (isDarkTheme) {
+                                    Modifier.border(
+                                        width = 1.dp,
+                                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.48f),
+                                        shape = navShape
+                                    )
+                                } else {
+                                    Modifier
+                                }
                             )
                     ) {
                         NavigationBar(

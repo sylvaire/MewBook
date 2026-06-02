@@ -5,6 +5,7 @@ import com.mewbook.app.data.local.entity.DavConfigEntity
 import com.mewbook.app.data.remote.DavRemoteDataSource
 import com.mewbook.app.domain.model.DavBackupFile
 import com.mewbook.app.domain.model.DavConfig
+import com.mewbook.app.domain.model.DavSyncDirection
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.runBlocking
@@ -63,6 +64,31 @@ class DavRepositoryImplTest {
             "https://dav.example.com/mewbook/manual_April_report_final.json",
             remote.lastPutFileUrl
         )
+    }
+
+    @Test
+    fun exportDataWithDetails_returnsUploadedFileMetadata() = runBlocking {
+        val dao = FakeDavConfigDao()
+        val remote = FakeDavRemoteDataSource()
+        val exportJson = """{"schemaVersion":4,"payload":{"records":[]}}"""
+        val repository = DavRepositoryImpl(
+            davConfigDao = dao,
+            davRemoteDataSource = remote,
+            backupSnapshotDataSource = FakeBackupSnapshotDataSource(exportJson = exportJson)
+        )
+
+        val result = repository.exportDataWithDetails(sampleConfig(), "April")
+
+        assertTrue(result.isSuccess)
+        val details = result.getOrThrow()
+        assertEquals(DavSyncDirection.EXPORT, details.direction)
+        assertEquals("manual_April.json", details.fileName)
+        assertEquals(exportJson.toByteArray(Charsets.UTF_8).size.toLong(), details.fileSizeBytes)
+        assertTrue(details.durationMillis >= 0L)
+        assertEquals(details.fileName, dao.lastSyncFileName)
+        assertEquals(details.fileSizeBytes, dao.lastSyncFileSizeBytes)
+        assertEquals(details.durationMillis, dao.lastSyncDurationMillis)
+        assertEquals(details.direction.name, dao.lastSyncDirection)
     }
 
     @Test
@@ -272,6 +298,38 @@ class DavRepositoryImplTest {
     }
 
     @Test
+    fun importDataWithDetails_returnsSelectedBackupMetadata() = runBlocking {
+        val dao = FakeDavConfigDao()
+        val backupJson = currentBackupJson()
+        val remote = FakeDavRemoteDataSource().apply {
+            getFileResponse = Result.success(backupJson)
+        }
+        val snapshot = FakeBackupSnapshotDataSource(importResult = Result.success(true))
+        val repository = DavRepositoryImpl(
+            davConfigDao = dao,
+            davRemoteDataSource = remote,
+            backupSnapshotDataSource = snapshot
+        )
+        val selectedBackup = DavBackupFile(
+            displayName = "mewbook_backup_20260418_110000.json",
+            fileUrl = "https://dav.example.com/MewBook/mewbook_backup_20260418_110000.json"
+        )
+
+        val result = repository.importDataWithDetails(sampleConfig(), selectedBackup)
+
+        assertTrue(result.isSuccess)
+        val details = result.getOrThrow()
+        assertEquals(DavSyncDirection.IMPORT, details.direction)
+        assertEquals(selectedBackup.displayName, details.fileName)
+        assertEquals(backupJson.toByteArray(Charsets.UTF_8).size.toLong(), details.fileSizeBytes)
+        assertTrue(details.durationMillis >= 0L)
+        assertEquals(details.fileName, dao.lastSyncFileName)
+        assertEquals(details.fileSizeBytes, dao.lastSyncFileSizeBytes)
+        assertEquals(details.durationMillis, dao.lastSyncDurationMillis)
+        assertEquals(details.direction.name, dao.lastSyncDirection)
+    }
+
+    @Test
     fun getDavConfigOnce_parsesLastSyncMillisCorrectly() = runBlocking {
         val dao = FakeDavConfigDao()
         dao.insertDavConfig(sampleEntity(lastSyncTime = 1_713_456_000_000L))
@@ -299,6 +357,32 @@ class DavRepositoryImplTest {
         val result = repository.getDavConfigOnce()
 
         assertEquals(2024, result?.lastSyncTime?.year)
+    }
+
+    @Test
+    fun getDavConfigOnce_parsesLastSyncDetails() = runBlocking {
+        val dao = FakeDavConfigDao()
+        dao.insertDavConfig(
+            sampleEntity(lastSyncTime = 1_713_456_000_000L).copy(
+                lastSyncFileName = "mewbook_backup_20260418_120000.json",
+                lastSyncFileSizeBytes = 4096L,
+                lastSyncDurationMillis = 1200L,
+                lastSyncDirection = DavSyncDirection.EXPORT.name
+            )
+        )
+        val repository = DavRepositoryImpl(
+            davConfigDao = dao,
+            davRemoteDataSource = FakeDavRemoteDataSource(),
+            backupSnapshotDataSource = FakeBackupSnapshotDataSource()
+        )
+
+        val details = repository.getDavConfigOnce()?.lastSyncDetails
+
+        assertNotNull(details)
+        assertEquals(DavSyncDirection.EXPORT, details?.direction)
+        assertEquals("mewbook_backup_20260418_120000.json", details?.fileName)
+        assertEquals(4096L, details?.fileSizeBytes)
+        assertEquals(1200L, details?.durationMillis)
     }
 
     @Test
@@ -397,6 +481,10 @@ class DavRepositoryImplTest {
 private class FakeDavConfigDao : DavConfigDao {
     private val flow = MutableStateFlow<DavConfigEntity?>(null)
     var lastSyncTime: Long? = null
+    var lastSyncFileName: String? = null
+    var lastSyncFileSizeBytes: Long? = null
+    var lastSyncDurationMillis: Long? = null
+    var lastSyncDirection: String? = null
 
     override fun getDavConfig(): Flow<DavConfigEntity?> = flow
 
@@ -416,6 +504,20 @@ private class FakeDavConfigDao : DavConfigDao {
 
     override suspend fun updateLastSyncTime(syncTime: Long) {
         lastSyncTime = syncTime
+    }
+
+    override suspend fun updateLastSyncDetails(
+        syncTime: Long,
+        fileName: String?,
+        fileSizeBytes: Long?,
+        durationMillis: Long?,
+        direction: String?
+    ) {
+        lastSyncTime = syncTime
+        lastSyncFileName = fileName
+        lastSyncFileSizeBytes = fileSizeBytes
+        lastSyncDurationMillis = durationMillis
+        lastSyncDirection = direction
     }
 }
 

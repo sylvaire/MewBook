@@ -8,23 +8,23 @@ import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Restore
+import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.TableChart
+import androidx.compose.material.icons.filled.UploadFile
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -39,7 +39,6 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -50,12 +49,12 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.activity.result.contract.ActivityResultContracts
 import com.mewbook.app.data.backup.BackupCategoryImportAction
 import com.mewbook.app.ui.components.MewCompactTopAppBar
+import com.mewbook.app.ui.components.SettingsGroupCard
+import com.mewbook.app.ui.components.SettingsGroupRow
 import com.mewbook.app.ui.components.SettingsPageScaffold
 import com.mewbook.app.ui.components.SettingsSectionHeader
 import com.mewbook.app.ui.components.SettingsSummaryCard
 import com.mewbook.app.ui.components.SettingsSurfaceCard
-import com.mewbook.app.ui.theme.ClayDesign
-import com.mewbook.app.ui.theme.clayCardShadow
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -256,12 +255,6 @@ fun ExportScreen(
         }
     ) { paddingValues ->
         SettingsPageScaffold(paddingValues = paddingValues) {
-            SettingsSummaryCard(
-                icon = Icons.Filled.CheckCircle,
-                title = "迁移、备份与还原",
-                subtitle = "本地备份、格式导出和数据还原都在这里处理；还原与导入前会先展示预览。"
-            )
-
             uiState.currentSnapshotSummary?.let { summary ->
                 SettingsSummaryCard(
                     title = "当前数据概览",
@@ -274,122 +267,63 @@ fun ExportScreen(
 
             SettingsSectionHeader(
                 title = "导入其他记账 App",
-                description = "CSV 走本地解析；字段混乱时可以进入智能导入。"
+                description = "CSV 走本地解析；字段混乱时用智能导入，导入前都会先预览。"
             )
 
-            SettingsSurfaceCard {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Text(
-                        text = "支持常见 CSV 导入；如果文件字段比较混乱，也可以用智能导入把文本转换成当前格式。",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                    Button(
-                        onClick = onNavigateToSmartImport,
-                        enabled = !uiState.isBackingUpLocally &&
-                            !uiState.isRestoringLocally &&
-                            !uiState.isPreviewingRestore &&
-                            !uiState.isPreviewingRecordImport &&
-                            !uiState.isImportingRecords,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.AutoAwesome,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("智能导入")
-                    }
-                    OutlinedButton(
-                        onClick = {
-                            Log.d(TAG, "launch import picker via GetContent")
-                            importRecordsLauncher.launch("*/*")
-                        },
-                        enabled = !uiState.isBackingUpLocally &&
-                            !uiState.isRestoringLocally &&
-                            !uiState.isPreviewingRestore &&
-                            !uiState.isPreviewingRecordImport &&
-                            !uiState.isImportingRecords,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        if (uiState.isPreviewingRecordImport || uiState.isImportingRecords) {
-                            ButtonLoadingIndicator(color = MaterialTheme.colorScheme.primary)
-                        } else {
-                            Text("选择 CSV 文件")
-                        }
-                    }
+            ImportActionsCard(
+                busy = uiState.isBackingUpLocally ||
+                    uiState.isRestoringLocally ||
+                    uiState.isPreviewingRestore ||
+                    uiState.isPreviewingRecordImport ||
+                    uiState.isImportingRecords,
+                importBusy = uiState.isPreviewingRecordImport || uiState.isImportingRecords,
+                onSmartImport = onNavigateToSmartImport,
+                onChooseCsv = {
+                    Log.d(TAG, "launch import picker via GetContent")
+                    importRecordsLauncher.launch("*/*")
                 }
-            }
+            )
 
             SettingsSectionHeader(
                 title = "本地备份",
-                description = "完整保存或恢复应用数据，适合换机前后使用。"
+                description = "完整保存或恢复应用数据；还原会覆盖本地内容，适合换机前后使用。"
             )
 
-            SettingsSurfaceCard {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Button(
-                        onClick = { createBackupLauncher.launch(viewModel.suggestedBackupFileName()) },
-                        enabled = !uiState.isBackingUpLocally &&
-                            !uiState.isRestoringLocally &&
-                            !uiState.isPreviewingRestore &&
-                            !uiState.isPreviewingRecordImport &&
-                            !uiState.isImportingRecords,
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        if (uiState.isBackingUpLocally) {
-                            ButtonLoadingIndicator(color = MaterialTheme.colorScheme.onPrimary)
-                        } else {
-                            Text("本地备份")
-                        }
-                    }
-
-                    OutlinedButton(
-                        onClick = {
-                            Log.d(TAG, "launch restore picker via GetContent")
-                            restoreBackupLauncher.launch("*/*")
-                        },
-                        enabled = !uiState.isBackingUpLocally &&
-                            !uiState.isRestoringLocally &&
-                            !uiState.isPreviewingRestore &&
-                            !uiState.isPreviewingRecordImport &&
-                            !uiState.isImportingRecords,
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        if (uiState.isRestoringLocally) {
-                            ButtonLoadingIndicator(color = MaterialTheme.colorScheme.primary)
-                        } else {
-                            Text("本地还原")
-                        }
-                    }
+            LocalBackupActionsCard(
+                busy = uiState.isBackingUpLocally ||
+                    uiState.isRestoringLocally ||
+                    uiState.isPreviewingRestore ||
+                    uiState.isPreviewingRecordImport ||
+                    uiState.isImportingRecords,
+                backupBusy = uiState.isBackingUpLocally,
+                restoreBusy = uiState.isRestoringLocally,
+                onBackup = { createBackupLauncher.launch(viewModel.suggestedBackupFileName()) },
+                onRestore = {
+                    Log.d(TAG, "launch restore picker via GetContent")
+                    restoreBackupLauncher.launch("*/*")
                 }
-            }
+            )
 
             SettingsSectionHeader(title = "分享导出")
 
-            ExportOptionCard(
-                icon = Icons.Default.TableChart,
-                title = "CSV 格式",
-                description = "导出为逗号分隔值文件，可用 Excel 打开",
-                onClick = { viewModel.export(ExportType.CSV) },
-                isLoading = uiState.isExporting && uiState.exportType == ExportType.CSV
-            )
+            SettingsGroupCard {
+                ExportOptionRow(
+                    icon = Icons.Default.TableChart,
+                    title = "CSV 格式",
+                    description = "逗号分隔值文件，可用 Excel 打开",
+                    onClick = { viewModel.export(ExportType.CSV) },
+                    isLoading = uiState.isExporting && uiState.exportType == ExportType.CSV
+                )
 
-            ExportOptionCard(
-                icon = Icons.Default.Code,
-                title = "JSON 格式",
-                description = "导出为 JSON 格式，保留完整数据结构",
-                onClick = { viewModel.export(ExportType.JSON) },
-                isLoading = uiState.isExporting && uiState.exportType == ExportType.JSON
-            )
+                ExportOptionRow(
+                    icon = Icons.Default.Code,
+                    title = "JSON 格式",
+                    description = "保留完整数据结构，适合迁移和归档",
+                    onClick = { viewModel.export(ExportType.JSON) },
+                    isLoading = uiState.isExporting && uiState.exportType == ExportType.JSON,
+                    showDivider = false
+                )
+            }
 
             if (uiState.error != null) {
                 SettingsSurfaceCard(
@@ -403,15 +337,6 @@ fun ExportScreen(
                 }
             }
 
-            SettingsSectionHeader(title = "迁移说明")
-            SettingsSurfaceCard {
-                Text(
-                    text = "导入其他记账 App 会读取常见 CSV 导出列并先预览，再按去重策略合并到当前账本。本地备份/还原会处理完整应用数据。CSV 适合表格查看，JSON 适合跨设备恢复。",
-                    modifier = Modifier.padding(16.dp),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
         }
     }
 }
@@ -446,53 +371,134 @@ private tailrec fun Context.findActivity(): Activity? {
 }
 
 @Composable
-fun ExportOptionCard(
-    icon: ImageVector,
-    title: String,
-    description: String,
-    onClick: () -> Unit,
-    isLoading: Boolean
+private fun ImportActionsCard(
+    busy: Boolean,
+    importBusy: Boolean,
+    onSmartImport: () -> Unit,
+    onChooseCsv: () -> Unit
 ) {
     SettingsSurfaceCard {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.height(24.dp)
-            )
-
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.Medium,
-                    maxLines = 1
+            Button(
+                onClick = onSmartImport,
+                enabled = !busy,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.AutoAwesome,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp)
                 )
-                Text(
-                    text = description,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1
-                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("智能导入")
             }
-
-            if (isLoading) {
-                ButtonLoadingIndicator(color = MaterialTheme.colorScheme.primary)
-            } else {
-                OutlinedButton(
-                    onClick = onClick,
-                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp)
-                ) {
-                    Text("导出", style = MaterialTheme.typography.labelMedium)
+            OutlinedButton(
+                onClick = onChooseCsv,
+                enabled = !busy,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                if (importBusy) {
+                    ButtonLoadingIndicator(color = MaterialTheme.colorScheme.primary)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("导入中")
+                } else {
+                    Icon(
+                        imageVector = Icons.Filled.UploadFile,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("选择 CSV 文件")
                 }
             }
         }
     }
+}
+
+@Composable
+private fun LocalBackupActionsCard(
+    busy: Boolean,
+    backupBusy: Boolean,
+    restoreBusy: Boolean,
+    onBackup: () -> Unit,
+    onRestore: () -> Unit
+) {
+    SettingsSurfaceCard {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Button(
+                onClick = onBackup,
+                enabled = !busy,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                if (backupBusy) {
+                    ButtonLoadingIndicator(color = MaterialTheme.colorScheme.onPrimary)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("备份中")
+                } else {
+                    Icon(
+                        imageVector = Icons.Filled.Save,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("本地备份")
+                }
+            }
+
+            OutlinedButton(
+                onClick = onRestore,
+                enabled = !busy,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                if (restoreBusy) {
+                    ButtonLoadingIndicator(color = MaterialTheme.colorScheme.primary)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("还原中")
+                } else {
+                    Icon(
+                        imageVector = Icons.Filled.Restore,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("本地还原")
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ExportOptionRow(
+    icon: ImageVector,
+    title: String,
+    description: String,
+    onClick: () -> Unit,
+    isLoading: Boolean,
+    showDivider: Boolean = true
+) {
+    SettingsGroupRow(
+        icon = icon,
+        title = title,
+        subtitle = description,
+        onClick = onClick,
+        showDivider = showDivider,
+        trailing = {
+            if (isLoading) {
+                ButtonLoadingIndicator(color = MaterialTheme.colorScheme.primary)
+            } else {
+                Text(
+                    text = "导出",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+        }
+    )
 }

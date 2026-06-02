@@ -53,13 +53,14 @@ import com.mewbook.app.domain.model.BudgetPeriodType
 import com.mewbook.app.domain.policy.HapticFeedbackPolicy
 import com.mewbook.app.ui.components.BudgetPeriodTypeSelector
 import com.mewbook.app.ui.components.MewCompactTopAppBar
-import com.mewbook.app.ui.components.SettingsDangerRowCard
+import com.mewbook.app.ui.components.SettingsGroupCard
+import com.mewbook.app.ui.components.SettingsGroupDangerRow
+import com.mewbook.app.ui.components.SettingsGroupRow
+import com.mewbook.app.ui.components.SettingsGroupSwitchRow
+import com.mewbook.app.ui.components.SettingsIconContainer
 import com.mewbook.app.ui.components.SettingsPageScaffold
-import com.mewbook.app.ui.components.SettingsRowCard
 import com.mewbook.app.ui.components.SettingsSectionHeader
 import com.mewbook.app.ui.components.SettingsSummaryCard
-import com.mewbook.app.ui.components.SettingsSurfaceCard
-import com.mewbook.app.ui.components.SettingsSwitchRowCard
 import com.mewbook.app.ui.components.displayLabel
 import com.mewbook.app.ui.components.rememberMewHapticFeedback
 import com.mewbook.app.ui.update.AppUpdateUiState
@@ -186,10 +187,13 @@ fun SettingsScreen(
         }
     ) { paddingValues ->
         SettingsPageScaffold(paddingValues = paddingValues) {
+            val updateStatus = updateStatusSubtitle(updateUiState)
             SettingsSummaryCard(
                 icon = Icons.Filled.Info,
                 title = "喵喵记账",
-                subtitle = "版本 ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
+                subtitle = updateStatus?.let {
+                    "版本 ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE}) · $it"
+                } ?: "版本 ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
                 onClick = {
                     performWithHaptic(HapticFeedbackPolicy.Interaction.RowClick) {
                         showAppInfoDialog = true
@@ -202,147 +206,158 @@ fun SettingsScreen(
                 description = "控制主题、首页信息密度和默认统计周期。"
             )
 
-            SettingsRowCard(
-                icon = Icons.Filled.Palette,
-                title = "主题",
-                subtitle = themeMode.displayName,
-                onClick = {
-                    performWithHaptic(HapticFeedbackPolicy.Interaction.RowClick) {
-                        showThemeDialog = true
+            SettingsGroupCard {
+                SettingsGroupRow(
+                    icon = Icons.Filled.Palette,
+                    title = "主题",
+                    subtitle = themeMode.displayName,
+                    onClick = {
+                        performWithHaptic(HapticFeedbackPolicy.Interaction.RowClick) {
+                            showThemeDialog = true
+                        }
                     }
-                }
-            )
+                )
 
-            SettingsSwitchRowCard(
-                icon = Icons.Filled.AccountBalanceWallet,
-                title = "首页收支概览",
-                subtitle = "控制首页是否显示收支概览卡片",
-                checked = showHomeOverviewCards,
-                onCheckedChange = {
-                    performWithHaptic(HapticFeedbackPolicy.Interaction.Toggle) {
-                        viewModel.setShowHomeOverviewCards(it)
+                SettingsGroupSwitchRow(
+                    icon = Icons.Filled.AccountBalanceWallet,
+                    title = "首页收支概览",
+                    subtitle = "控制首页是否显示收支概览卡片",
+                    checked = showHomeOverviewCards,
+                    onCheckedChange = {
+                        performWithHaptic(HapticFeedbackPolicy.Interaction.Toggle) {
+                            viewModel.setShowHomeOverviewCards(it)
+                        }
                     }
-                }
-            )
+                )
 
-            SettingsSwitchRowCard(
-                icon = Icons.Filled.TouchApp,
-                title = "触感反馈",
-                subtitle = "记账键盘、设置操作和快捷入口提供震动反馈",
-                checked = keyPressHapticEnabled,
-                onCheckedChange = {
-                    performWithHaptic(HapticFeedbackPolicy.Interaction.Toggle) {
-                        viewModel.setKeyPressHapticEnabled(it)
+                SettingsGroupSwitchRow(
+                    icon = Icons.Filled.TouchApp,
+                    title = "触感反馈",
+                    subtitle = "记账键盘、设置操作和快捷入口提供震动反馈",
+                    checked = keyPressHapticEnabled,
+                    onCheckedChange = {
+                        performWithHaptic(HapticFeedbackPolicy.Interaction.Toggle) {
+                            viewModel.setKeyPressHapticEnabled(it)
+                        }
                     }
-                }
-            )
+                )
 
-            HomePeriodPreferenceItem(
-                selectedPeriodType = selectedHomePeriod,
-                hapticFeedbackEnabled = keyPressHapticEnabled,
-                onSelect = viewModel::setSelectedHomePeriod
-            )
+                HomePeriodPreferenceItem(
+                    selectedPeriodType = selectedHomePeriod,
+                    hapticFeedbackEnabled = keyPressHapticEnabled,
+                    onSelect = viewModel::setSelectedHomePeriod
+                )
+            }
 
             SettingsSectionHeader(
                 title = "账务结构",
                 description = "管理账本、分类、预算和固定收支模板。"
             )
 
-            SettingsRowCard(
-                icon = Icons.Filled.AccountBalance,
-                title = "账本管理",
-                subtitle = "长按删除，自定义排序",
-                onClick = {
-                    performWithHaptic(HapticFeedbackPolicy.Interaction.RowClick, onNavigateToLedgerManagement)
-                }
-            )
+            SettingsGroupCard {
+                SettingsGroupRow(
+                    icon = Icons.Filled.AccountBalance,
+                    title = "账本管理",
+                    subtitle = "默认账本、账户归属和手动排序",
+                    onClick = {
+                        performWithHaptic(HapticFeedbackPolicy.Interaction.RowClick, onNavigateToLedgerManagement)
+                    }
+                )
 
-            SettingsRowCard(
-                icon = Icons.Filled.Category,
-                title = "分类管理",
-                subtitle = "管理收支分类",
-                onClick = {
-                    performWithHaptic(HapticFeedbackPolicy.Interaction.RowClick, onNavigateToCategories)
-                }
-            )
+                SettingsGroupRow(
+                    icon = Icons.Filled.Category,
+                    title = "分类管理",
+                    subtitle = "整理收入、支出分类和图标顺序",
+                    onClick = {
+                        performWithHaptic(HapticFeedbackPolicy.Interaction.RowClick, onNavigateToCategories)
+                    }
+                )
 
-            SettingsRowCard(
-                icon = Icons.Filled.AccountBalanceWallet,
-                title = "预算管理",
-                subtitle = "设置不同周期及类型预算",
-                onClick = {
-                    performWithHaptic(HapticFeedbackPolicy.Interaction.RowClick, onNavigateToBudget)
-                }
-            )
+                SettingsGroupRow(
+                    icon = Icons.Filled.AccountBalanceWallet,
+                    title = "预算管理",
+                    subtitle = "总预算、分类预算和周期切换",
+                    onClick = {
+                        performWithHaptic(HapticFeedbackPolicy.Interaction.RowClick, onNavigateToBudget)
+                    }
+                )
 
-            SettingsRowCard(
-                icon = Icons.Filled.CalendarMonth,
-                title = "周期模板",
-                subtitle = "工资、房租、订阅等固定记账",
-                onClick = {
-                    performWithHaptic(HapticFeedbackPolicy.Interaction.RowClick, onNavigateToRecurringTemplates)
-                }
-            )
+                SettingsGroupRow(
+                    icon = Icons.Filled.CalendarMonth,
+                    title = "周期模板",
+                    subtitle = "工资、房租、订阅等固定记账",
+                    showDivider = false,
+                    onClick = {
+                        performWithHaptic(HapticFeedbackPolicy.Interaction.RowClick, onNavigateToRecurringTemplates)
+                    }
+                )
+            }
 
             SettingsSectionHeader(
                 title = "数据与同步",
                 description = "处理云端备份、本地备份、还原和外部导入。"
             )
 
-            SettingsRowCard(
-                icon = Icons.Filled.CloudSync,
-                title = "DAV同步",
-                subtitle = "自动备份、手动导入导出与同步预览",
-                onClick = {
-                    performWithHaptic(HapticFeedbackPolicy.Interaction.RowClick, onNavigateToDavSettings)
-                }
-            )
+            SettingsGroupCard {
+                SettingsGroupRow(
+                    icon = Icons.Filled.CloudSync,
+                    title = "DAV 同步",
+                    subtitle = "云端备份、冲突策略和导入预览",
+                    onClick = {
+                        performWithHaptic(HapticFeedbackPolicy.Interaction.RowClick, onNavigateToDavSettings)
+                    }
+                )
 
-            SettingsRowCard(
-                icon = Icons.Filled.Download,
-                title = "迁移与备份",
-                subtitle = "外部导入、本地备份、还原与格式导出",
-                onClick = {
-                    performWithHaptic(HapticFeedbackPolicy.Interaction.RowClick, onNavigateToExport)
-                }
-            )
+                SettingsGroupRow(
+                    icon = Icons.Filled.Download,
+                    title = "迁移与备份",
+                    subtitle = "外部导入、本地备份、还原与格式导出",
+                    onClick = {
+                        performWithHaptic(HapticFeedbackPolicy.Interaction.RowClick, onNavigateToExport)
+                    }
+                )
 
-            SettingsRowCard(
-                icon = Icons.Filled.Restore,
-                title = "回收站",
-                subtitle = "找回 30 天内删除的记录",
-                onClick = {
-                    performWithHaptic(HapticFeedbackPolicy.Interaction.RowClick, onNavigateToRecycleBin)
-                }
-            )
+                SettingsGroupRow(
+                    icon = Icons.Filled.Restore,
+                    title = "回收站",
+                    subtitle = "恢复或批量处理 30 天内删除的记录",
+                    showDivider = false,
+                    onClick = {
+                        performWithHaptic(HapticFeedbackPolicy.Interaction.RowClick, onNavigateToRecycleBin)
+                    }
+                )
+            }
 
             SettingsSectionHeader(
                 title = "应用与安全",
                 description = "自动更新偏好和不可恢复的数据操作集中在这里。"
             )
 
-            SettingsSwitchRowCard(
-                icon = Icons.Filled.CloudSync,
-                title = "自动检查更新",
-                subtitle = if (updateEnabled) "启动时自动检查新版本" else "已关闭，可在版本详情中手动检查",
-                checked = updateEnabled,
-                onCheckedChange = {
-                    performWithHaptic(HapticFeedbackPolicy.Interaction.Toggle) {
-                        viewModel.setUpdateEnabled(it)
+            SettingsGroupCard {
+                SettingsGroupSwitchRow(
+                    icon = Icons.Filled.CloudSync,
+                    title = "自动检查更新",
+                    subtitle = if (updateEnabled) "启动时自动检查新版本" else "已关闭，可在版本详情中手动检查",
+                    checked = updateEnabled,
+                    onCheckedChange = {
+                        performWithHaptic(HapticFeedbackPolicy.Interaction.Toggle) {
+                            viewModel.setUpdateEnabled(it)
+                        }
                     }
-                }
-            )
+                )
 
-            SettingsDangerRowCard(
-                icon = Icons.Filled.DeleteForever,
-                title = "清除数据",
-                subtitle = "删除所有记账数据，不可恢复",
-                onClick = {
-                    performWithHaptic(HapticFeedbackPolicy.Interaction.RowClick) {
-                        showClearDataDialog = true
+                SettingsGroupDangerRow(
+                    icon = Icons.Filled.DeleteForever,
+                    title = "清除数据",
+                    subtitle = "删除所有记账数据，不可恢复",
+                    showDivider = false,
+                    onClick = {
+                        performWithHaptic(HapticFeedbackPolicy.Interaction.RowClick) {
+                            showClearDataDialog = true
+                        }
                     }
-                }
-            )
+                )
+            }
         }
     }
 }
@@ -476,47 +491,44 @@ private fun HomePeriodPreferenceItem(
     hapticFeedbackEnabled: Boolean,
     onSelect: (BudgetPeriodType) -> Unit
 ) {
-    SettingsSurfaceCard {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp)
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 14.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.CalendarMonth,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary
-                )
-
-                Spacer(modifier = Modifier.width(16.dp))
-
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "首页显示周期",
-                        style = MaterialTheme.typography.bodyLarge,
-                        fontWeight = androidx.compose.ui.text.font.FontWeight.Medium
-                    )
-                    Text(
-                        text = "当前：${selectedPeriodType.displayLabel()}，控制首页记录和金额概览的统计范围",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-            }
-
-            BudgetPeriodTypeSelector(
-                selectedPeriodType = selectedPeriodType,
-                onSelect = onSelect,
-                modifier = Modifier.padding(top = 12.dp),
-                hapticFeedbackEnabled = hapticFeedbackEnabled
+            SettingsIconContainer(
+                icon = Icons.Filled.CalendarMonth,
+                tint = MaterialTheme.colorScheme.primary
             )
+
+            Spacer(modifier = Modifier.width(12.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "首页显示周期",
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Medium
+                )
+                Text(
+                    text = "当前：${selectedPeriodType.displayLabel()}，控制首页记录和金额概览的统计范围",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
         }
+
+        BudgetPeriodTypeSelector(
+            selectedPeriodType = selectedPeriodType,
+            onSelect = onSelect,
+            modifier = Modifier.padding(top = 12.dp),
+            hapticFeedbackEnabled = hapticFeedbackEnabled
+        )
     }
 }
 

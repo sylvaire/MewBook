@@ -51,7 +51,7 @@ import com.mewbook.app.ui.components.RecordItem
 import com.mewbook.app.ui.screens.add.AddEditRecordSheet
 import com.mewbook.app.ui.screens.home.RecordDetailDialog
 import com.mewbook.app.ui.theme.ClayDesign
-import com.mewbook.app.ui.theme.ExpenseRed
+import com.mewbook.app.ui.theme.LocalMewBookSemanticColors
 import com.mewbook.app.ui.theme.clayCardShadow
 import com.mewbook.app.util.formatCurrency
 
@@ -62,6 +62,7 @@ fun CategoryExpenseDetailScreen(
     viewModel: CategoryExpenseDetailViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val semanticColors = LocalMewBookSemanticColors.current
     var pendingDeleteRecordId by remember { mutableLongStateOf(0L) }
     var showDeleteConfirmDialog by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
@@ -174,7 +175,7 @@ fun CategoryExpenseDetailScreen(
                                     text = "-${formatCurrency(uiState.totalExpense)}",
                                     style = MaterialTheme.typography.titleLarge,
                                     fontWeight = FontWeight.Bold,
-                                    color = ExpenseRed
+                                    color = semanticColors.expense
                                 )
                             }
                         }

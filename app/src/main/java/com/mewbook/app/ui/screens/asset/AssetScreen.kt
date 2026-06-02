@@ -41,8 +41,7 @@ import com.mewbook.app.ui.components.AccountTypeIconBadge
 import com.mewbook.app.ui.components.MewCompactTopAppBar
 import com.mewbook.app.ui.components.toDisplayName
 import com.mewbook.app.ui.theme.ClayDesign
-import com.mewbook.app.ui.theme.ExpenseRed
-import com.mewbook.app.ui.theme.IncomeGreen
+import com.mewbook.app.ui.theme.LocalMewBookSemanticColors
 import com.mewbook.app.ui.theme.clayCardShadow
 import com.mewbook.app.util.formatCurrency
 
@@ -153,6 +152,8 @@ fun NetAssetCard(
     totalAsset: Double,
     totalLiability: Double
 ) {
+    val semanticColors = LocalMewBookSemanticColors.current
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -179,7 +180,7 @@ fun NetAssetCard(
                 text = formatCurrency(netAsset),
                 style = MaterialTheme.typography.headlineLarge,
                 fontWeight = FontWeight.Bold,
-                color = if (netAsset >= 0) IncomeGreen else ExpenseRed
+                color = if (netAsset >= 0) semanticColors.income else semanticColors.expense
             )
             Spacer(modifier = Modifier.height(16.dp))
             Row(
@@ -196,7 +197,7 @@ fun NetAssetCard(
                         text = formatCurrency(totalAsset),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
-                        color = IncomeGreen
+                        color = semanticColors.income
                     )
                 }
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -209,7 +210,7 @@ fun NetAssetCard(
                         text = formatCurrency(totalLiability),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
-                        color = ExpenseRed
+                        color = semanticColors.expense
                     )
                 }
             }
@@ -222,6 +223,8 @@ fun AccountItem(
     account: Account,
     onClick: (Account) -> Unit
 ) {
+    val semanticColors = LocalMewBookSemanticColors.current
+
     Card(
         onClick = { onClick(account) },
         modifier = Modifier
@@ -263,7 +266,7 @@ fun AccountItem(
                 text = formatCurrency(account.balance),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
-                color = if (account.balance >= 0) MaterialTheme.colorScheme.onSurface else ExpenseRed
+                color = if (account.balance >= 0) MaterialTheme.colorScheme.onSurface else semanticColors.expense
             )
         }
     }

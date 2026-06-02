@@ -121,6 +121,15 @@ object DatabaseModule {
         }
     }
 
+    private val MIGRATION_6_7 = object : Migration(6, 7) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE dav_config ADD COLUMN lastSyncFileName TEXT")
+            db.execSQL("ALTER TABLE dav_config ADD COLUMN lastSyncFileSizeBytes INTEGER")
+            db.execSQL("ALTER TABLE dav_config ADD COLUMN lastSyncDurationMillis INTEGER")
+            db.execSQL("ALTER TABLE dav_config ADD COLUMN lastSyncDirection TEXT")
+        }
+    }
+
     @Provides
     @Singleton
     fun provideDatabase(
@@ -131,7 +140,7 @@ object DatabaseModule {
             MewBookDatabase::class.java,
             MewBookDatabase.DATABASE_NAME
         )
-            .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
+            .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
             .build()
     }
 

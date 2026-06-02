@@ -7,7 +7,11 @@ import androidx.lifecycle.viewModelScope
 import com.mewbook.app.data.backup.BackupRestorePreview
 import com.mewbook.app.domain.model.DavAutoBackupStatus
 import com.mewbook.app.domain.model.DavBackupFile
+import com.mewbook.app.domain.model.DavConflictStrategy
 import com.mewbook.app.domain.model.DavConfig
+import com.mewbook.app.domain.model.DavSyncSuccessDetails
+import com.mewbook.app.domain.policy.DavConflictPolicy
+import com.mewbook.app.domain.policy.DavImportDecision
 import com.mewbook.app.domain.repository.DavAutoBackupStatusRepository
 import com.mewbook.app.domain.usecase.dav.ExportDataUseCase
 import com.mewbook.app.domain.usecase.dav.GetDavConfigUseCase
@@ -33,6 +37,8 @@ data class DavSettingsUiState(
     val remotePath: String = "/MewBook",
     val isEnabled: Boolean = false,
     val lastSyncTime: LocalDateTime? = null,
+    val lastSyncDetails: DavSyncSuccessDetails? = null,
+    val conflictStrategy: DavConflictStrategy = DavConflictStrategy.MANUAL,
     val isLoading: Boolean = false,
     val isTesting: Boolean = false,
     val isExporting: Boolean = false,
@@ -88,6 +94,7 @@ class DavSettingsViewModel @Inject constructor(
                         remotePath = config.remotePath,
                         isEnabled = config.isEnabled,
                         lastSyncTime = config.lastSyncTime,
+                        lastSyncDetails = config.lastSyncDetails,
                         isLoading = false
                     )
                 }
@@ -138,7 +145,8 @@ class DavSettingsViewModel @Inject constructor(
                 password = state.password,
                 remotePath = state.remotePath,
                 isEnabled = state.isEnabled,
-                lastSyncTime = state.lastSyncTime
+                lastSyncTime = state.lastSyncTime,
+                lastSyncDetails = state.lastSyncDetails
             )
             saveDavConfigUseCase(config)
             _uiState.update { it.copy(message = "配置已保存") }
@@ -181,6 +189,10 @@ class DavSettingsViewModel @Inject constructor(
         _uiState.update { it.copy(exportFileNameInput = fileName, message = null) }
     }
 
+    fun updateConflictStrategy(strategy: DavConflictStrategy) {
+        _uiState.update { it.copy(conflictStrategy = strategy, message = null) }
+    }
+
     fun dismissExportFileNameDialog() {
         _uiState.update { it.copy(showExportFileNameDialog = false, exportFileNameInput = "") }
     }
@@ -204,13 +216,14 @@ class DavSettingsViewModel @Inject constructor(
             )
             val requestedFileName = state.exportFileNameInput.trim().takeIf { it.isNotEmpty() }
 
-            val result = exportDataUseCase(config, requestedFileName)
+            val result = exportDataUseCase.withDetails(config, requestedFileName)
             _uiState.update {
-                val syncedAt = if (result.isSuccess) LocalDateTime.now() else it.lastSyncTime
+                val details = result.getOrNull()
                 it.copy(
                     isExporting = false,
                     exportFileNameInput = "",
-                    lastSyncTime = syncedAt,
+                    lastSyncTime = details?.syncedAt ?: it.lastSyncTime,
+                    lastSyncDetails = details ?: it.lastSyncDetails,
                     message = if (result.isSuccess) "导出成功！" else "导出失败: ${result.exceptionOrNull()?.message}"
                 )
             }
@@ -295,15 +308,16 @@ class DavSettingsViewModel @Inject constructor(
 
             val selectedBackupFile = state.selectedImportBackupFile
             val result = if (selectedBackupFile == null) {
-                importDataUseCase(config)
+                importDataUseCase.withDetails(config)
             } else {
-                importDataUseCase(config, selectedBackupFile)
+                importDataUseCase.withDetails(config, selectedBackupFile)
             }
             _uiState.update {
-                val syncedAt = if (result.isSuccess) LocalDateTime.now() else it.lastSyncTime
+                val details = result.getOrNull()
                 it.copy(
                     isImporting = false,
-                    lastSyncTime = syncedAt,
+                    lastSyncTime = details?.syncedAt ?: it.lastSyncTime,
+                    lastSyncDetails = details ?: it.lastSyncDetails,
                     selectedImportBackupFile = if (result.isSuccess) null else selectedBackupFile,
                     message = if (result.isSuccess) "导入成功！" else "导入失败: ${result.exceptionOrNull()?.message}"
                 )
@@ -312,8 +326,36 @@ class DavSettingsViewModel @Inject constructor(
     }
 
     fun confirmImportData() {
+        val state = _uiState.value
+        val preview = state.importPreview
+        if (preview == null) {
+            importData()
+            return
+        }
+
+        when (DavConflictPolicy.decide(state.conflictStrategy, preview)) {
+            DavImportDecision.IMPORT_REMOTE -> confirmRemoteImport()
+            DavImportDecision.KEEP_LOCAL -> keepLocalImport("已按本地优先保留本地数据")
+            DavImportDecision.REQUIRE_MANUAL_CHOICE -> {
+                _uiState.update { it.copy(message = "请手动选择保留本地或远端覆盖") }
+            }
+        }
+    }
+
+    fun confirmRemoteImport() {
         _uiState.update { it.copy(importPreview = null) }
         importData()
+    }
+
+    fun keepLocalImport(message: String = "已保留本地数据") {
+        _uiState.update {
+            it.copy(
+                importPreview = null,
+                isPreviewingImport = false,
+                selectedImportBackupFile = null,
+                message = message
+            )
+        }
     }
 
     fun clearImportPreview() {

@@ -23,6 +23,11 @@ signing/
 .cline/
 .cursor/
 .omx/
+.codegraph/
+
+# Local emulator/test captures
+tmp*.png
+tmp*.xml
 
 # OS / misc
 Thumbs.db

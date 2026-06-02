@@ -82,16 +82,31 @@ object BackupMigration {
         current: BackupEnvelope,
         incoming: BackupEnvelope
     ): BackupRestorePreview {
+        val recordChanges = countChanges(current.payload.records, incoming.payload.records) { it.id }
+        val categoryChanges = countChanges(current.payload.categories, incoming.payload.categories) { it.id }
+        val accountChanges = countChanges(current.payload.accounts, incoming.payload.accounts) { it.id }
+        val budgetChanges = countChanges(current.payload.budgets, incoming.payload.budgets) { it.id }
+        val templateChanges = countChanges(current.payload.templates, incoming.payload.templates) { it.id }
+        val ledgerChanges = countChanges(current.payload.ledgers, incoming.payload.ledgers) { it.id }
+
         return BackupRestorePreview(
             current = summarizeEnvelope(current),
             incoming = summarizeEnvelope(incoming),
             conflicts = BackupConflictSummary(
-                records = countConflicts(current.payload.records.map { it.id }, incoming.payload.records.map { it.id }),
-                categories = countConflicts(current.payload.categories.map { it.id }, incoming.payload.categories.map { it.id }),
-                accounts = countConflicts(current.payload.accounts.map { it.id }, incoming.payload.accounts.map { it.id }),
-                budgets = countConflicts(current.payload.budgets.map { it.id }, incoming.payload.budgets.map { it.id }),
-                templates = countConflicts(current.payload.templates.map { it.id }, incoming.payload.templates.map { it.id }),
-                ledgers = countConflicts(current.payload.ledgers.map { it.id }, incoming.payload.ledgers.map { it.id })
+                records = recordChanges.modified,
+                categories = categoryChanges.modified,
+                accounts = accountChanges.modified,
+                budgets = budgetChanges.modified,
+                templates = templateChanges.modified,
+                ledgers = ledgerChanges.modified
+            ),
+            changes = BackupChangeSummary(
+                records = recordChanges,
+                categories = categoryChanges,
+                accounts = accountChanges,
+                budgets = budgetChanges,
+                templates = templateChanges,
+                ledgers = ledgerChanges
             )
         )
     }
@@ -106,11 +121,21 @@ object BackupMigration {
         )
     }
 
-    private fun countConflicts(currentIds: List<Long>, incomingIds: List<Long>): Int {
-        if (currentIds.isEmpty() || incomingIds.isEmpty()) {
-            return 0
-        }
-        return currentIds.toSet().intersect(incomingIds.toSet()).size
+    private fun <T> countChanges(
+        currentItems: List<T>,
+        incomingItems: List<T>,
+        idSelector: (T) -> Long
+    ): BackupChangeCount {
+        val currentById = currentItems.associateBy(idSelector)
+        val incomingById = incomingItems.associateBy(idSelector)
+        val currentIds = currentById.keys
+        val incomingIds = incomingById.keys
+        val sharedIds = currentIds.intersect(incomingIds)
+        return BackupChangeCount(
+            added = (incomingIds - currentIds).size,
+            modified = sharedIds.count { id -> currentById[id] != incomingById[id] },
+            deleted = (currentIds - incomingIds).size
+        )
     }
 
     private fun migrateLegacyExportV1(legacy: LegacyExportV1): BackupEnvelope {

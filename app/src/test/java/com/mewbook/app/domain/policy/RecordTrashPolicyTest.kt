@@ -65,4 +65,26 @@ class RecordTrashPolicyTest {
             RecordTrashPolicy.expirationCutoff(LocalDateTime.of(2026, 5, 23, 12, 0))
         )
     }
+
+    @Test
+    fun isExpiringSoonWarnsOnlyDuringLastRetentionDay() {
+        assertFalse(
+            RecordTrashPolicy.isExpiringSoon(
+                deletedAt = deletedAt,
+                now = deletedAt.plusDays(28).plusHours(23)
+            )
+        )
+        assertTrue(
+            RecordTrashPolicy.isExpiringSoon(
+                deletedAt = deletedAt,
+                now = deletedAt.plusDays(29)
+            )
+        )
+        assertFalse(
+            RecordTrashPolicy.isExpiringSoon(
+                deletedAt = deletedAt,
+                now = deletedAt.plusDays(30).plusSeconds(1)
+            )
+        )
+    }
 }

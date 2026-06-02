@@ -330,7 +330,11 @@ class BackupRepository @Inject constructor(
         password = password,
         remotePath = remotePath,
         isEnabled = isEnabled,
-        lastSyncTime = lastSyncTime
+        lastSyncTime = lastSyncTime,
+        lastSyncFileName = lastSyncFileName,
+        lastSyncFileSizeBytes = lastSyncFileSizeBytes,
+        lastSyncDurationMillis = lastSyncDurationMillis,
+        lastSyncDirection = lastSyncDirection
     )
 
     private fun BackupRecord.toEntity() = RecordEntity(
@@ -416,7 +420,11 @@ class BackupRepository @Inject constructor(
         password = password,
         remotePath = remotePath,
         isEnabled = isEnabled,
-        lastSyncTime = lastSyncTime
+        lastSyncTime = lastSyncTime,
+        lastSyncFileName = lastSyncFileName,
+        lastSyncFileSizeBytes = lastSyncFileSizeBytes,
+        lastSyncDurationMillis = lastSyncDurationMillis,
+        lastSyncDirection = lastSyncDirection
     )
 
     private fun RecurringTemplateEntity.toBackup() = BackupRecurringTemplate(

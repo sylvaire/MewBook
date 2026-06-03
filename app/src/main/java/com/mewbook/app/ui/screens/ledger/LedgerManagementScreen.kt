@@ -67,7 +67,7 @@ import com.mewbook.app.domain.policy.LedgerMoveDirection
 import com.mewbook.app.domain.policy.LedgerOrderingPolicy
 import com.mewbook.app.domain.repository.AccountRepository
 import com.mewbook.app.domain.repository.LedgerRepository
-import com.mewbook.app.ui.components.AccountTypeIconBadge
+import com.mewbook.app.ui.components.AccountIconBadge
 import com.mewbook.app.ui.components.MewCompactTopAppBar
 import com.mewbook.app.ui.components.SettingsSectionHeader
 import com.mewbook.app.ui.components.SettingsSurfaceCard
@@ -516,8 +516,9 @@ private fun DefaultAccountItem(
                 .padding(horizontal = 14.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            AccountTypeIconBadge(
+            AccountIconBadge(
                 type = account.type,
+                iconName = account.icon,
                 accentColor = Color(account.color),
                 containerSize = 32.dp,
                 iconSize = 18.dp,

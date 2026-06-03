@@ -37,7 +37,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mewbook.app.domain.model.Account
-import com.mewbook.app.ui.components.AccountTypeIconBadge
+import com.mewbook.app.ui.components.AccountIconBadge
 import com.mewbook.app.ui.components.MewCompactTopAppBar
 import com.mewbook.app.ui.components.toDisplayName
 import com.mewbook.app.ui.theme.ClayDesign
@@ -242,8 +242,9 @@ fun AccountItem(
                 .padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            AccountTypeIconBadge(
+            AccountIconBadge(
                 type = account.type,
+                iconName = account.icon,
                 accentColor = Color(account.color),
                 containerSize = 44.dp,
                 iconSize = 24.dp,

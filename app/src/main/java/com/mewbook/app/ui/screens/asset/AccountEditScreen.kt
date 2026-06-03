@@ -48,9 +48,12 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import com.mewbook.app.domain.model.Account
+import com.mewbook.app.ui.components.AccountIconBadge
+import com.mewbook.app.ui.components.AccountIconPicker
 import com.mewbook.app.domain.repository.AccountRepository
-import com.mewbook.app.ui.components.AccountTypeIconBadge
 import com.mewbook.app.ui.components.MewCompactTopAppBar
+import com.mewbook.app.ui.components.normalizeAccountIconName
+import com.mewbook.app.ui.components.supportsCustomIcon
 import com.mewbook.app.ui.components.toDisplayName
 import com.mewbook.app.ui.theme.ClayDesign
 import com.mewbook.app.ui.theme.LocalMewBookSemanticColors
@@ -87,11 +90,15 @@ class AccountEditViewModel @Inject constructor(
         }
     }
 
-    fun saveChanges(name: String, balance: Double) {
+    fun saveChanges(name: String, balance: Double, iconName: String) {
         viewModelScope.launch {
             val account = _uiState.value.account ?: return@launch
             _uiState.update { it.copy(isSaving = true) }
-            val updated = account.copy(name = name, balance = balance)
+            val updated = account.copy(
+                name = name,
+                balance = balance,
+                icon = normalizeAccountIconName(iconName, account.type)
+            )
             accountRepository.updateAccount(updated)
             _uiState.update { it.copy(account = updated, isSaving = false) }
         }
@@ -117,6 +124,7 @@ fun AccountEditScreen(
     val semanticColors = LocalMewBookSemanticColors.current
     var balanceText by remember { mutableStateOf("") }
     var nameText by remember { mutableStateOf("") }
+    var selectedIconName by remember { mutableStateOf("") }
     var showDeleteDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(accountId) {
@@ -130,6 +138,9 @@ fun AccountEditScreen(
             }
             if (nameText.isEmpty()) {
                 nameText = it.name
+            }
+            if (selectedIconName.isEmpty()) {
+                selectedIconName = normalizeAccountIconName(it.icon, it.type)
             }
         }
     }
@@ -220,8 +231,9 @@ fun AccountEditScreen(
                                 .padding(20.dp),
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-                            AccountTypeIconBadge(
+                            AccountIconBadge(
                                 type = account.type,
+                                iconName = selectedIconName,
                                 accentColor = Color(account.color),
                                 containerSize = 56.dp,
                                 iconSize = 30.dp,
@@ -246,6 +258,29 @@ fun AccountEditScreen(
                     }
 
                     Spacer(modifier = Modifier.height(16.dp))
+
+                    if (account.type.supportsCustomIcon()) {
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clayCardShadow(),
+                            shape = RoundedCornerShape(ClayDesign.CardRadius),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.surface
+                            )
+                        ) {
+                            AccountIconPicker(
+                                selectedIconName = selectedIconName,
+                                accountType = account.type,
+                                accentColor = Color(account.color),
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp),
+                                onIconSelected = { selectedIconName = it }
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(16.dp))
+                    }
 
                     // Edit fields card
                     Card(
@@ -295,16 +330,17 @@ fun AccountEditScreen(
 
                     Spacer(modifier = Modifier.height(24.dp))
 
-                    val hasChanges = remember(nameText, balanceText, account) {
+                    val hasChanges = remember(nameText, balanceText, selectedIconName, account) {
                         val nameChanged = nameText.isNotBlank() && nameText != account.name
                         val balanceChanged = balanceText.toDoubleOrNull()?.let { it != account.balance } ?: false
-                        nameChanged || balanceChanged
+                        val iconChanged = selectedIconName != normalizeAccountIconName(account.icon, account.type)
+                        nameChanged || balanceChanged || iconChanged
                     }
 
                     Button(
                         onClick = {
                             val balance = balanceText.toDoubleOrNull() ?: account.balance
-                            viewModel.saveChanges(nameText.ifBlank { account.name }, balance)
+                            viewModel.saveChanges(nameText.ifBlank { account.name }, balance, selectedIconName)
                             onNavigateBack()
                         },
                         modifier = Modifier.fillMaxWidth(),

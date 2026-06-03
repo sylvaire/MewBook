@@ -51,10 +51,13 @@ import com.mewbook.app.domain.policy.AccountDefaultsPolicy
 import com.mewbook.app.domain.policy.AccountNamingPolicy
 import com.mewbook.app.domain.repository.AccountRepository
 import com.mewbook.app.domain.repository.LedgerRepository
+import com.mewbook.app.ui.components.AccountIconPicker
 import com.mewbook.app.ui.components.AccountTypeIconBadge
 import com.mewbook.app.ui.components.MewCompactTopAppBar
 import com.mewbook.app.ui.components.defaultColorValue
 import com.mewbook.app.ui.components.defaultIconName
+import com.mewbook.app.ui.components.normalizeAccountIconName
+import com.mewbook.app.ui.components.supportsCustomIcon
 import com.mewbook.app.ui.components.toDisplayName
 import com.mewbook.app.ui.theme.ClayDesign
 import com.mewbook.app.ui.theme.clayCardShadow
@@ -86,7 +89,8 @@ class AddAccountViewModel @Inject constructor(
     fun saveAccount(
         name: String,
         type: AccountType,
-        balance: Double
+        balance: Double,
+        iconName: String
     ) {
         viewModelScope.launch {
             _uiState.update { it.copy(isSaving = true, isDuplicateName = false, error = null) }
@@ -123,7 +127,7 @@ class AddAccountViewModel @Inject constructor(
                     name = finalName,
                     type = type,
                     balance = balance,
-                    icon = getDefaultIconNameForType(type),
+                    icon = normalizeAccountIconName(iconName, type),
                     color = getDefaultColorForType(type),
                     isDefault = shouldSetAsDefault,
                     sortOrder = nextSortOrder,
@@ -156,10 +160,6 @@ class AddAccountViewModel @Inject constructor(
     private fun getDefaultColorForType(type: AccountType): Long {
         return type.defaultColorValue()
     }
-
-    private fun getDefaultIconNameForType(type: AccountType): String {
-        return type.defaultIconName()
-    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
@@ -173,6 +173,7 @@ fun AddAccountScreen(
     var selectedType by remember { mutableStateOf(preselectedType ?: AccountType.BANK) }
     var accountName by remember { mutableStateOf("") }
     var balance by remember { mutableStateOf("") }
+    var selectedIconName by remember { mutableStateOf(selectedType.defaultIconName()) }
 
     // 根据类型获取默认名称
     val defaultName = when (selectedType) {
@@ -241,7 +242,10 @@ fun AddAccountScreen(
                             AccountTypeChip(
                                 type = type,
                                 isSelected = selectedType == type,
-                                onClick = { selectedType = type }
+                                onClick = {
+                                    selectedType = type
+                                    selectedIconName = type.defaultIconName()
+                                }
                             )
                         }
                     }
@@ -249,6 +253,29 @@ fun AddAccountScreen(
             }
 
             Spacer(modifier = Modifier.height(16.dp))
+
+            if (selectedType.supportsCustomIcon()) {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clayCardShadow(),
+                    shape = RoundedCornerShape(ClayDesign.CardRadius),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surface
+                    )
+                ) {
+                    AccountIconPicker(
+                        selectedIconName = selectedIconName,
+                        accountType = selectedType,
+                        accentColor = Color(selectedType.defaultColorValue()),
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp),
+                        onIconSelected = { selectedIconName = it }
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+            }
 
             // Fields card
             Card(
@@ -303,7 +330,7 @@ fun AddAccountScreen(
                 onClick = {
                     val balanceValue = balance.toDoubleOrNull() ?: 0.0
                     viewModel.clearError()
-                    viewModel.saveAccount(accountName, selectedType, balanceValue)
+                    viewModel.saveAccount(accountName, selectedType, balanceValue, selectedIconName)
                 },
                 modifier = Modifier.fillMaxWidth(),
                 enabled = !uiState.isSaving,

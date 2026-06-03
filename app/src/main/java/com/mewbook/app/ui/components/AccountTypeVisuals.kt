@@ -5,10 +5,16 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccountBalance
 import androidx.compose.material.icons.filled.AccountBalanceWallet
+import androidx.compose.material.icons.filled.AttachMoney
 import androidx.compose.material.icons.filled.CreditCard
+import androidx.compose.material.icons.filled.CurrencyYuan
 import androidx.compose.material.icons.filled.MoreHoriz
+import androidx.compose.material.icons.filled.Payments
+import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Savings
+import androidx.compose.material.icons.filled.Wallet
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
@@ -23,6 +29,46 @@ import androidx.compose.ui.unit.dp
 import com.mewbook.app.R
 import com.mewbook.app.domain.model.AccountType
 
+data class AccountIconOption(
+    val name: String,
+    val label: String,
+    val group: String
+)
+
+fun accountIconOptions(): List<AccountIconOption> {
+    return listOf(
+        AccountIconOption("bank_card", "磁条卡", "银行卡"),
+        AccountIconOption("bank_card_chip", "芯片卡", "银行卡"),
+        AccountIconOption("bank_card_contactless", "闪付卡", "银行卡"),
+        AccountIconOption("bank_card_branch", "银行账户", "银行卡"),
+        AccountIconOption("alipay", "支付宝", "支付方式"),
+        AccountIconOption("wechat", "微信", "支付方式"),
+        AccountIconOption("payments", "收付款", "支付方式"),
+        AccountIconOption("qr_code_scanner", "扫码支付", "支付方式"),
+        AccountIconOption("wallet", "钱包", "支付方式"),
+        AccountIconOption("account_balance_wallet", "现金", "支付方式"),
+        AccountIconOption("credit_card", "信用卡", "账户"),
+        AccountIconOption("account_balance", "银行", "账户"),
+        AccountIconOption("savings", "储蓄", "账户"),
+        AccountIconOption("currency_yuan", "人民币", "账户"),
+        AccountIconOption("attach_money", "资金", "账户"),
+        AccountIconOption("more_horiz", "其他", "账户")
+    )
+}
+
+fun AccountType.supportsCustomIcon(): Boolean {
+    return this == AccountType.OTHER
+}
+
+fun normalizeAccountIconName(iconName: String, type: AccountType): String {
+    if (!type.supportsCustomIcon()) {
+        return type.defaultIconName()
+    }
+
+    val supportedIconNames = accountIconOptions().map { it.name }.toSet()
+    return iconName.takeIf { it in supportedIconNames } ?: type.defaultIconName()
+}
+
 @Composable
 fun AccountType.toIcon(): ImageVector {
     return when (this) {
@@ -36,8 +82,34 @@ fun AccountType.toIcon(): ImageVector {
     }
 }
 
+@Composable
+fun accountIconByName(iconName: String, fallbackType: AccountType): ImageVector {
+    return when (normalizeAccountIconName(iconName, fallbackType)) {
+        "account_balance_wallet" -> Icons.Filled.AccountBalanceWallet
+        "bank_card" -> ImageVector.vectorResource(id = R.drawable.ic_bank_card)
+        "bank_card_chip" -> ImageVector.vectorResource(id = R.drawable.ic_bank_card_chip)
+        "bank_card_contactless" -> ImageVector.vectorResource(id = R.drawable.ic_bank_card_contactless)
+        "bank_card_branch" -> ImageVector.vectorResource(id = R.drawable.ic_bank_card_branch)
+        "alipay" -> ImageVector.vectorResource(id = R.drawable.ic_alipay)
+        "wechat" -> ImageVector.vectorResource(id = R.drawable.ic_wechat)
+        "credit_card" -> Icons.Filled.CreditCard
+        "payments" -> Icons.Filled.Payments
+        "qr_code_scanner" -> Icons.Filled.QrCodeScanner
+        "wallet" -> Icons.Filled.Wallet
+        "account_balance" -> Icons.Filled.AccountBalance
+        "savings" -> Icons.Filled.Savings
+        "currency_yuan" -> Icons.Filled.CurrencyYuan
+        "attach_money" -> Icons.Filled.AttachMoney
+        else -> Icons.Filled.MoreHoriz
+    }
+}
+
 fun AccountType.usesBrandIconTint(): Boolean {
     return this == AccountType.ALIPAY || this == AccountType.WECHAT
+}
+
+fun usesBrandAccountIconTint(iconName: String): Boolean {
+    return iconName == "alipay" || iconName == "wechat"
 }
 
 fun AccountType.defaultColorValue(): Long {
@@ -73,7 +145,29 @@ fun AccountTypeIconBadge(
     iconSize: Dp = 22.dp,
     emphasized: Boolean = false
 ) {
-    val backgroundColor = if (type.usesBrandIconTint()) {
+    AccountIconBadge(
+        type = type,
+        iconName = type.defaultIconName(),
+        accentColor = accentColor,
+        modifier = modifier,
+        containerSize = containerSize,
+        iconSize = iconSize,
+        emphasized = emphasized
+    )
+}
+
+@Composable
+fun AccountIconBadge(
+    type: AccountType,
+    iconName: String,
+    accentColor: Color = Color(type.defaultColorValue()),
+    modifier: Modifier = Modifier,
+    containerSize: Dp = 40.dp,
+    iconSize: Dp = 22.dp,
+    emphasized: Boolean = false
+) {
+    val normalizedIconName = normalizeAccountIconName(iconName, type)
+    val backgroundColor = if (usesBrandAccountIconTint(normalizedIconName)) {
         MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (emphasized) 0.72f else 0.48f)
     } else {
         accentColor.copy(alpha = if (emphasized) 0.20f else 0.14f)
@@ -87,10 +181,10 @@ fun AccountTypeIconBadge(
         contentAlignment = Alignment.Center
     ) {
         Icon(
-            imageVector = type.toIcon(),
+            imageVector = accountIconByName(normalizedIconName, type),
             contentDescription = null,
             modifier = Modifier.size(iconSize),
-            tint = if (type.usesBrandIconTint()) Color.Unspecified else accentColor
+            tint = if (usesBrandAccountIconTint(normalizedIconName)) Color.Unspecified else accentColor
         )
     }
 }

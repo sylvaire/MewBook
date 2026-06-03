@@ -96,7 +96,7 @@ import com.mewbook.app.domain.model.Record
 import com.mewbook.app.domain.model.RecordType
 import com.mewbook.app.domain.policy.CategorySelectionPolicy
 import com.mewbook.app.domain.policy.HapticFeedbackPolicy
-import com.mewbook.app.ui.components.AccountTypeIconBadge
+import com.mewbook.app.ui.components.AccountIconBadge
 import com.mewbook.app.ui.components.CategoryIconBadge
 import com.mewbook.app.ui.components.CategoryChip
 import com.mewbook.app.ui.components.rememberMewHapticFeedback
@@ -731,8 +731,9 @@ private fun KeyboardPanel(
                                 )
                             },
                             leadingIcon = {
-                                AccountTypeIconBadge(
+                                AccountIconBadge(
                                     type = account.type,
+                                    iconName = account.icon,
                                     accentColor = Color(account.color),
                                     containerSize = 16.dp,
                                     iconSize = 10.dp,

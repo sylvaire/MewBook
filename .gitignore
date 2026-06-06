@@ -24,6 +24,7 @@ signing/
 .cursor/
 .omx/
 .codegraph/
+.superpowers/
 
 # Local emulator/test captures
 tmp*.png

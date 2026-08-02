@@ -6,8 +6,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.assertIsNotDisplayed
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -49,8 +50,8 @@ class SwipeableHomeRecordItemTest {
     fun closedRow_hidesActionsFromAccessibility() {
         setContent()
 
-        rule.onNodeWithText("编辑").assertIsNotDisplayed()
-        rule.onNodeWithText("删除").assertIsNotDisplayed()
+        rule.onAllNodesWithText("编辑").assertCountEquals(0)
+        rule.onAllNodesWithText("删除").assertCountEquals(0)
     }
 
     @Test

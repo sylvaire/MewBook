@@ -51,6 +51,7 @@ import com.mewbook.app.ui.components.RecordItem
 import com.mewbook.app.ui.components.rememberMewHapticFeedback
 import com.mewbook.app.ui.theme.ClayDesign
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.drop
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
@@ -112,6 +113,7 @@ internal fun SwipeableHomeRecordItem(
     LaunchedEffect(dragState) {
         snapshotFlow { dragState.currentValue }
             .distinctUntilChanged()
+            .drop(1)
             .collect { anchor ->
                 when (anchor) {
                     SwipeAnchor.Open -> onRequestOpen()

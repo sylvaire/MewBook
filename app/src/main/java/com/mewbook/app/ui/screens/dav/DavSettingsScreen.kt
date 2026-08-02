@@ -174,6 +174,11 @@ fun DavSettingsScreen(
                 fallbackTime = uiState.lastSyncTime
             )
 
+            LastDavOperationCard(
+                lastSyncTime = uiState.lastSyncTime,
+                operation = uiState.lastOperation
+            )
+
             ConflictStrategyCard(
                 selectedStrategy = uiState.conflictStrategy,
                 onStrategyChange = viewModel::updateConflictStrategy
@@ -311,6 +316,80 @@ private fun LastSyncDetailsCard(
                         text = "尚未同步",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun LastDavOperationCard(
+    lastSyncTime: java.time.LocalDateTime?,
+    operation: DavSyncOperationSummary?
+) {
+    val formatter = remember { DateTimeFormatter.ofPattern("yyyy年MM月dd日 HH:mm") }
+    SettingsSurfaceCard {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = "同步概览",
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = if (lastSyncTime != null) {
+                    "最近成功同步：${lastSyncTime.format(formatter)}"
+                } else {
+                    "最近成功同步：尚未同步"
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            if (operation == null) {
+                Text(
+                    text = "完成连接测试、导出、导入或备份列表加载后，这里会显示最近操作结果。",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            } else {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "最近操作：${operation.title} · ${operation.status}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = if (operation.isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
+                )
+                Text(
+                    text = "操作时间：${operation.time.format(formatter)}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                operation.fileName?.let { fileName ->
+                    Text(
+                        text = "文件：$fileName",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                operation.remoteBackupCount?.let { count ->
+                    Text(
+                        text = "远程备份：${count} 个可用文件",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                operation.conflictCount?.let { count ->
+                    Text(
+                        text = "可能冲突：${count} 项",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (count > 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                operation.detail?.takeIf { it.isNotBlank() }?.let { detail ->
+                    Text(
+                        text = detail,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (operation.isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }

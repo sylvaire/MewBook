@@ -102,7 +102,6 @@ import com.mewbook.app.domain.policy.HomePeriodSwipePolicy
 import com.mewbook.app.domain.policy.QuickEntryFabGesturePolicy
 import com.mewbook.app.ui.components.BudgetPeriodNavigator
 import com.mewbook.app.ui.components.MewSnackbarHost
-import com.mewbook.app.ui.components.RecordItem
 import com.mewbook.app.ui.components.MewCompactTopAppBar
 import com.mewbook.app.ui.components.rememberMewHapticFeedback
 import com.mewbook.app.ui.screens.add.AddEditRecordSheet
@@ -405,7 +404,12 @@ fun HomeScreen(
                                 },
                                 scrollToDate = scrollToDate,
                                 hapticFeedbackEnabled = uiState.keyPressHapticEnabled,
-                                onRecordClick = { record -> viewModel.showRecordDetail(record) }
+                                onRecordClick = { record -> viewModel.showRecordDetail(record) },
+                                onEditRecord = { record -> viewModel.editRecordFromDetail(record) },
+                                onDeleteRecord = { recordId ->
+                                    pendingDeleteRecordId = recordId
+                                    showDeleteConfirmDialog = true
+                                }
                             )
                         }
                     }
@@ -964,11 +968,24 @@ private fun HomeRecordList(
     headerContent: (@Composable () -> Unit)? = null,
     scrollToDate: LocalDate? = null,
     hapticFeedbackEnabled: Boolean,
-    onRecordClick: (com.mewbook.app.domain.model.Record) -> Unit
+    onRecordClick: (Record) -> Unit,
+    onEditRecord: (Record) -> Unit,
+    onDeleteRecord: (Long) -> Unit
 ) {
     val listState = rememberLazyListState()
+    var expandedRecordId by remember { mutableStateOf<Long?>(null) }
     val entries = remember(records, periodType) {
         HomeRecordListGroupingPolicy.buildEntries(records, periodType)
+    }
+    val visibleRecordIds = remember(records) {
+        records.mapTo(mutableSetOf()) { record -> record.id }
+    }
+
+    LaunchedEffect(visibleRecordIds) {
+        expandedRecordId = HomeRecordSwipeStatePolicy.retainVisible(
+            currentId = expandedRecordId,
+            visibleIds = visibleRecordIds
+        )
     }
 
     LaunchedEffect(scrollToDate, entries) {
@@ -1025,12 +1042,36 @@ private fun HomeRecordList(
                 is HomeRecordListEntry.RecordEntry -> {
                     val record = entry.record
                     val category = categories[record.categoryId]
-                    RecordItem(
+                    SwipeableHomeRecordItem(
                         record = record,
                         categoryName = category?.name ?: "未知",
                         categoryIcon = category?.icon ?: "more_horiz",
                         categoryColor = category?.color ?: 0xFF808080,
-                        onClick = { onRecordClick(record) },
+                        isOpen = expandedRecordId == record.id,
+                        onRequestOpen = {
+                            expandedRecordId = HomeRecordSwipeStatePolicy.open(
+                                currentId = expandedRecordId,
+                                requestedId = record.id
+                            )
+                        },
+                        onRequestClose = {
+                            expandedRecordId = HomeRecordSwipeStatePolicy.close(
+                                currentId = expandedRecordId,
+                                requestedId = record.id
+                            )
+                        },
+                        onClick = {
+                            expandedRecordId = null
+                            onRecordClick(record)
+                        },
+                        onEdit = { selectedRecord ->
+                            expandedRecordId = null
+                            onEditRecord(selectedRecord)
+                        },
+                        onDelete = { recordId ->
+                            expandedRecordId = null
+                            onDeleteRecord(recordId)
+                        },
                         modifier = Modifier.padding(horizontal = 16.dp),
                         hapticFeedbackEnabled = hapticFeedbackEnabled
                     )

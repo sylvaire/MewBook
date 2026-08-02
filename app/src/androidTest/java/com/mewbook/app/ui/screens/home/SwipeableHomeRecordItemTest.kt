@@ -6,6 +6,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -43,6 +44,14 @@ class SwipeableHomeRecordItemTest {
         updatedAt = LocalDateTime.of(2026, 8, 2, 12, 0),
         syncId = "record-1"
     )
+
+    @Test
+    fun closedRow_hidesActionsFromAccessibility() {
+        setContent()
+
+        rule.onNodeWithText("编辑").assertIsNotDisplayed()
+        rule.onNodeWithText("删除").assertIsNotDisplayed()
+    }
 
     @Test
     fun swipeLeft_revealsLabeledActions_withoutInvokingEitherAction() {

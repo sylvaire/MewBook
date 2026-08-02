@@ -39,6 +39,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
@@ -177,8 +178,16 @@ private fun SwipeActionBackground(
     onDelete: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val actionsEnabled = revealProgress >= 0.95f
+    val accessibilityModifier = if (actionsEnabled) {
+        Modifier
+    } else {
+        Modifier.clearAndSetSemantics { }
+    }
     Box(
-        modifier = modifier.clip(RoundedCornerShape(ClayDesign.CardRadius)),
+        modifier = modifier
+            .clip(RoundedCornerShape(ClayDesign.CardRadius))
+            .then(accessibilityModifier),
         contentAlignment = Alignment.CenterEnd
     ) {
         Row(
@@ -194,6 +203,7 @@ private fun SwipeActionBackground(
                 onClick = onEdit,
                 containerColor = MaterialTheme.colorScheme.secondaryContainer,
                 contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                enabled = actionsEnabled,
                 modifier = Modifier.weight(1f),
                 revealProgress = revealProgress
             ) {
@@ -205,6 +215,7 @@ private fun SwipeActionBackground(
                 onClick = onDelete,
                 containerColor = MaterialTheme.colorScheme.errorContainer,
                 contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                enabled = actionsEnabled,
                 modifier = Modifier.weight(1f),
                 revealProgress = revealProgress
             ) {
@@ -221,12 +232,14 @@ private fun SwipeActionButton(
     onClick: () -> Unit,
     containerColor: androidx.compose.ui.graphics.Color,
     contentColor: androidx.compose.ui.graphics.Color,
+    enabled: Boolean,
     revealProgress: Float,
     modifier: Modifier = Modifier,
     icon: @Composable () -> Unit
 ) {
     Surface(
         onClick = onClick,
+        enabled = enabled,
         modifier = modifier
             .fillMaxHeight()
             .graphicsLayer {
